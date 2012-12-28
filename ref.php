@@ -318,7 +318,7 @@ class ref{
           $modifiers .= $this->htmlEntity('abstract', 'A', 'This method is abstract');
 
         if($method->isFinal())
-          $modifiers .= $this->htmlEntity('final', 'F', 'This method cannot be overridden');
+          $modifiers .= $this->htmlEntity('final', 'F', 'This method is final and cannot be overridden');
 
         if($method->isProtected())
           $modifiers .= $this->htmlEntity('protected', 'P', 'This method is protected');

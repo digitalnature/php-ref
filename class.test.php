@@ -58,6 +58,12 @@ abstract class AbstractTest implements \Iterator{
 	 */  
   public function rewind(){}
 
+
+	/**
+	 * Example abstract function definition
+	 */ 
+  abstract public function getList();
+
 }
 
 
@@ -74,17 +80,20 @@ final class ClassTest extends AbstractTest implements Testable{
   
 	public
 
-
 		/**
 		 * A public variable that everyone can access		 
 		 */
 	  $pubA = 420,
 
-
 		/**
 		 * Another one, to test recursivity
 		 */
-	  $pubB = null;
+	  $pubB = null,
+
+		/**
+		 * DateTime object
+		 */
+	  $date = null;	  
 
 
 
@@ -107,6 +116,7 @@ final class ClassTest extends AbstractTest implements Testable{
 	public function __construct(array $list){
 		$this->list = $list;
 		$this->pubB = $this;
+		$this->date = \DateTime::createFromFormat('U', time(), new \DateTimeZone('Europe/London'));
 	}
 
 
@@ -131,7 +141,7 @@ final class ClassTest extends AbstractTest implements Testable{
 	 * @since   1.0
 	 * @param   array $list   List as indexed array
 	 */
-	protected function setList(array $list){
+	final protected function setList(array $list){
 		$this->list = $list;
 	}
 
@@ -144,7 +154,7 @@ final class ClassTest extends AbstractTest implements Testable{
 	 * @param   array $list  Indexed array containing list items
 	 * @return  static       A new instance of this class
 	 */
-  public static function factory(array $list){
+  final public static function factory(array $list){
   	return new static($list);
   }
 
