@@ -23,22 +23,20 @@
   display: none;  
 }
 
-/* tooltip */
+/* tooltip; note that js overrides top/left, this is why we use margin  */
 #rTip{
-  margin: 0;
+  position: absolute;
+  display: none;
+  white-space: pre;  
+  margin: 10px 0 0 15px;
   line-height: 20px;
   border: 0;
   padding: 7px 10px;
-  display: none;
   background: #343434;
   color: #ccc;         
   text-align: left;
-  position: absolute;
-  white-space: pre;
   z-index: 1000;
-  border-radius: 4px;         
-  -moz-box-shadow:0 0 4px rgba(0,0,0, 0.25);
-  -webkit-box-shadow:0 0 4px rgba(0,0,0, 0.25);
+  border-radius: 4px;  
   box-shadow:0 0 4px rgba(0,0,0, 0.25);
 }
 
@@ -158,13 +156,13 @@
 
 /* expand graphic */
 .rToggle.exp{
-  background-image: url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAA4AAAAKCAYAAACE2W/HAAAAGXRFWHRTb2Z0d2FyZQBBZG9iZSBJbWFnZVJlYWR5ccllPAAAANlJREFUeNpivMXgnMnAwFDOAAFMQMxIAP8A4iqW/wz/ZwIZzkAczEAcWAbESxn////PcIPRQQrI2QfE6gQ03QZia43/B16DnMYAZDz7x/CvDIi/AzEu+AuI80GaYH4CA63/hzb9Zfg7FYhxwYlANdsZkAIDDv4x/KkB4gNAzICGj4HkkNWC/YgMzjGa6ACpXUAsCRV6Bwo8o/9nLiCrY0L3PVDBFaBfGoD4HxD/B+JGdE0gwIIt6P4x/J0NpKyAmBeIJ2NTg+FUGDjJqMcPpNjM/196jU0eIMAAamd5ydD+c/UAAAAASUVORK5CYII=);
+  background-image: url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAA4AAAAKCAYAAACE2W/HAAAAjklEQVR42mM8xWCwmIGBIYaBNLCUCUjkAvFDEjSB1OaANH4A4kQg/keEpn9QtR+YoAL7gbiXCI19ULUMTEiCtUB8CY8mkFwNjIOs8ScQR0NpdPATGoA/sWkEgStAXIVFI0jsMrIAExZF/UC8D4m/HyrGQEjjfyBOAOL3UBwPFUMBLDgC4jEQZwMxI5SNAQAT3x/BDuoigAAAAABJRU5ErkJggg==);
   vertical-align: -2px;
 }
 
 /* collapse graphic */
 .rToggle.col{
-  background-image: url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAoAAAAOCAYAAAAWo42rAAAAGXRFWHRTb2Z0d2FyZQBBZG9iZSBJbWFnZVJlYWR5ccllPAAAAN5JREFUeNp80c8KAVEUBvBzNMkLWHgAexHKQsTGK8gD2LBjZWGl2FvI1lZkLzYWSuRPNGM/HsBClDm+ITUyc2/9OnXnm697Z8igXAlYREjFR0QtGJw5HyTF8iEfgCIsDM4VFEELxRZBGMY6Zzvg/wsiIu/Yhx9qMDtxJuLV6JSC6ZHTVWA7yHtKmZghj6MJjKCsWWhUXNZ+doWHKniBJvQjshQEn27BOVSisjp8NzT5bbxBFxoxWd+db6IRX+ezdKjHZTNxO4fdaM8hVBOyNb1uhaC0MXtJ2Vmqf/0SYACgdogg1XKkmQAAAABJRU5ErkJggg==);
+  background-image: url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAoAAAAOCAMAAAAhfX2ZAAAARVBMVEXKADDKADDKADDKADDKADDKADDKADDKADDKADDKADDKADDKADDKADDKADDKADDKADDKADDKADDKADDKADDKADDKADDKADB30XNKAAAAFnRSTlMApA8dQP2KB9FyAr33LODuWe9a+C3hP1wWFgAAAD5JREFUeF5jYGRigAExPhY4U4yVjR3GFBPj4IUzxXg4uWBMMTFuZjhTjF8AzhQUwlAgDNfGIYJhhSjcYoRzAMRuBc5yKN+nAAAAAElFTkSuQmCC);
 }
 
 /* trick to hide next element when this class is present */
