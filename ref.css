@@ -1,0 +1,178 @@
+
+.ref, #rTip{
+  font:normal normal 13px Consolas, Monaco, Andale Mono, Courier New, monospace;  
+  line-height:20px;
+}
+
+.ref{
+  background:#f9f9f9;        
+  border: 1px solid #eee;
+  padding: 2px 5px;
+  border-radius: 2px;
+  margin: 4px 0;
+}
+
+/* base */
+.ref span{
+  display: inline;
+  white-space: pre;
+}
+
+/* hidden content (used to generate the tooltip */
+.ref code{
+  display: none;  
+}
+
+/* tooltip */
+#rTip{
+  margin: 0;
+  line-height: 20px;
+  border: 0;
+  padding: 7px 10px;
+  display: none;
+  background: #343434;
+  color: #ccc;         
+  text-align: left;
+  position: absolute;
+  white-space: pre;
+  z-index: 1000;
+  border-radius: 4px;         
+  -moz-box-shadow:0 0 4px rgba(0,0,0, 0.25);
+  -webkit-box-shadow:0 0 4px rgba(0,0,0, 0.25);
+  box-shadow:0 0 4px rgba(0,0,0, 0.25);
+}
+
+/* lists */
+.ref dl{
+  margin-left: 18px;
+}
+
+.ref dt{
+  float: left;
+  margin-right: 10px;
+}      
+
+.ref dd{
+  overflow: hidden;
+}
+
+/* show help cursor when mouse is over a SPAN with a tooltip */
+.rHasTip{
+  cursor: help;
+}
+
+/* key-value dividers, property & method modifiers etc. */
+.rDiv{
+  color: #ccc;
+}
+
+/* tag-like appearance for boolean, null and resource types */
+.rTrue, .rFalse, .rNull, .rResource{
+  font: bold 11px Helvetica, Arial; 
+  background: #eee;
+  color:#fff;        
+  padding:1px 3px;
+  text-transform:lowercase;
+  border-radius: 2px;        
+  margin-right: 5px;
+}
+
+/* boolean true value */
+.rTrue{
+  background:#339900;
+}
+
+/* boolean false value */
+.rFalse{
+  background:#CC0033;
+  color:#fff;
+}   
+
+/* null value */
+.rNull{
+  background:#eee;
+  color:#999;
+  text-shadow: #fff 0 1px 1px;
+}
+
+/* resources */
+.rResource{
+  background: #343434;
+}   
+
+/* integer or double values */
+.rInteger, .rDouble{
+  color: #0099CC;
+}   
+
+/* string values */
+.rString{
+  color: #669933;
+  background: #f6f9f3; 
+}
+
+/* arrays & objects */
+.rArray, .rObject, .rInterface{
+  color:#CC0033;
+}
+
+/* methods */
+.rMethod{
+  font-weight: bold;
+  color: #0066CC;
+}
+
+/* optional method arguments */
+.rParamOpt{
+  font-style: italic;
+  color: #aaa;
+}
+
+/* array info text */
+.rArray b{
+  font: bold 11px Helvetica, Arial;  
+  text-transform: lowercase;
+  padding: 0 5px;
+  color: #333;
+}
+
+/* section title (for objects) */
+.ref h4{
+  font: bold 11px Helvetica, Arial;
+  color:#bcbcbc;
+  text-transform: lowercase;
+  border-bottom: 1px dotted #ccc;
+  display: block; 
+  margin: 6px 0 4px 10px;
+}     
+
+/* expand/collapse toggle link */
+.rToggle{
+  width: 14px;
+  height: 14px;        
+  display: inline-block;              
+  background: transparent none no-repeat center bottom;        
+  vertical-align: -3px;
+  cursor: pointer;
+}
+
+/* expand graphic */
+.rToggle.exp{
+  background-image: url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAA4AAAAKCAYAAACE2W/HAAAAGXRFWHRTb2Z0d2FyZQBBZG9iZSBJbWFnZVJlYWR5ccllPAAAANlJREFUeNpivMXgnMnAwFDOAAFMQMxIAP8A4iqW/wz/ZwIZzkAczEAcWAbESxn////PcIPRQQrI2QfE6gQ03QZia43/B16DnMYAZDz7x/CvDIi/AzEu+AuI80GaYH4CA63/hzb9Zfg7FYhxwYlANdsZkAIDDv4x/KkB4gNAzICGj4HkkNWC/YgMzjGa6ACpXUAsCRV6Bwo8o/9nLiCrY0L3PVDBFaBfGoD4HxD/B+JGdE0gwIIt6P4x/J0NpKyAmBeIJ2NTg+FUGDjJqMcPpNjM/196jU0eIMAAamd5ydD+c/UAAAAASUVORK5CYII=);
+  vertical-align: -2px;
+}
+
+/* collapse graphic */
+.rToggle.col{
+  background-image: url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAoAAAAOCAYAAAAWo42rAAAAGXRFWHRTb2Z0d2FyZQBBZG9iZSBJbWFnZVJlYWR5ccllPAAAAN5JREFUeNp80c8KAVEUBvBzNMkLWHgAexHKQsTGK8gD2LBjZWGl2FvI1lZkLzYWSuRPNGM/HsBClDm+ITUyc2/9OnXnm697Z8igXAlYREjFR0QtGJw5HyTF8iEfgCIsDM4VFEELxRZBGMY6Zzvg/wsiIu/Yhx9qMDtxJuLV6JSC6ZHTVWA7yHtKmZghj6MJjKCsWWhUXNZ+doWHKniBJvQjshQEn27BOVSisjp8NzT5bbxBFxoxWd+db6IRX+ezdKjHZTNxO4fdaM8hVBOyNb1uhaC0MXtJ2Vmqf/0SYACgdogg1XKkmQAAAABJRU5ErkJggg==);
+}
+
+/* trick to hide next element when this class is present */
+.rToggle.col + div{
+  display:none;
+}
+
+/* same, but displays the element */
+.rToggle.exp + div{
+  display:block;
+}
