@@ -82,17 +82,17 @@ final class ClassTest extends AbstractTest implements Testable{
 		/**
 		 * A public variable that everyone can access		 
 		 */
-	  $pubA = 420,
+	  $pubVarA     = 420,
 
 		/**
 		 * Another one, to test recursivity
 		 */
-	  $pubB = null,
+	  $pubVarB     = null,
 
 		/**
 		 * DateTime object
 		 */
-	  $date = null;	  
+	  $currentDate = null;	  
 
 
 
@@ -114,8 +114,8 @@ final class ClassTest extends AbstractTest implements Testable{
 	 */
 	public function __construct(array $list){
 		$this->list = $list;
-		$this->pubB = $this;
-		$this->date = \DateTime::createFromFormat('U', time(), new \DateTimeZone('Europe/London'));
+		$this->pubVarB = $this;
+		$this->currentDate = \DateTime::createFromFormat('U', time(), new \DateTimeZone('Europe/London'));
 	}
 
 

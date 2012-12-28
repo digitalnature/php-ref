@@ -33,12 +33,14 @@ class ref{
     COMMENT_TAG_REGEX = '@([^ ]+)(?:\s+(.*?))?(?=(\n[ \t]*@|\s*$))';
 
 
+
   protected static
 
     // tracks style/jscript inclusion state
     $didAssets = false,    
 
-    // for multiple r() calls on the same line
+    // used to determine the position of the current call,
+    // if more ::describe() calls were made on the same line
     $lineInst  = array();
 
 
@@ -205,7 +207,7 @@ class ref{
     // display the interfaces this objects' class implements
     if($interfaces){
 
-      $output .= '<h4>Implements:</h4>';
+      $output .= '<h4>Interfaces:</h4>';
 
       $intfNames = array();
 
