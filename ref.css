@@ -59,7 +59,6 @@
 
 /* base */
 .ref span{
-  display: inline-block;
   white-space: pre;
 }
 
@@ -205,11 +204,11 @@
   vertical-align: -3px;
   cursor: pointer;
   background-image: url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAA4AAAAKCAYAAACE2W/HAAAAjklEQVR42mM8xWCwmIGBIYaBNLCUCUjkAvFDEjSB1OaANH4A4kQg/keEpn9QtR+YoAL7gbiXCI19ULUMTEiCtUB8CY8mkFwNjIOs8ScQR0NpdPATGoA/sWkEgStAXIVFI0jsMrIAExZF/UC8D4m/HyrGQEjjfyBOAOL3UBwPFUMBLDgC4jEQZwMxI5SNAQAT3x/BDuoigAAAAABJRU5ErkJggg==);  
-          transition: all ease-in .2s;  
-       -o-transition: all ease-in .2s;          
-      -ms-transition: all ease-in .2s;          
-     -moz-transition: all ease-in .2s;   
-  -webkit-transition: all ease-in .2s;
+          transition: all ease-in .15s;  
+       -o-transition: all ease-in .15s;          
+      -ms-transition: all ease-in .15s;          
+     -moz-transition: all ease-in .15s;   
+  -webkit-transition: all ease-in .15s;
 }
 
 /* expand graphic */
@@ -232,10 +231,10 @@
 
 /* trick to hide next element when this class is present */
 .rToggle.col + div{
-  display:none;
+  display: none;
 }
 
 /* same, but displays the element */
 .rToggle.exp + div{
-  display:block;
+  display: block;
 }

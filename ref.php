@@ -150,7 +150,7 @@ class ref{
     }
     
     foreach($classes as &$class){
-
+     
       $modifiers = '';
 
       if($class->isAbstract())
@@ -164,11 +164,16 @@ class ref{
         $modifiers .= $this->htmlEntity('cloneable', 'C', 'Instances of this class can be cloned');
 
       if($class->isIterateable())
-        $modifiers .= $this->htmlEntity('iterateable', 'X', 'Instances of this class are iterateable');      
+        $modifiers .= $this->htmlEntity('iterateable', 'X', 'Instances of this class are iterateable');            
 
-      
-     
-      $class = $modifiers . $this->htmlEntity('class', $class->getName(), $class);
+      $className = $class->getName();
+
+      if($class->isInternal())
+        $className = sprintf('<a href="http://php.net/manual/en/book.%s.php" target="_blank">%s</a>', strtolower($className), $className);
+
+      $className = $this->htmlEntity('class', $className, $class);      
+
+      $class = $modifiers . $className;
     }  
 
     $objectName = implode(' :: ', array_reverse($classes));
@@ -314,7 +319,7 @@ class ref{
 
         // is this method inherited?
         $inherited = $reflector->getShortName() !== $method->getDeclaringClass()->getShortName();
-        $htmlClass = $inherited ? 'methodInherited' : 'method';
+        $htmlClass = $inherited ? 'methodInherited' : 'method';     
 
         $modTip = $inherited ? sprintf('Inherited from ::%s', $method->getDeclaringClass()->getShortName()) : null;
 
@@ -329,7 +334,17 @@ class ref{
 
         $output .= sprintf('<dt>%s</dt>', $this->htmlEntity('div', $method->isStatic() ? '::' : '-&gt;', $modTip));
         $output .= sprintf('<dt>%s</dt>', $modifiers);
-        $output .= sprintf('<dd>%s(%s)</dd>', $this->htmlEntity($htmlClass, $method->name, $method), implode(', ', $paramStrings));
+
+        $name = $method->name;
+
+        if($method->isInternal()){
+          $phpName = str_replace('_', '-', ltrim(strtolower($name), '_'));
+          $name = sprintf('<a href="http://php.net/manual/en/%s.%s" target="_blank">%s</a>', strtolower($method->getDeclaringClass()->getName()), $phpName, $name);
+        }  
+
+        $name = $this->htmlEntity($htmlClass, $name, $method);  
+
+        $output .= sprintf('<dd>%s(%s)</dd>', $name, implode(', ', $paramStrings));
         $output .= '</dl>';        
       }  
 
@@ -447,7 +462,6 @@ class ref{
                   $inSQuotes = !$inSQuotes;
 
                 $expressions[$index] .= $code[$i];              
-
                 break;
 
               case '"':
@@ -455,7 +469,6 @@ class ref{
                   $inDQuotes = !$inDQuotes;
 
                 $expressions[$index] .= $code[$i];                            
-
                 break;              
 
               case '{':
@@ -463,7 +476,6 @@ class ref{
                   $cBracketLvl++;
 
                 $expressions[$index] .= $code[$i];
-
                 break;            
 
               case '}':
@@ -479,7 +491,6 @@ class ref{
                   $sBracketLvl++;
 
                 $expressions[$index] .= $code[$i];
-
                 break;
                   
               case ')':
@@ -517,6 +528,10 @@ class ref{
         break;
       }  
     }
+
+    // free these variables now
+    $trace = $callee = null;
+    unset($trace, $callee);
 
     $expressions = array_map('trim', $expressions);
 
