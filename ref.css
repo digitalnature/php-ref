@@ -1,10 +1,11 @@
 
-.ref, #rTip{
-  font:normal normal 13px Consolas, Monaco, Andale Mono, Courier New, monospace;  
-  line-height:20px;
+.ref *, #rTip *{
+  margin: 0;
+  padding: 0;
 }
 
 .ref{
+  font:normal normal 13px/18px Consolas, Monaco, Andale Mono, Courier New, monospace;  
   background:#f9f9f9;        
   border: 1px solid #eee;
   padding: 2px 5px;
@@ -12,19 +13,9 @@
   margin: 4px 0;
 }
 
-/* base */
-.ref span{
-  display: inline;
-  white-space: pre;
-}
-
-/* hidden content (used to generate the tooltip */
-.ref code{
-  display: none;  
-}
-
-/* tooltip; note that js overrides top/left, this is why we use margin  */
+/* tooltip; note that the js overrides top/left properties, this is why we use margin  */
 #rTip{
+  font:normal normal 13px/18px Consolas, Monaco, Andale Mono, Courier New, monospace;    
   position: absolute;
   display: none;
   white-space: pre;  
@@ -40,18 +31,25 @@
   box-shadow:0 0 4px rgba(0,0,0, 0.25);
 }
 
-/* lists */
+/* emulate a table for displaying array & object members */
 .ref dl{
-  margin-left: 18px;
+  display:table-row;
 }
 
-.ref dt{
-  float: left;
-  margin-right: 10px;
-}      
+.ref dt, .ref dd{
+  display:table-cell;
+  padding-left: 10px;  
+}    
 
-.ref dd{
-  overflow: hidden;
+/* base */
+.ref span{
+  display: inline;
+  white-space: pre;
+}
+
+/* hidden content (used to generate the tooltip */
+.ref code{
+  display: none;  
 }
 
 /* show help cursor when mouse is over a SPAN with a tooltip */
@@ -141,7 +139,7 @@
   text-transform: lowercase;
   border-bottom: 1px dotted #ccc;
   display: block; 
-  margin: 6px 0 4px 10px;
+  margin: 7px 0 5px 10px;
 }     
 
 /* expand/collapse toggle link */

@@ -26,11 +26,11 @@ header('Content-type: text/html');
 
     <h3>Simple tests</h3>
 
-    <?php ref(true, false, null, fopen('php://stdin', 'r'), 24, 4.20, "Hey look a string", array(), $array); ?>
+    <?php r(true, false, null, fopen('php://stdin', 'r'), 24, 4.20, "Hey look a string", array(), $array); ?>
 
     <h3>Complex structure</h3>    
   
-    <?php ref($obj); ?>    
+    <?php r($obj); ?>    
 
   </body>
 <html>

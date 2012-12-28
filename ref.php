@@ -7,8 +7,8 @@
  *
  * @version  1.0
  */
-function ref(){
-  print call_user_func_array('ref::describe', func_get_args());
+function r(){
+  print ref::describe(func_get_args());
 }
 
 
@@ -27,11 +27,16 @@ class ref{
 
     // shortcut function used to access the ::describe method below;
     // if its namespaced, the namespace must be present as well
-    WRAPPER_FUNC      = 'ref',
+    SHORTCUT_FUNC      = 'r',
 
     // regex used to parse tags in docblocks
     COMMENT_TAG_REGEX = '@([^ ]+)(?:\s+(.*?))?(?=(\n[ \t]*@|\s*$))';
 
+
+  protected static
+
+    // tracks style/jscript inclusion state
+    $didAssets = false;   
 
 
   protected
@@ -43,7 +48,295 @@ class ref{
     $objectHashes = array(),
 
     // expand/collapse state
-    $expanded    = true;
+    $expanded     = true;
+
+
+
+  /**
+   * Generates info report from the given variable
+   *
+   * @since   1.0   
+   * @param   mixed $subject    Variable to query   
+   * @return  string
+   */
+  protected function toHtml(&$subject){
+
+     // expand first level
+    $expState = $this->expanded ? 'exp' : 'col';
+
+    $this->expanded = false;       
+
+    $output = '';
+
+    // identify variable type
+    switch(true){
+
+      // null value
+      case is_null($subject):        
+        return $this->htmlEntity('null');
+
+      // boolean
+      case is_bool($subject):
+        $text = $subject ? 'true' : 'false';
+        return $this->htmlEntity($text, $text, gettype($subject));        
+
+      // resource
+      case is_resource($subject):
+        return $this->htmlEntity('resource', sprintf('%s: %s', $subject, get_resource_type($subject)), gettype($subject));        
+
+      // integer or double
+      case is_int($subject) || is_float($subject):
+        return $this->htmlEntity(gettype($subject), $subject, gettype($subject));
+
+      // string
+      case is_string($subject):
+        return $this->htmlEntity('string', htmlspecialchars($subject, ENT_QUOTES), sprintf('%s (%d)', gettype($subject), strlen($subject)));        
+
+      // arrays
+      case is_array($subject):
+
+        // empty array?
+        if(empty($subject))      
+          return $this->htmlEntity('array', 'Array()');
+
+        // set a marker to detect recursion
+        if(!$this->arrayMarker)
+          $this->arrayMarker = uniqid('', true);
+
+        // if our marker element is present in the array it means that we were here before
+        if(isset($subject[$this->arrayMarker]))
+          return $this->htmlEntity('array', 'Array(<b>Recursion</b>)');
+
+        $subject[$this->arrayMarker] = true;             
+
+        // note that we must substract the marker element
+        $output .= $this->htmlEntity('array', sprintf('Array(<b>%d</b>', count($subject) - 1));
+        $output .= sprintf('<a class="rToggle %s"></a><div>', $expState);
+
+        foreach($subject as $key => &$value){
+
+          // ignore our marker
+          if($key === $this->arrayMarker)
+            continue;
+
+          $keyInfo = is_string($key) ? sprintf('Key: %s (%d)', gettype($key), strlen($key)) : gettype($key);
+
+          $output .= '<dl>';
+          $output .= '<dt>' . $this->htmlEntity('key', htmlspecialchars($key, ENT_QUOTES), $keyInfo) . '</dt>';
+          $output .= '<dt>' . $this->htmlEntity('div', '=&gt') . '<dt>';
+          $output .= '<dd>' . $this->toHtml($value) . '</dd>';
+          $output .= '</dl>';
+        }
+
+        // remove our temporary marker;
+        // not really required, because the wrapper function doesn't take references, but we want to be nice :P
+        unset($subject[$this->arrayMarker]);      
+
+        return $output . '</div>' . $this->htmlEntity('array', ')');    
+    }
+
+    // if we reached this point, $subject must be an object
+    $classes = $sections = array();
+    $haveParent = new \ReflectionObject($subject);
+
+    // get parent/ancestor classes
+    while($haveParent !== false){
+      $classes[] = $haveParent;
+      $haveParent = $haveParent->getParentClass();
+    }
+    
+    foreach($classes as &$class)
+      $class = $this->htmlEntity('class', $class->getName(), $class);
+
+    $objectName = implode('::', array_reverse($classes));
+    $objectHash = spl_object_hash($subject);
+
+    // already been here?
+    if(in_array($objectHash, $this->objectHashes))
+      return $this->htmlEntity('object', $objectName . ' Object(<b>Recursion</b>)');
+
+    // track hash
+    $this->objectHashes[] = $objectHash;
+
+    // again, because reflectionObjects can't be cloned apparently :)
+    $reflector = new \ReflectionObject($subject);
+
+    $props      = $reflector->getProperties(\ReflectionMethod::IS_PUBLIC);    
+    $methods    = $reflector->getMethods(\ReflectionMethod::IS_PUBLIC);
+    $constants  = $reflector->getConstants();
+    $interfaces = $reflector->getInterfaces();
+
+    // no data to display?
+    if(!$props && !$methods && !$constants && !$interfaces)
+      return $this->htmlEntity('object', $objectName . ' Object()');
+
+    $output .= $this->htmlEntity('object', $objectName . ' Object(');
+    $output .= sprintf('<a class="rToggle %s"></a><div>', $expState);
+
+    // display the interfaces this objects' class implements
+    if($interfaces){
+
+      $output .= '<h4>Implements:</h4>';
+
+      $intfNames = array();
+
+      foreach($interfaces as $name => $interface)
+        $intfNames[] = $this->htmlEntity('interface', $interface->getName(), $interface);
+
+      $output .= implode(', ', $intfNames);
+    }
+
+    // class constants
+    if($constants){
+
+      $output .= '<h4>Constants:</h4>';
+
+      foreach($constants as $name => $value){
+        $output .= '<dl>';
+        $output .= sprintf('<dt>%s</dt>', $this->htmlEntity('div', '::'));
+        $output .= sprintf('<dt>%s</dt>', $this->htmlEntity('constant', htmlspecialchars($name, ENT_QUOTES)));
+        $output .= sprintf('<dt>%s</dt>', $this->htmlEntity('div', '='));
+        $output .= sprintf('<dd>%s</dd>', $this->toHtml($value));        
+        $output .= '</dl>';
+      }  
+      
+    }
+
+    // object/class properties
+    if($props){
+      $output .= '<h4>Properties:</h4>';
+
+      foreach($props as $prop){
+        $nameTip = '';
+        $value = $prop->getValue($subject);        
+
+        $output .= '<dl>';
+        $output .= sprintf('<dt>%s</dt>', $this->htmlEntity('div', $prop->isStatic() ? '::' : '-&gt;'));
+        $output .= sprintf('<dt>%s</dt>', $this->htmlEntity('property', htmlspecialchars($prop->name, ENT_QUOTES), $nameTip));
+        $output .= sprintf('<dt>%s</dt>', $this->htmlEntity('div', '='));
+        $output .= sprintf('<dd>%s</dd>', $this->toHtml($value));
+        $output .= '</dl>';        
+      }
+
+    }
+
+    // class methods
+    if($methods){
+
+      $output .= '<h4>Methods:</h4>';
+
+      foreach($methods as $method){
+
+        // for now, ignore PHP-reserved method names like __construct, __toString etc... (@todo)
+        if(strpos($method->name, '__') === 0)
+          continue;
+
+        $output .= '<dl>';        
+
+        $paramStrings = array();
+        $tags = static::parseComment($method->getDocComment(), 'tags');
+        $tags = isset($tags['param']) ? $tags['param'] : array();
+
+        // process arguments
+        foreach($method->getParameters() as $parameter){
+
+          $paramName = sprintf('$%s', $parameter->getName());
+
+          if($parameter->isPassedByReference())
+            $paramName = sprintf('&%s', $paramName);
+
+          $tip = null;
+          
+          foreach($tags as $tag){
+            list($types, $varName, $varDesc) = $tag;
+            if($varName === $parameter->getName()){
+              $tip = $varDesc;
+              break;
+            }  
+          }  
+        
+          if($parameter->isOptional()){
+            $paramName  = $this->htmlEntity('paramOpt', $paramName, $tip);
+            $paramValue = $parameter->isDefaultValueAvailable() ? $parameter->getDefaultValue() : null;
+            $paramName  = $this->htmlEntity('paramValue', $paramName) . $this->htmlEntity('div', ' = ') . $this->toHtml($paramValue);
+
+          }else{
+            $paramName = $this->htmlEntity('param', $paramName, $tip);
+          }
+
+          $paramStrings[] = $paramName;
+        }
+
+        // is this method inherited?
+        $inherited = $reflector->getShortName() !== $method->getDeclaringClass()->getShortName();
+
+        $modTip = $inherited ? sprintf('Inherited from ::%s', $method->getDeclaringClass()->getShortName()) : null;
+
+        $output .= sprintf('<dt>%s</dt>', $this->htmlEntity('div', $method->isStatic() ? '::' : '-&gt;'), $modTip);
+        $output .= sprintf('<dd>%s(%s)</dd>', $this->htmlEntity('method', $method->name, $method), implode(', ', $paramStrings));
+        $output .= '</dl>';        
+      }  
+
+    }
+
+    return $output . '</div>' . $this->htmlEntity('object', ')');  
+  }
+
+  /**
+   * Text version of the method above -- todo
+   *
+   * @since   1.0   
+   * @param   mixed $subject    Variable to query   
+   * @return  string
+   */
+  protected function toText(&$subject){
+
+  }  
+
+
+
+  /**
+   * Helper method, used to generate a SPAN tag with the given info
+   *
+   * @since   1.0
+   * @param   string $class           Entity class ('r' will be prepended to it)
+   * @param   string $text            Entity text content
+   * @param   string|Reflector $tip   Tooltip content, or Reflector object from which to generate this content
+   * @return  string                  SPAN tag with the provided information
+   */
+  protected function htmlEntity($class, $text = null, $tip = null){
+
+    if($text === null)
+      $text = $class;
+
+    if($tip instanceof \Reflector){
+
+      // function/class/method is part of the core
+      if($tip->isInternal()){
+        $tip = sprintf('Internal - part of %s (%s)', $tip->getExtensionName(), $tip->getExtension()->getVersion());
+
+      // user-defined; attempt to get doc comments
+      }else{
+       
+        $tip = preg_split('/$\R?^/m', $tip->getDocComment());
+
+        foreach($tip as &$line)
+          $line = ltrim($line, '/* ');
+
+        $tip = trim(implode("\n", $tip));
+      }
+
+    }
+
+    $tip = empty($tip) ? '' : sprintf('<code>%s</code>', $tip);
+    
+    $class = ucfirst($class);
+
+    if($tip !== '')
+      $class .= ' rHasTip';
+
+    return sprintf('<span class="r%s">%s%s</span>', $class, $text, $tip);
+  }
 
 
 
@@ -51,17 +344,11 @@ class ref{
    * Returns human-readable info about the given variable(s)
    *   
    * @since   1.0
-   * @param   mixed $args    Variable(s) to query, multiple arguments can be passed
+   * @param   array $args    Variable(s) to query
    * @return  string         Information about each variable (currently only HTML output)
    */
-  public static function describe($args){
+  public static function describe(array $args){
 
-    static
-
-      // status of the script/style inclusion
-      $didAssets  = false;
-
-    $args = func_get_args();
     $output = array();
   
     // iterate trough the arguments and print info for each one
@@ -71,10 +358,10 @@ class ref{
 
       $instance = new static();
 
-      //continue;
-      $result = $instance->toHtml($subject);
+      $html = $instance->toHtml($subject);
 
-      if(!$didAssets){
+      // first call? include styles & js
+      if(!static::$didAssets){
 
         ob_start();
         ?>
@@ -92,11 +379,11 @@ class ref{
         </script>       
         
         <?php    
-        $output[] = preg_replace('/\s+/', ' ', trim(ob_get_clean()));
-        $didAssets = true;
+        $html = preg_replace('/\s+/', ' ', trim(ob_get_clean())) . $html;
+        static::$didAssets = true;
       }
 
-      $output[] = sprintf('<!-- dump --><div class="ref">%s</div><!-- /dump (took %ss) -->', $result, round(microtime(true) - $startTime, 4));
+      $output[] = sprintf('<!-- dump #%d --><div class="ref">%s</div><!-- /dump (took %ss) -->', $index, $html, round(microtime(true) - $startTime, 4));
     }
 
     return implode("\n\n", $output);
@@ -236,298 +523,5 @@ class ref{
   protected static function normalizeString($str){
     return preg_replace('/\s*\n\s*/', ' ', trim($str));
   }
-
-
-
-  /**
-   * Helper method, used to generate a SPAN tag with the given info
-   *
-   * @since   1.0
-   * @param   string $class           Entity class ('r' will be prepended to it)
-   * @param   string $text            Entity text content
-   * @param   string|Reflector $tip   Tooltip content, or Reflector object from which to generate this content
-   * @return  string                  SPAN tag with the provided information
-   */
-  protected function htmlEntity($class, $text = null, $tip = null){
-
-    if($text === null)
-      $text = $class;
-
-    if($tip instanceof \Reflector){
-
-      // function/class/method is part of the core
-      if($tip->isInternal()){
-        $tip = sprintf('Internal - part of %s (%s)', $tip->getExtensionName(), $tip->getExtension()->getVersion());
-
-      // user-defined; attempt to get doc comments
-      }else{
-       
-        $tip = preg_split('/$\R?^/m', $tip->getDocComment());
-
-        foreach($tip as &$line)
-          $line = ltrim($line, '/* ');
-
-        $tip = trim(implode("\n", $tip));
-      }
-
-    }
-
-    $tip = ($tip !== null) ? sprintf('<code>%s</code>', $tip) : '';
-    
-    $class = ucfirst($class);
-
-    if($tip !== '')
-      $class .= ' rHasTip';
-
-    return sprintf('<span class="r%s">%s%s</span>', $class, $text, $tip);
-  }
-
-
-
-  /**
-   * Generates info report from the given variable
-   *
-   * @since   1.0   
-   * @param   mixed $subject    Variable to query   
-   * @return  string
-   */
-  protected function toHtml(&$subject){
-
-     // expand first level
-    $expState = $this->expanded ? 'exp' : 'col';
-
-    $this->expanded = false;       
-
-    $output = '';
-
-    // identify variable type
-    switch(true){
-
-      // null value
-      case is_null($subject):        
-        return $this->htmlEntity('null');
-
-      // boolean
-      case is_bool($subject):
-        $text = $subject ? 'true' : 'false';
-        return $this->htmlEntity($text, $text, gettype($subject));        
-
-      // resource
-      case is_resource($subject):
-        return $this->htmlEntity('resource', sprintf('%s: %s', $subject, get_resource_type($subject)), gettype($subject));        
-
-      // integer or double
-      case is_int($subject) || is_float($subject):
-        return $this->htmlEntity(gettype($subject), $subject, gettype($subject));
-
-      // string
-      case is_string($subject):
-        return $this->htmlEntity('string', htmlspecialchars($subject, ENT_QUOTES), sprintf('%s (%d)', gettype($subject), strlen($subject)));        
-
-      // arrays
-      case is_array($subject):
-
-        // empty array?
-        if(empty($subject))      
-          return $this->htmlEntity('array', 'Array()');
-
-        // set a marker to detect recursion
-        if(!$this->arrayMarker)
-          $this->arrayMarker = uniqid('', true);
-
-        // if our marker element is present in the array it means that we were here before
-        if(isset($subject[$this->arrayMarker]))
-          return $this->htmlEntity('array', 'Array(<b>Recursion</b>)');
-
-        // determine longest key
-        $longest = max(array_map('strlen', array_keys($subject)));  
-        $subject[$this->arrayMarker] = true;             
-
-        // note that we must substract the marker element
-        $output .= $this->htmlEntity('array', sprintf('Array(<b>%d</b>', count($subject) - 1));
-        $output .= sprintf('<a class="rToggle %s"></a><div><dl>', $expState);
-
-        foreach($subject as $key => &$value){
-
-          // ignore our marker
-          if($key === $this->arrayMarker)
-            continue;
-
-          $keyInfo = is_string($key) ? sprintf('KEY: %s (%d)', gettype($key), strlen($key)) : gettype($key);
-
-          $output .= '<dt>' . $this->htmlEntity('key', str_pad(htmlspecialchars($key, ENT_QUOTES), $longest), $keyInfo) . '</dt>';
-          $output .= '<dt>' . $this->htmlEntity('div', '=&gt') . '<dt>';
-          $output .= '<dd>' . $this->toHtml($value) . '</dd>';
-        }
-
-        // remove our temporary marker;
-        // not really required, because the wrapper function doesn't take references, but we want to be nice :P
-        unset($subject[$this->arrayMarker]);      
-
-        return $output . '</dl></div>' . $this->htmlEntity('array', ')');    
-    }
-
-    // if we reached this point, $subject must be an object
-    $classes = $sections = array();
-    $haveParent = new \ReflectionObject($subject);
-
-    // get parent/ancestor classes
-    while($haveParent !== false){
-      $classes[] = $haveParent;
-      $haveParent = $haveParent->getParentClass();
-    }
-    
-    foreach($classes as &$class)
-      $class = $this->htmlEntity('class', $class->getName(), $class);
-
-    $objectName = implode('::', array_reverse($classes));
-    $objectHash = spl_object_hash($subject);
-
-    // already been here?
-    if(in_array($objectHash, $this->objectHashes))
-      return $this->htmlEntity('object', $objectName . ' Object(<b>Recursion</b>)');
-
-    // track hash
-    $this->objectHashes[] = $objectHash;
-
-    // again, because reflectionObjects can't be cloned apparently :)
-    $reflector = new \ReflectionObject($subject);
-
-    $props      = $reflector->getProperties(\ReflectionMethod::IS_PUBLIC);    
-    $methods    = $reflector->getMethods(\ReflectionMethod::IS_PUBLIC);
-    $constants  = $reflector->getConstants();
-    $interfaces = $reflector->getInterfaces();
-
-    // no data to display?
-    if(!$props && !$methods && !$constants && !$interfaces)
-      return $this->htmlEntity('object', $objectName . ' Object()');
-
-    $output .= $this->htmlEntity('object', $objectName . ' Object(');
-    $output .= sprintf('<a class="rToggle %s"></a><div>', $expState);
-
-    // display the interfaces this objects' class implements
-    if($interfaces){
-
-      $output .= '<h4>Implements:</h4>';
-
-      $intfNames = array();
-
-      foreach($interfaces as $name => $interface)
-        $intfNames[] = $this->htmlEntity('interface', $interface->getName(), $interface);
-
-      $output .= implode(', ', $intfNames);
-    }
-
-    // class constants
-    if($constants){
-
-      $output .= '<h4>Constants:</h4><dl>';
-
-      $longest = max(array_map('strlen', array_keys($constants)));  
-
-      foreach($constants as $name => $value){
-        $output .= sprintf('<dt>%s</dt>', $this->htmlEntity('div', '::'));
-        $output .= sprintf('<dt>%s</dt>', $this->htmlEntity('constant', str_pad(htmlspecialchars($name, ENT_QUOTES), $longest)));
-        $output .= sprintf('<dt>%s</dt>', $this->htmlEntity('div', '='));
-        $output .= sprintf('<dd>%s</dd>', $this->toHtml($value));        
-      }  
-      
-      $output .= '</dl>';
-    }
-
-    // object/class properties
-    if($props){
-      $output .= '<h4>Properties:</h4><dl>';
-
-      $propNames = array();
-
-      foreach($props as $prop)
-        $propNames[] = $prop->name;
-
-      $longest = max(array_map('strlen', $propNames));
-
-      foreach($props as $prop){
-        $nameTip = '';
-        $value = $prop->getValue($subject);        
-
-        $output .= sprintf('<dt>%s</dt>', $this->htmlEntity('div', $prop->isStatic() ? '::' : '-&gt;'));
-        $output .= sprintf('<dt>%s</dt>', $this->htmlEntity('property', str_pad($prop->name, $longest), $nameTip));
-        $output .= sprintf('<dt>%s</dt>', $this->htmlEntity('div', '='));
-        $output .= sprintf('<dd>%s</dd>', $this->toHtml($value));
-      }
-
-      $output .= '</dl>';
-    }
-
-    // class methods
-    if($methods){
-
-      $output .= '<h4>Methods:</h4><dl>';
-
-      foreach($methods as $method){
-
-        // for now, ignore PHP-reserved method names like __construct, __toString etc... (@todo)
-        if(strpos($method->name, '__') === 0)
-          continue;
-
-        $paramStrings = array();
-        $tags = static::parseComment($method->getDocComment(), 'tags');
-        $tags = isset($tags['param']) ? $tags['param'] : array();
-
-        // process arguments
-        foreach($method->getParameters() as $parameter){
-
-          $paramName = sprintf('$%s', $parameter->getName());
-
-          if($parameter->isPassedByReference())
-            $paramName = sprintf('&%s', $paramName);
-
-          $tip = null;
-          
-          foreach($tags as $tag){
-            list($types, $varName, $varDesc) = $tag;
-            if($varName === $parameter->getName()){
-              $tip = $varDesc;
-              break;
-            }  
-          }  
-        
-          if($parameter->isOptional()){
-            $paramName  = $this->htmlEntity('paramOpt', $paramName, $tip);
-            $paramValue = $parameter->isDefaultValueAvailable() ? $parameter->getDefaultValue() : null;
-            $paramName  = $this->htmlEntity('paramValue', $paramName) . $this->htmlEntity('div', ' = ') . $this->toHtml($paramValue);
-
-          }else{
-            $paramName = $this->htmlEntity('param', $paramName, $tip);
-          }
-
-          $paramStrings[] = $paramName;
-        }
-
-        // is this method inherited?
-        $inherited = $reflector->getShortName() !== $method->getDeclaringClass()->getShortName();
-
-        $modTip = $inherited ? sprintf('Inherited from ::%s', $method->getDeclaringClass()->getShortName()) : null;
-
-        $output .= sprintf('<dt>%s</dt>', $this->htmlEntity('div', $method->isStatic() ? '::' : '-&gt;'), $modTip);
-        $output .= sprintf('<dd>%s(%s)</dd>', $this->htmlEntity('method', $method->name, $method), implode(', ', $paramStrings));
-      }  
-      
-      $output .= '</dl>';
-    }
-
-    return $output . '</div>' . $this->htmlEntity('object', ')');  
-  }
-
-  /**
-   * Text version of the method above -- todo
-   *
-   * @since   1.0   
-   * @param   mixed $subject    Variable to query   
-   * @return  string
-   */
-  protected function toText(&$subject){
-
-  }  
 
 }
