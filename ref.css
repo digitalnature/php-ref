@@ -11,6 +11,8 @@
   padding: 2px 5px;
   border-radius: 2px;
   margin: 4px 0;
+  overflow: auto;
+  text-shadow: #fff 0 1px 0;
 }
 
 /* tooltip; note that the js overrides top/left properties, this is why we use margin  */
@@ -38,12 +40,13 @@
 
 .ref dt, .ref dd{
   display:table-cell;
-  padding-left: 10px;  
-}    
+  vertical-align: top;
+  padding-left: 10px; 
+}
 
 /* base */
 .ref span{
-  display: inline;
+  display: inline-block;
   white-space: pre;
 }
 
@@ -68,7 +71,8 @@
   background: #eee;
   color:#fff;        
   padding:1px 3px;
-  text-transform:lowercase;
+  text-transform: lowercase;
+  text-shadow: none;
   border-radius: 2px;        
   margin-right: 5px;
 }
@@ -108,14 +112,19 @@
 }
 
 /* arrays & objects */
-.rArray, .rObject, .rInterface{
+.rArray, .rObject, .rInterface, .rTrait{
   color:#CC0033;
 }
 
 /* methods */
-.rMethod{
+.rMethod, .rMethodInherited{
   font-weight: bold;
-  color: #0066CC;
+  color: #0057ae;
+}
+
+/* inherited methods */
+.rMethodInherited{
+  color: #80b3e6;
 }
 
 /* optional method arguments */
@@ -132,15 +141,47 @@
   color: #333;
 }
 
+/* tiny bubbles that indicate visibility info */
+.rFinal, .rAbstract, .rProtected, .rIterateable, .rCloneable{
+  font: normal 11px Helvetica, Arial;    
+  background: #78bded;
+  color:#fff;        
+  width: 14px;
+  height: 14px;
+  text-transform: uppercase;
+  text-align: center;
+  text-shadow: none;
+  line-height: 15px;
+  border-radius: 30px;
+  margin: 0 2px;
+  display: inline-block;
+}
+
+.rAbstract{
+  background: #baed78;
+}
+
+.rProtected{
+  background: #edd078;
+}
+
+.rIterateable{
+  background: #d5dea5;
+}
+
+.rCloneable{
+  background: #bdd7d1;
+}
+
 /* section title (for objects) */
 .ref h4{
   font: bold 11px Helvetica, Arial;
-  color:#bcbcbc;
+  color: #bcbcbc;
   text-transform: lowercase;
   border-bottom: 1px dotted #ccc;
   display: block; 
   margin: 7px 0 5px 10px;
-}     
+}
 
 /* expand/collapse toggle link */
 .rToggle{

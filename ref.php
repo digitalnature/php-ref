@@ -145,10 +145,29 @@ class ref{
       $haveParent = $haveParent->getParentClass();
     }
     
-    foreach($classes as &$class)
-      $class = $this->htmlEntity('class', $class->getName(), $class);
+    foreach($classes as &$class){
 
-    $objectName = implode('::', array_reverse($classes));
+      $modifiers = '';
+
+      if($class->isAbstract())
+        $modifiers .= $this->htmlEntity('abstract', 'A', 'This class is abstract');
+
+      if($class->isFinal())
+        $modifiers .= $this->htmlEntity('final', 'F', 'This class is final and cannot be extended');
+
+      // php 5.4+ only
+      if((PHP_MINOR_VERSION > 3) && $class->isCloneable())
+        $modifiers .= $this->htmlEntity('cloneable', 'C', 'Instances of this class can be cloned');
+
+      if($class->isIterateable())
+        $modifiers .= $this->htmlEntity('iterateable', 'X', 'Instances of this class are iterateable');      
+
+      
+     
+      $class = $modifiers . $this->htmlEntity('class', $class->getName(), $class);
+    }  
+
+    $objectName = implode(' :: ', array_reverse($classes));
     $objectHash = spl_object_hash($subject);
 
     // already been here?
@@ -161,10 +180,11 @@ class ref{
     // again, because reflectionObjects can't be cloned apparently :)
     $reflector = new \ReflectionObject($subject);
 
-    $props      = $reflector->getProperties(\ReflectionMethod::IS_PUBLIC);    
-    $methods    = $reflector->getMethods(\ReflectionMethod::IS_PUBLIC);
+    $props      = $reflector->getProperties(\ReflectionMethod::IS_PUBLIC | \ReflectionMethod::IS_PROTECTED);    
+    $methods    = $reflector->getMethods(\ReflectionMethod::IS_PUBLIC | \ReflectionMethod::IS_PROTECTED);
     $constants  = $reflector->getConstants();
     $interfaces = $reflector->getInterfaces();
+    $traits     = (PHP_MINOR_VERSION > 3) ? $reflector->getTraits() : array();
 
     // no data to display?
     if(!$props && !$methods && !$constants && !$interfaces)
@@ -183,7 +203,7 @@ class ref{
       foreach($interfaces as $name => $interface)
         $intfNames[] = $this->htmlEntity('interface', $interface->getName(), $interface);
 
-      $output .= implode(', ', $intfNames);
+      $output .= sprintf('<dl><dt>%s</dt></dl>', implode(', ', $intfNames));
     }
 
     // class constants
@@ -202,17 +222,40 @@ class ref{
       
     }
 
+    // traits this objects' class uses
+    if($traits){
+      $output .= '<h4>Uses:</h4>';
+
+      $traitNames = array();
+
+      foreach($traits as $name => $trait)
+        $traitNames[] = $this->htmlEntity('trait', $trait->getName(), $trait);
+
+      $output .= sprintf('<dl><dt>%s</dt></dl>', implode(', ', $traitNames));      
+    }
+
     // object/class properties
     if($props){
       $output .= '<h4>Properties:</h4>';
 
       foreach($props as $prop){
-        $nameTip = '';
-        $value = $prop->getValue($subject);        
+        $modifiers = '';
+
+        if($prop->isProtected())        
+          $prop->setAccessible(true);
+
+        $value = $prop->getValue($subject);
+
+        if($prop->isProtected())        
+          $prop->setAccessible(false);        
+
+        if($prop->isProtected())
+          $modifiers .= $this->htmlEntity('protected', 'P', 'This property is protected');
 
         $output .= '<dl>';
         $output .= sprintf('<dt>%s</dt>', $this->htmlEntity('div', $prop->isStatic() ? '::' : '-&gt;'));
-        $output .= sprintf('<dt>%s</dt>', $this->htmlEntity('property', htmlspecialchars($prop->name, ENT_QUOTES), $nameTip));
+        $output .= sprintf('<dt>%s</dt>', $modifiers);
+        $output .= sprintf('<dt>%s</dt>', $this->htmlEntity('property', htmlspecialchars($prop->name, ENT_QUOTES), $prop));
         $output .= sprintf('<dt>%s</dt>', $this->htmlEntity('div', '='));
         $output .= sprintf('<dd>%s</dd>', $this->toHtml($value));
         $output .= '</dl>';        
@@ -227,13 +270,11 @@ class ref{
 
       foreach($methods as $method){
 
-        // for now, ignore PHP-reserved method names like __construct, __toString etc... (@todo)
-        if(strpos($method->name, '__') === 0)
-          continue;
-
         $output .= '<dl>';        
 
         $paramStrings = array();
+        $modifiers = '';
+
         $tags = static::parseComment($method->getDocComment(), 'tags');
         $tags = isset($tags['param']) ? $tags['param'] : array();
 
@@ -269,11 +310,22 @@ class ref{
 
         // is this method inherited?
         $inherited = $reflector->getShortName() !== $method->getDeclaringClass()->getShortName();
+        $htmlClass = $inherited ? 'methodInherited' : 'method';
 
         $modTip = $inherited ? sprintf('Inherited from ::%s', $method->getDeclaringClass()->getShortName()) : null;
 
-        $output .= sprintf('<dt>%s</dt>', $this->htmlEntity('div', $method->isStatic() ? '::' : '-&gt;'), $modTip);
-        $output .= sprintf('<dd>%s(%s)</dd>', $this->htmlEntity('method', $method->name, $method), implode(', ', $paramStrings));
+        if($method->isAbstract())
+          $modifiers .= $this->htmlEntity('abstract', 'A', 'This method is abstract');
+
+        if($method->isFinal())
+          $modifiers .= $this->htmlEntity('final', 'F', 'This method cannot be overridden');
+
+        if($method->isProtected())
+          $modifiers .= $this->htmlEntity('protected', 'P', 'This method is protected');
+
+        $output .= sprintf('<dt>%s</dt>', $this->htmlEntity('div', $method->isStatic() ? '::' : '-&gt;', $modTip));
+        $output .= sprintf('<dt>%s</dt>', $modifiers);
+        $output .= sprintf('<dd>%s(%s)</dd>', $this->htmlEntity($htmlClass, $method->name, $method), implode(', ', $paramStrings));
         $output .= '</dl>';        
       }  
 
@@ -312,18 +364,21 @@ class ref{
     if($tip instanceof \Reflector){
 
       // function/class/method is part of the core
-      if($tip->isInternal()){
+      if(method_exists($tip, 'isInternal') && $tip->isInternal()){
         $tip = sprintf('Internal - part of %s (%s)', $tip->getExtensionName(), $tip->getExtension()->getVersion());
 
       // user-defined; attempt to get doc comments
       }else{
-       
-        $tip = preg_split('/$\R?^/m', $tip->getDocComment());
 
-        foreach($tip as &$line)
-          $line = ltrim($line, '/* ');
+        $comments = static::parseComment($tip->getDocComment());
 
-        $tip = trim(implode("\n", $tip));
+        $tip = '';
+
+        if(!empty($comments['title']))
+          $tip .= $comments['title'];
+
+        if(!empty($comments['desc']))
+          $tip .= "\n\n" . $comments['desc'];        
       }
 
     }
@@ -350,11 +405,12 @@ class ref{
   public static function describe(array $args){
 
     $output = array();
-  
+ 
     // iterate trough the arguments and print info for each one
     foreach($args as $index => $subject){
 
       $startTime = microtime(true);  
+      $startMem = memory_get_usage();
 
       $instance = new static();
 
@@ -383,7 +439,15 @@ class ref{
         static::$didAssets = true;
       }
 
-      $output[] = sprintf('<!-- dump #%d --><div class="ref">%s</div><!-- /dump (took %ss) -->', $index, $html, round(microtime(true) - $startTime, 4));
+      $instance = null;
+      unset($instance);
+
+      $endTime = microtime(true);
+
+      $memUsage = abs(round((memory_get_usage() - $startMem) / 1024, 2));
+      $cpuUsage = round(microtime(true) - $startTime, 4);
+
+      $output[] = sprintf('<!-- dump #%d --><div class="ref">%s</div><!-- /dump (took %ss, %sK) -->', $index + 1, $html, $cpuUsage, $memUsage);
     }
 
     return implode("\n\n", $output);

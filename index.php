@@ -2,8 +2,10 @@
 
 
 require __DIR__ . '/ref.php';
+require __DIR__ . '/class.test.php';
 
-$obj = new Ref();
+$obj = new Tests\ClassTest(array('foo', 'bar'));
+
 
 $array = array(
   'foo'   => 'bar',
@@ -12,10 +14,6 @@ $array = array(
 );
 
 $array['self'] = &$array;
-
-$obj->foo = 'bar';
-$obj->date = \DateTime::createFromFormat('U', time(), new \DateTimeZone('Europe/London'));
-$obj->array = $array;
 
 header('Content-type: text/html');
 
