@@ -36,7 +36,11 @@ class ref{
   protected static
 
     // tracks style/jscript inclusion state
-    $didAssets = false;   
+    $didAssets = false,    
+
+    // for multiple r() calls on the same line
+    $lineInst  = array();
+
 
 
   protected
@@ -66,7 +70,7 @@ class ref{
 
     $this->expanded = false;       
 
-    $output = '';
+    $output = '';   
 
     // identify variable type
     switch(true){
@@ -356,7 +360,7 @@ class ref{
    * @param   string|Reflector $tip   Tooltip content, or Reflector object from which to generate this content
    * @return  string                  SPAN tag with the provided information
    */
-  protected function htmlEntity($class, $text = null, $tip = null){
+  protected static function htmlEntity($class, $text = null, $tip = null){
 
     if($text === null)
       $text = $class;
@@ -405,7 +409,156 @@ class ref{
   public static function describe(array $args){
 
     $output = array();
- 
+
+    // find caller information;
+    // pull only basic info with php 5.3.6+ to save some memory
+    $trace = debug_backtrace(defined('DEBUG_BACKTRACE_IGNORE_ARGS') ? DEBUG_BACKTRACE_IGNORE_ARGS : null);
+    
+    while($callee = array_pop($trace)){
+      if((!strcasecmp($callee['function'], static::SHORTCUT_FUNC)) || (isset($callee['class']) && !strcasecmp($callee['class'], __CLASS__))){
+
+        $codeContext = empty($callee['class']) ? $callee['function'] : $callee['function'];     
+      
+        $code = file($callee['file']);
+        $code = array_slice($code, $callee['line'] - 1);
+        $code = implode('', $code);
+
+        $instIdx = 0;
+        static::$lineInst[$callee['line']] = isset(static::$lineInst[$callee['line']]) ? static::$lineInst[$callee['line']] + 1 : 1;
+
+        // if there are multiple calls to this function on the same line, make sure this is the one we're after;
+        // note that calls that span across multiple lines will produce incorrect expression info :(
+        while($instIdx < static::$lineInst[$callee['line']]){
+          $code = trim(substr($code, strpos($code, $codeContext) + strlen($codeContext)));
+          $code = substr($code, 1);
+
+          $inSQuotes = $inDQuotes = false;
+          $expressions = array(0 => '');
+          $index = 0;
+          $sBracketLvl = 0;
+          $cBracketLvl = 0;
+
+          for($i = 0, $len = strlen($code); $i < $len; $i++){
+
+            switch($code[$i]){
+
+              case '\'':
+                if(!$inDQuotes)
+                  $inSQuotes = !$inSQuotes;
+
+                $expressions[$index] .= $code[$i];              
+
+                break;
+
+              case '"':
+                if(!$inSQuotes)
+                  $inDQuotes = !$inDQuotes;
+
+                $expressions[$index] .= $code[$i];                            
+
+                break;              
+
+              case '{':
+                if(!$inSQuotes && !$inDQuotes)
+                  $cBracketLvl++;
+
+                $expressions[$index] .= $code[$i];
+
+                break;            
+
+              case '}':
+                $expressions[$index] .= $code[$i];
+
+                if(!$inSQuotes && !$inDQuotes)
+                  $cBracketLvl--;
+
+                break;  
+
+              case '(':
+                if(!$inSQuotes && !$inDQuotes)
+                  $sBracketLvl++;
+
+                $expressions[$index] .= $code[$i];
+
+                break;
+                  
+              case ')':
+                if($sBracketLvl > 0)
+                  $expressions[$index] .= $code[$i];
+
+                if(!$inSQuotes && !$inDQuotes){
+                  $sBracketLvl--;
+
+                  if($sBracketLvl < 0){
+                    $code = substr($code, $i + 1);
+                    break 2;
+                  }  
+
+                }
+
+                break;                
+
+              case ',':
+                if(!$inSQuotes && !$inDQuotes && ($sBracketLvl === 0) && ($cBracketLvl === 0)){
+                  $index++;
+                  $expressions[$index] = '';
+                  break;
+                }
+
+              default:
+                $expressions[$index] .= $code[$i];
+            }
+
+          }
+
+          $instIdx++;
+        }
+
+        break;
+      }  
+    }
+
+    $expressions = array_map('trim', $expressions);
+
+    foreach($expressions as &$item){
+
+      if(strripos($item, '(') === false)
+        continue;
+
+      $fn = explode('(', $item, 2);
+
+      // try to find out if this is a function
+      try{
+        $reflector = new \ReflectionFunction($fn[0]);        
+
+        $item = static::htmlEntity('srcFunction', $item, $reflector);
+
+        if($reflector->isInternal())
+          $item = sprintf('<a href="http://php.net/manual/en/function.%s.php" target="_blank">%s</a>', str_replace('_', '-', strtolower($fn[0])), $item);
+      
+      }catch(\Exception $e){
+
+        if(strpos($item, '::') === false)
+          continue;        
+
+        $fn = explode('::', $fn[0], 2);
+
+        // perhaps it's a static class method
+        try{
+          $reflector = new \ReflectionMethod($fn[0], $fn[1]);
+          $item = static::htmlEntity('srcMethod', $item, $reflector);
+
+          if($reflector->isInternal())
+            $item = sprintf('<a href="http://php.net/manual/en/%s.%s.php" target="_blank">%s</a>', ltrim(strtolower($fn[0]), '\\'), strtolower($fn[1]), $item);
+
+        }catch(\Exception $e){
+          $reflector = null;
+        }  
+      }
+
+    }
+
+
     // iterate trough the arguments and print info for each one
     foreach($args as $index => $subject){
 
@@ -415,7 +568,7 @@ class ref{
       $instance = new static();
 
       $html = $instance->toHtml($subject);
-
+ 
       // first call? include styles & js
       if(!static::$didAssets){
 
@@ -447,7 +600,9 @@ class ref{
       $memUsage = abs(round((memory_get_usage() - $startMem) / 1024, 2));
       $cpuUsage = round(microtime(true) - $startTime, 4);
 
-      $output[] = sprintf('<!-- dump #%d --><div class="ref">%s</div><!-- /dump (took %ss, %sK) -->', $index + 1, $html, $cpuUsage, $memUsage);
+      $source = sprintf('<dfn class="refDfn">&gt; %s</dfn>', $expressions[$index]);
+
+      $output[] = sprintf('<!-- ref #%d -->%s<div class="ref">%s</div><!-- /ref (took %ss, %sK) -->', $index + 1, $source, $html, $cpuUsage, $memUsage);
     }
 
     return implode("\n\n", $output);

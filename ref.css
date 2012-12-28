@@ -1,23 +1,27 @@
 
-.ref *, #rTip *{
+.ref *, .refDfn, #rTip{
+  font:normal normal 13px/18px Consolas, Monaco, Andale Mono, Courier New, monospace;      
   margin: 0;
   padding: 0;
 }
 
 .ref{
-  font:normal normal 13px/18px Consolas, Monaco, Andale Mono, Courier New, monospace;  
   background:#f9f9f9;        
   border: 1px solid #eee;
   padding: 2px 5px;
-  border-radius: 2px;
-  margin: 4px 0;
+  border-radius: 0 0 4px 4px;
+  margin: 0 0 4px;
   overflow: auto;
   text-shadow: #fff 0 1px 0;
 }
 
+.ref a, .refDfn a, #rTip a{
+  color: inherit;
+  text-decoration: underline;
+}
+
 /* tooltip; note that the js overrides top/left properties, this is why we use margin  */
 #rTip{
-  font:normal normal 13px/18px Consolas, Monaco, Andale Mono, Courier New, monospace;    
   position: absolute;
   display: none;
   white-space: pre;  
@@ -29,8 +33,17 @@
   color: #ccc;         
   text-align: left;
   z-index: 1000;
-  border-radius: 4px;  
+  border-radius: 4px;
   box-shadow:0 0 4px rgba(0,0,0, 0.25);
+}
+
+.refDfn{
+  margin: 2px 0 0;
+  padding: 2px 4px;
+  display: block;
+  background: #333;  
+  color: #ccc;
+  border-radius: 4px 4px 0 0;
 }
 
 /* emulate a table for displaying array & object members */
@@ -51,7 +64,7 @@
 }
 
 /* hidden content (used to generate the tooltip */
-.ref code{
+.ref code, .refDfn code{
   display: none;  
 }
 
