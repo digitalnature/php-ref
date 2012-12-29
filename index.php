@@ -4,12 +4,12 @@
 require __DIR__ . '/ref.php';
 require __DIR__ . '/class.test.php';
 
-$obj = new Tests\ClassTest(array('foo', 'bar'));
+$obj = new Tests\ClassTest(array('foo', 'bar', 'abc def'));
 
 $array = array(
-  'foo'   => 'bar',
-  'abc'   => 5,
-  'child' => array(4, 'five', 6),
+  'foo'         => 'bar',
+  'abc def xyz' => 5,
+  'child'       => array(4, 'five', 6),
 );
 
 $array['self'] = &$array;

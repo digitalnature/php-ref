@@ -131,7 +131,7 @@ class ref{
   /**
    * Builds a report with information about $subject
    *
-   * @since   1.0   
+   * @since   1.0
    * @param   mixed $subject    Variable to query   
    * @return  string
    */
@@ -187,7 +187,7 @@ class ref{
 
         // note that we must substract the marker element
         $output .= $this->entity('array', sprintf('Array(<b>%d</b>', count($subject) - 1));
-        $output .= sprintf('<a class="rToggle %s"></a><div>', $expState);
+        $output .= sprintf('<a class="rToggle %s"></a><section><div>', $expState);
 
         foreach($subject as $key => &$value){
 
@@ -206,9 +206,9 @@ class ref{
 
         // remove our temporary marker;
         // not really required, because the shortcut function doesn't take references, but we want to be nice :P
-        unset($subject[$this->arrayMarker]);      
+        unset($subject[$this->arrayMarker]);
 
-        return $output . '</div>' . $this->entity('array', ')');    
+        return $output . '</div></section>' . $this->entity('array', ')');    
     }
 
     // if we reached this point, $subject must be an object
@@ -274,13 +274,12 @@ class ref{
       return $this->entity('object', $objectName . ' Object()');
 
     $output .= $this->entity('object', $objectName . ' Object(');
-    $output .= sprintf('<a class="rToggle %s"></a><div>', $expState);
+    $output .= sprintf('<a class="rToggle %s"></a><section>', $expState);
 
     // display the interfaces this objects' class implements
     if($interfaces){
 
       $output .= '<h4>Interfaces:</h4>';
-
       $intfNames = array();
 
       foreach($interfaces as $name => $interface){
@@ -300,6 +299,7 @@ class ref{
     if($constants){
 
       $output .= '<h4>Constants:</h4>';
+      $output .= '<div>';
 
       foreach($constants as $name => $value){
 
@@ -314,8 +314,9 @@ class ref{
         $output .= sprintf('<dt>%s</dt>', $this->entity('div', '='));
         $output .= sprintf('<dd>%s</dd>', $this->transformSubject($value));        
         $output .= '</dl>';
-      }  
+      }
       
+      $output .= '</div>';
     }
 
     // traits this objects' class uses
@@ -333,7 +334,8 @@ class ref{
     // object/class properties
     if($props){
       $output .= '<h4>Properties:</h4>';
-
+      $output .= '<div>';
+  
       foreach($props as $prop){
         $modifiers = '';
 
@@ -356,19 +358,21 @@ class ref{
 
         $output .= '<dl>';
         $output .= sprintf('<dt>%s</dt>', $this->entity('div', $prop->isStatic() ? '::' : '-&gt;'));
-        $output .= sprintf('<dt>%s</dt>', $modifiers);
+        $output .= sprintf('<dt><span class="rModifiers">%s</span></dt>', $modifiers);
         $output .= sprintf('<dt>%s</dt>', $this->entity('property', $name, $prop));
         $output .= sprintf('<dt>%s</dt>', $this->entity('div', '='));
         $output .= sprintf('<dd>%s</dd>', $this->transformSubject($value));
-        $output .= '</dl>';        
+        $output .= '</dl>';
       }
 
+      $output .= '</div>';      
     }
 
     // class methods
     if($methods){
 
       $output .= '<h4>Methods:</h4>';
+      $output .= '<div>';
 
       foreach($methods as $method){
 
@@ -445,7 +449,7 @@ class ref{
           $modifiers .= $this->entity('protected', 'P', 'This method is protected');
 
         $output .= sprintf('<dt>%s</dt>', $this->entity('div', $method->isStatic() ? '::' : '-&gt;', $modTip));
-        $output .= sprintf('<dt>%s</dt>', $modifiers);
+        $output .= sprintf('<dt><span class="rModifiers">%s</span></dt>', $modifiers);
 
         $name = $method->name;
 
@@ -459,11 +463,12 @@ class ref{
 
         $output .= sprintf('<dd>%s(%s)</dd>', $name, implode(', ', $paramStrings));
         $output .= '</dl>';        
-      }  
+      }
 
+      $output .= '</div>';
     }
 
-    return $output . '</div>' . $this->entity('object', ')');  
+    return $output . '</section>' . $this->entity('object', ')');  
   }
 
 
@@ -614,7 +619,7 @@ class ref{
 
 
   /**
-   * Determines the input expressions passed to the shortcut function
+   * Determines the input expression(s) passed to the shortcut function
    *
    * @since   1.0
    * @return  array   Array of string expressions passed to the shortcut function
@@ -637,6 +642,7 @@ class ref{
       $code = implode('', $code);
 
       $instIdx = 0;
+
       static::$lineInst[$callee['line']] = isset(static::$lineInst[$callee['line']]) ? static::$lineInst[$callee['line']] + 1 : 1;
 
       // if there are multiple calls to this function on the same line, make sure this is the one we're after;
@@ -723,8 +729,8 @@ class ref{
         $instIdx++;
       }
 
-      break;
-    
+      // further entries are irrelevant
+      break;    
     }
 
     return array_map('trim', $expressions);
@@ -736,10 +742,12 @@ class ref{
    * Returns human-readable info about the given variable(s)
    *   
    * @since   1.0
-   * @param   mixed $subject   Variable to query
-   * @return  string           Information about each variable (currently only HTML output)
+   * @param   mixed $subject      Variable to query
+   * @param   string $expression  Source expression string
+   * @param   string $format      Output format
+   * @return  string              Information about each variable (currently only HTML output)
    */
-  public static function build($subject, $expression = null, $outputMode = 'html'){
+  public static function build($subject, $expression = null, $format = 'html'){
 
     static
       $counter = 1;

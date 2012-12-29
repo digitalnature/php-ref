@@ -47,17 +47,29 @@
 /* emulate a table for displaying array & object members */
 .ref dl, .ref dt, .ref dd{
   margin: 0;
-  padding: 0;  
+  padding: 0;
 }
 
 .ref dl{
-  display:table-row;
+  display: table-row;
 }
 
 .ref dt, .ref dd{
-  display:table-cell;
+  display: table-cell;
   vertical-align: top;
-  padding-left: 10px; 
+  padding-left: 10px;
+}
+
+.ref dd{
+  width: 100% !important;
+}
+
+.ref section dl:nth-child(odd){
+  background: #f6f6f6;
+}
+
+.ref section dl:nth-child(even){
+  background: #f9f9f9;
 }
 
 /* base */
@@ -131,7 +143,6 @@
   color:#CC0033;
 }
 
-/* methods */
 .rMethod, .rMethodInherited{
   font-weight: bold;
   color: #0057ae;
@@ -233,11 +244,11 @@
 }
 
 /* trick to hide next element when this class is present */
-.rToggle.col + div{
+.rToggle.col + section{
   display: none;
 }
 
 /* same, but displays the element */
-.rToggle.exp + div{
+.rToggle.exp + section{
   display: block;
 }
