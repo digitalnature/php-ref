@@ -17,6 +17,7 @@ function r(){
 }
 
 
+
 /**
  * REF is a nicer alternative to PHP's print_r() / var_dump().
  *
@@ -70,10 +71,10 @@ class ref{
    * otherwise to php.net/manual (the english one)
    *
    * @since   1.0   
-   * @param   string $scheme    Scheme to use; valid schemes are 'class', 'function' and 'method'
-   * @param   string $arg1      Class or function name
-   * @param   string $arg2      Method name (require only for the 'method' scheme)
-   * @return  string            URI string
+   * @param   string $scheme     Scheme to use; valid schemes are 'class', 'function', 'method', 'constant' (class only) and 'property'
+   * @param   string $arg1       Class or function name
+   * @param   string|null $arg2  Method name (required only for the 'method' scheme)
+   * @return  string             URI string
    */
   protected static function getPhpManUri($scheme, $arg1, $arg2 = null){
 
@@ -98,13 +99,12 @@ class ref{
     foreach($args as &$arg)
       $arg = str_replace('_', '-', ltrim(strtolower($arg), '\\_'));
 
-    array_unshift($args, $docRefRoot);
-    array_push($args, $docRefExt);
-
     $schemes = array(
-      'class'     => '%s/class.%s%s',
-      'function'  => '%s/function.%s%s',
-      'method'    => '%s/%s.%s%s',
+      'class'     => $docRefRoot . '/class.%s'    . $docRefExt,
+      'function'  => $docRefRoot . '/function.%s' . $docRefExt,
+      'method'    => $docRefRoot . '/%1$s.%2$s'   . $docRefExt,
+      'constant'  => $docRefRoot . '/class.%1$s'  . $docRefExt . '#%1$s.constants.%2$s',
+      'property'  => $docRefRoot . '/class.%1$s'  . $docRefExt . '#%1$s.props.%2$s',
     );
 
     return vsprintf($schemes[$scheme], $args);
@@ -196,12 +196,16 @@ class ref{
     }
 
     // if we reached this point, $subject must be an object
-    $classes = $sections = array();
+    $classes = $sections = $internalParents = array();
     $haveParent = new \ReflectionObject($subject);
 
     // get parent/ancestor classes
     while($haveParent !== false){
       $classes[] = $haveParent;
+
+      if($haveParent->isInternal())
+        $internalParents[] = $haveParent;
+
       $haveParent = $haveParent->getParentClass();
     }
     
@@ -241,7 +245,7 @@ class ref{
     $this->objectHashes[] = $objectHash;
 
     // again, because reflectionObjects can't be cloned apparently :)
-    $reflector = new \ReflectionObject($subject);
+    $reflector = new \ReflectionObject($subject);    
 
     $props      = $reflector->getProperties(\ReflectionMethod::IS_PUBLIC | \ReflectionMethod::IS_PROTECTED);    
     $methods    = $reflector->getMethods(\ReflectionMethod::IS_PUBLIC | \ReflectionMethod::IS_PROTECTED);
@@ -282,9 +286,15 @@ class ref{
       $output .= '<h4>Constants:</h4>';
 
       foreach($constants as $name => $value){
+
         $output .= '<dl>';
+
+        foreach($internalParents as $parent)
+          if($parent->hasConstant($name))
+            $name = sprintf('<a href="%s" target="_blank">%s</a>', static::getPhpManUri('constant', $parent->getName(), $name), $name);
+
         $output .= sprintf('<dt>%s</dt>', $this->htmlEntity('div', '::'));
-        $output .= sprintf('<dt>%s</dt>', $this->htmlEntity('constant', htmlspecialchars($name, ENT_QUOTES)));
+        $output .= sprintf('<dt>%s</dt>', $this->htmlEntity('constant', $name));
         $output .= sprintf('<dt>%s</dt>', $this->htmlEntity('div', '='));
         $output .= sprintf('<dd>%s</dd>', $this->toHtml($value));        
         $output .= '</dl>';
@@ -322,10 +332,16 @@ class ref{
         if($prop->isProtected())
           $modifiers .= $this->htmlEntity('protected', 'P', 'This property is protected');
 
+        $name = htmlspecialchars($prop->name, ENT_QUOTES);
+
+        foreach($internalParents as $parent)
+          if($parent->hasProperty($name))
+            $name = sprintf('<a href="%s" target="_blank">%s</a>', static::getPhpManUri('property', $parent->getName(), $name), $name);
+
         $output .= '<dl>';
         $output .= sprintf('<dt>%s</dt>', $this->htmlEntity('div', $prop->isStatic() ? '::' : '-&gt;'));
         $output .= sprintf('<dt>%s</dt>', $modifiers);
-        $output .= sprintf('<dt>%s</dt>', $this->htmlEntity('property', htmlspecialchars($prop->name, ENT_QUOTES), $prop));
+        $output .= sprintf('<dt>%s</dt>', $this->htmlEntity('property', $name, $prop));
         $output .= sprintf('<dt>%s</dt>', $this->htmlEntity('div', '='));
         $output .= sprintf('<dd>%s</dd>', $this->toHtml($value));
         $output .= '</dl>';        
@@ -618,7 +634,7 @@ class ref{
 
     foreach($expressions as &$item){
 
-      if(strripos($item, '(') === false)
+      if(strpos($item, '(') === false)
         continue;
 
       $fn = explode('(', $item, 2);
@@ -626,30 +642,44 @@ class ref{
       // try to find out if this is a function
       try{
         $reflector = new \ReflectionFunction($fn[0]);        
-        $item = static::htmlEntity('srcFunction', $item, $reflector);
 
         if($reflector->isInternal())
-          $item = sprintf('<a href="%s" target="_blank">%s</a>', static::getPhpManUri('function', $fn[0]), $item);
+          $fn[0] = sprintf('<a href="%s" target="_blank">%s</a>', static::getPhpManUri('function', $fn[0]), $fn[0]);
       
       }catch(\Exception $e){
 
         if(strpos($item, '::') === false)
           continue;        
 
-        $fn = explode('::', $fn[0], 2);
+        $cn = explode('::', $fn[0], 2);
 
-        // perhaps it's a static class method
+        // perhaps it's a static class method; try to linkify method first
         try{
-          $reflector = new \ReflectionMethod($fn[0], $fn[1]);
-          $item = static::htmlEntity('srcMethod', $item, $reflector);
+          $reflector = new \ReflectionMethod($cn[0], $cn[1]);
 
           if($reflector->isInternal())
-            $item = sprintf('<a href="%s" target="_blank">%s</a>', static::getPhpManUri('method', $fn[0], $fn[1]), $item);
+            $cn[1] = sprintf('<a href="%s" target="_blank">%s</a>', static::getPhpManUri('method', $cn[0], $cn[1]), $cn[1]);
 
         }catch(\Exception $e){
           $reflector = null;
-        }  
+        }        
+
+        // attempt to linkify the class name as well
+        try{
+          $reflector = new \ReflectionClass($cn[0]);
+
+          if($reflector->isInternal())
+            $cn[0] = sprintf('<a href="%s" target="_blank">%s</a>', static::getPhpManUri('class', $cn[0]), $cn[0]);
+
+        }catch(\Exception $e){
+          $reflector = null;
+        }
+
+        // apply changes
+        $fn[0] = implode('::', $cn);
       }
+
+      $item = implode('(', $fn);
 
       $reflector = null;
       unset($reflector);

@@ -15,5 +15,5 @@ $array = array(
 $array['self'] = &$array;
 
 r(true, false,  null, fopen('php://stdin', 'r'), 24, 4.20, "Hey look a string", array(), $array); 
-r(\DateTime::createFromFormat('U', time(), new \DateTimeZone('Europe/London')));
+r(\PDO::getAvailableDrivers());
 r($obj);

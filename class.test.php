@@ -145,9 +145,10 @@ final class ClassTest extends AbstractTest implements Testable{
 
 
 	/**
-	 * A protected setter method
+	 * A protected setter method that returns a reference
 	 *
-	 * Only child classes can call it
+	 * Accessible only from classes that extend this class
+	 * or from parent classes
 	 *
 	 * @since   1.0
 	 * @param   array $list   List as indexed array
