@@ -643,40 +643,77 @@ class ref{
       try{
         $reflector = new \ReflectionFunction($fn[0]);        
 
-        if($reflector->isInternal())
+        if($reflector->isInternal()){
           $fn[0] = sprintf('<a href="%s" target="_blank">%s</a>', static::getPhpManUri('function', $fn[0]), $fn[0]);
+          $fn[0] = static::htmlEntity('srcFunction', $fn[0], $reflector);
+        }
       
       }catch(\Exception $e){
 
-        if(strpos($item, '::') === false)
-          continue;        
+        if(stripos($fn[0], 'new ') === 0){
 
-        $cn = explode('::', $fn[0], 2);
+          $cn = explode(' ' , $fn[0], 2);
 
-        // perhaps it's a static class method; try to linkify method first
-        try{
-          $reflector = new \ReflectionMethod($cn[0], $cn[1]);
+          // linkify 'new keyword' (as constructor)
+          try{          
+            $reflector = new \ReflectionMethod($cn[1], '__construct');
+            if($reflector->isInternal()){
+              $cn[0] = sprintf('<a href="%s" target="_blank">%s</a>', static::getPhpManUri('method', $cn[1], '__construct'), $cn[0]);
+              $cn[0] = static::htmlEntity('srcClass', $cn[0], $reflector);
+            }              
+          }catch(\Exception $e){
+            $reflector = null;
+          }            
 
-          if($reflector->isInternal())
-            $cn[1] = sprintf('<a href="%s" target="_blank">%s</a>', static::getPhpManUri('method', $cn[0], $cn[1]), $cn[1]);
+          // class name...
+          try{          
+            $reflector = new \ReflectionClass($cn[1]);
+            if($reflector->isInternal()){
+              $cn[1] = sprintf('<a href="%s" target="_blank">%s</a>', static::getPhpManUri('class', $cn[1]), $cn[1]);
+              $cn[1] = static::htmlEntity('srcClass', $cn[1], $reflector);
+            }              
+          }catch(\Exception $e){
+            $reflector = null;
+          }      
 
-        }catch(\Exception $e){
-          $reflector = null;
-        }        
+          $fn[0] = implode(' ', $cn);
 
-        // attempt to linkify the class name as well
-        try{
-          $reflector = new \ReflectionClass($cn[0]);
+        }else{
 
-          if($reflector->isInternal())
-            $cn[0] = sprintf('<a href="%s" target="_blank">%s</a>', static::getPhpManUri('class', $cn[0]), $cn[0]);
+          if(strpos($item, '::') === false)
+            continue;        
 
-        }catch(\Exception $e){
-          $reflector = null;
-        }
+          $cn = explode('::', $fn[0], 2);
 
-        // apply changes
-        $fn[0] = implode('::', $cn);
+          // perhaps it's a static class method; try to linkify method first
+          try{
+            $reflector = new \ReflectionMethod($cn[0], $cn[1]);
+
+            if($reflector->isInternal()){
+              $cn[1] = sprintf('<a href="%s" target="_blank">%s</a>', static::getPhpManUri('method', $cn[0], $cn[1]), $cn[1]);
+              $cn[1] = static::htmlEntity('srcMethod', $cn[1], $reflector);
+            }  
+
+          }catch(\Exception $e){
+            $reflector = null;
+          }        
+
+          // attempt to linkify the class name as well
+          try{
+            $reflector = new \ReflectionClass($cn[0]);
+
+            if($reflector->isInternal()){
+              $cn[0] = sprintf('<a href="%s" target="_blank">%s</a>', static::getPhpManUri('class', $cn[0]), $cn[0]);
+              $cn[0] = static::htmlEntity('srcClass', $cn[0], $reflector);
+            }  
+
+          }catch(\Exception $e){
+            $reflector = null;
+          }
+
+          // apply changes
+          $fn[0] = implode('::', $cn);
+        }  
       }
 
       $item = implode('(', $fn);
