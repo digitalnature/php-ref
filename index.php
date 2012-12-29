@@ -14,23 +14,6 @@ $array = array(
 
 $array['self'] = &$array;
 
-header('Content-type: text/html');
-
-?>
-<!DOCTYPE HTML>
-<html>
-  <body>
-
-    <h3>Simple tests</h3>
-
-    <?php r(true, false,  null, fopen('php://stdin', 'r'), 24, 4.20, "Hey look a string", array(), $array); ?>
-
-    <?php r(\DateTime::createFromFormat('U', time(), new \DateTimeZone('Europe/London'))); ?>
-
-    <h3>Complex structure</h3>    
-  
-    <?php r($obj); ?>    
-
-  </body>
-<html>
-
+r(true, false,  null, fopen('php://stdin', 'r'), 24, 4.20, "Hey look a string", array(), $array); 
+r(\DateTime::createFromFormat('U', time(), new \DateTimeZone('Europe/London')));
+r($obj);

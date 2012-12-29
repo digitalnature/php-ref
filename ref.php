@@ -8,7 +8,12 @@
  * @version  1.0
  */
 function r(){
-  print ref::describe(func_get_args());
+  $output = ref::describe(func_get_args());
+
+  if(headers_sent())
+    return print $output;
+
+  return printf('<!DOCTYPE HTML><html><body>%s', $output);
 }
 
 
@@ -59,7 +64,7 @@ class ref{
 
 
   /**
-   * Generates an URI to PHP's documentation page for the requested context
+   * Generates an URI to the PHP's documentation page for the requested context
    *
    * URI will point to the local PHP manual if installed and configured,
    * otherwise to php.net/manual (the english one)
@@ -70,11 +75,9 @@ class ref{
    * @param   string $arg2      Method name (require only for the 'method' scheme)
    * @return  string            URI string
    */
-  protected static function getPhpManUri($scheme){
+  protected static function getPhpManUri($scheme, $arg1, $arg2 = null){
 
-    static
-      $docRefRoot = null,
-      $docRefExt  = null;
+    static $docRefRoot = null, $docRefExt  = null;
 
      // most people don't have this set
     if(!$docRefRoot)
@@ -84,10 +87,10 @@ class ref{
       $docRefRoot = 'http://php.net/manual/en';
 
     if(!$docRefExt)
-      $docRefExt = ltrim(ini_get('docref_ext'), '.');
+      $docRefExt = ini_get('docref_ext');
 
     if(!$docRefExt)
-      $docRefExt = 'php';
+      $docRefExt = '.php';
 
     $args   = func_get_args();
     $scheme = array_shift($args);
@@ -99,10 +102,10 @@ class ref{
     array_push($args, $docRefExt);
 
     $schemes = array(
-      'interface' => '%s/class.%s.%s',
-      'class'     => '%s/book.%s.%s',
-      'function'  => '%s/function.%s.%s',
-      'method'    => '%s/%s.%s.%s',
+      'interface' => '%s/class.%s%s',
+      'class'     => '%s/book.%s%s',
+      'function'  => '%s/function.%s%s',
+      'method'    => '%s/%s.%s%s',
     );
 
     return vsprintf($schemes[$scheme], $args);
@@ -352,7 +355,13 @@ class ref{
           $paramName = sprintf('$%s', $parameter->getName());
 
           if($parameter->isPassedByReference())
-            $paramName = sprintf('&%s', $paramName);
+            $paramName = sprintf('&amp;%s', $paramName);
+
+          if($parameter->getClass())
+            $paramName = sprintf('%s %s', $this->htmlEntity('classHint', $parameter->getClass()->getName(), $parameter->getClass()), $paramName);
+
+          if($parameter->isArray())
+            $paramName = sprintf('%s %s', $this->htmlEntity('arrayHint', 'Array', 'Expects array'), $paramName);
 
           $tip = null;
           
@@ -362,8 +371,8 @@ class ref{
               $tip = $varDesc;
               break;
             }  
-          }  
-        
+          }
+       
           if($parameter->isOptional()){
             $paramName  = $this->htmlEntity('paramOpt', $paramName, $tip);
             $paramValue = $parameter->isDefaultValueAvailable() ? $parameter->getDefaultValue() : null;
@@ -395,6 +404,9 @@ class ref{
         $output .= sprintf('<dt>%s</dt>', $modifiers);
 
         $name = $method->name;
+
+        if($method->returnsReference())
+          $name = '&' . $name;
 
         if($method->isInternal())
           $name = sprintf('<a href="%s" target="_blank">%s</a>', static::getPhpManUri('method', $method->getDeclaringClass()->getName(), $name), $name);
@@ -602,7 +614,6 @@ class ref{
       // try to find out if this is a function
       try{
         $reflector = new \ReflectionFunction($fn[0]);        
-
         $item = static::htmlEntity('srcFunction', $item, $reflector);
 
         if($reflector->isInternal())
@@ -628,6 +639,8 @@ class ref{
         }  
       }
 
+      $reflector = null;
+      unset($reflector);
     }
 
 

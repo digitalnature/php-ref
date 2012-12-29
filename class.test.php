@@ -29,6 +29,9 @@ abstract class AbstractTest implements \Iterator{
 
 	private
 
+		/**
+		 * A private property
+		 */
 	  $data = array();
 
 
@@ -112,11 +115,20 @@ final class ClassTest extends AbstractTest implements Testable{
 	 * @since   1.0
 	 * @param   mixed $list   Value to set for "B"
 	 */
-	public function __construct(array $list){
+	public function __construct(array $list, &$refTest = null, \iterator $classHintTest = null){
 		$this->list = $list;
 		$this->pubVarB = $this;
 		$this->currentDate = \DateTime::createFromFormat('U', time(), new \DateTimeZone('Europe/London'));
 	}
+
+
+	/**
+	 * A private method
+	 *
+	 * @since   1.0
+	 * @return  array    Normalized list
+	 */
+	private function normalizeList(){}
 
 
 
@@ -126,9 +138,7 @@ final class ClassTest extends AbstractTest implements Testable{
 	 * @since   1.0
 	 * @return  array    Indexed array containing list items
 	 */
-	public function getList(){
-		return $this->list;
-	}
+	public function getList(){}
 
 
 
@@ -140,9 +150,7 @@ final class ClassTest extends AbstractTest implements Testable{
 	 * @since   1.0
 	 * @param   array $list   List as indexed array
 	 */
-	final protected function setList(array $list){
-		$this->list = $list;
-	}
+	final protected function &setList(array $list){}
 
 
 
@@ -153,8 +161,17 @@ final class ClassTest extends AbstractTest implements Testable{
 	 * @param   array $list  Indexed array containing list items
 	 * @return  static       A new instance of this class
 	 */
-  final public static function factory(array $list){
-  	return new static($list);
+  final public static function factory(array $list){}
+
+
+
+	/**
+	 * A method that overrides parent::rewind()
+	 *
+	 * @since   1.0	 
+	 */
+  public function rewind(){
+
   }
 
 }
