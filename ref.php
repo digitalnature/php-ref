@@ -113,7 +113,7 @@ class ref{
 
 
   /**
-   * Builds a HTML string with information about $subject
+   * Builds a report with information about $subject
    *
    * @since   1.0   
    * @param   mixed $subject    Variable to query   
@@ -133,31 +133,31 @@ class ref{
 
       // null value
       case is_null($subject):        
-        return $this->htmlEntity('null');
+        return $this->entity('null');
 
       // boolean
       case is_bool($subject):
         $text = $subject ? 'true' : 'false';
-        return $this->htmlEntity($text, $text, gettype($subject));        
+        return $this->entity($text, $text, gettype($subject));        
 
       // resource
       case is_resource($subject):
-        return $this->htmlEntity('resource', sprintf('%s: %s', $subject, get_resource_type($subject)), gettype($subject));        
+        return $this->entity('resource', sprintf('%s: %s', $subject, get_resource_type($subject)), gettype($subject));        
 
       // integer or double
       case is_int($subject) || is_float($subject):
-        return $this->htmlEntity(gettype($subject), $subject, gettype($subject));
+        return $this->entity(gettype($subject), $subject, gettype($subject));
 
       // string
       case is_string($subject):
-        return $this->htmlEntity('string', htmlspecialchars($subject, ENT_QUOTES), sprintf('%s (%d)', gettype($subject), strlen($subject)));        
+        return $this->entity('string', htmlspecialchars($subject, ENT_QUOTES), sprintf('%s (%d)', gettype($subject), strlen($subject)));        
 
       // arrays
       case is_array($subject):
 
         // empty array?
         if(empty($subject))      
-          return $this->htmlEntity('array', 'Array()');
+          return $this->entity('array', 'Array()');
 
         // set a marker to detect recursion
         if(!$this->arrayMarker)
@@ -165,12 +165,12 @@ class ref{
 
         // if our marker element is present in the array it means that we were here before
         if(isset($subject[$this->arrayMarker]))
-          return $this->htmlEntity('array', 'Array(<b>Recursion</b>)');
+          return $this->entity('array', 'Array(<b>Recursion</b>)');
 
         $subject[$this->arrayMarker] = true;             
 
         // note that we must substract the marker element
-        $output .= $this->htmlEntity('array', sprintf('Array(<b>%d</b>', count($subject) - 1));
+        $output .= $this->entity('array', sprintf('Array(<b>%d</b>', count($subject) - 1));
         $output .= sprintf('<a class="rToggle %s"></a><div>', $expState);
 
         foreach($subject as $key => &$value){
@@ -182,8 +182,8 @@ class ref{
           $keyInfo = is_string($key) ? sprintf('String key (%d)', strlen($key)) : sprintf('Integer key', gettype($key));
 
           $output .= '<dl>';
-          $output .= '<dt>' . $this->htmlEntity('key', htmlspecialchars($key, ENT_QUOTES), $keyInfo) . '</dt>';
-          $output .= '<dt>' . $this->htmlEntity('div', '=&gt') . '<dt>';
+          $output .= '<dt>' . $this->entity('key', htmlspecialchars($key, ENT_QUOTES), $keyInfo) . '</dt>';
+          $output .= '<dt>' . $this->entity('div', '=&gt') . '<dt>';
           $output .= '<dd>' . $this->toHtml($value) . '</dd>';
           $output .= '</dl>';
         }
@@ -192,7 +192,7 @@ class ref{
         // not really required, because the wrapper function doesn't take references, but we want to be nice :P
         unset($subject[$this->arrayMarker]);      
 
-        return $output . '</div>' . $this->htmlEntity('array', ')');    
+        return $output . '</div>' . $this->entity('array', ')');    
     }
 
     // if we reached this point, $subject must be an object
@@ -214,24 +214,24 @@ class ref{
       $modifiers = '';
 
       if($class->isAbstract())
-        $modifiers .= $this->htmlEntity('abstract', 'A', 'This class is abstract');
+        $modifiers .= $this->entity('abstract', 'A', 'This class is abstract');
 
       if($class->isFinal())
-        $modifiers .= $this->htmlEntity('final', 'F', 'This class is final and cannot be extended');
+        $modifiers .= $this->entity('final', 'F', 'This class is final and cannot be extended');
 
       // php 5.4+ only
       if((PHP_MINOR_VERSION > 3) && $class->isCloneable())
-        $modifiers .= $this->htmlEntity('cloneable', 'C', 'Instances of this class can be cloned');
+        $modifiers .= $this->entity('cloneable', 'C', 'Instances of this class can be cloned');
 
       if($class->isIterateable())
-        $modifiers .= $this->htmlEntity('iterateable', 'X', 'Instances of this class are iterateable');            
+        $modifiers .= $this->entity('iterateable', 'X', 'Instances of this class are iterateable');            
      
       $className = $class->getName();
 
       if($class->isInternal())
         $className = sprintf('<a href="%s" target="_blank">%s</a>', static::getPhpManUri('class', $className), $className);
 
-      $class = $modifiers . $this->htmlEntity('class', $className, $class);
+      $class = $modifiers . $this->entity('class', $className, $class);
     }  
 
     $objectName = implode(' :: ', array_reverse($classes));
@@ -239,7 +239,7 @@ class ref{
 
     // already been here?
     if(in_array($objectHash, $this->objectHashes))
-      return $this->htmlEntity('object', $objectName . ' Object(<b>Recursion</b>)');
+      return $this->entity('object', $objectName . ' Object(<b>Recursion</b>)');
 
     // track hash
     $this->objectHashes[] = $objectHash;
@@ -255,9 +255,9 @@ class ref{
 
     // no data to display?
     if(!$props && !$methods && !$constants && !$interfaces && !$traits)
-      return $this->htmlEntity('object', $objectName . ' Object()');
+      return $this->entity('object', $objectName . ' Object()');
 
-    $output .= $this->htmlEntity('object', $objectName . ' Object(');
+    $output .= $this->entity('object', $objectName . ' Object(');
     $output .= sprintf('<a class="rToggle %s"></a><div>', $expState);
 
     // display the interfaces this objects' class implements
@@ -274,7 +274,7 @@ class ref{
         if($interface->isInternal())
           $name = sprintf('<a href="%s" target="_blank">%s</a>', static::getPhpManUri('class', $name), $name);
 
-        $intfNames[] = $this->htmlEntity('interface', $name, $interface);      
+        $intfNames[] = $this->entity('interface', $name, $interface);      
       }  
 
       $output .= sprintf('<dl><dt>%s</dt></dl>', implode(', ', $intfNames));
@@ -293,9 +293,9 @@ class ref{
           if($parent->hasConstant($name))
             $name = sprintf('<a href="%s" target="_blank">%s</a>', static::getPhpManUri('constant', $parent->getName(), $name), $name);
 
-        $output .= sprintf('<dt>%s</dt>', $this->htmlEntity('div', '::'));
-        $output .= sprintf('<dt>%s</dt>', $this->htmlEntity('constant', $name));
-        $output .= sprintf('<dt>%s</dt>', $this->htmlEntity('div', '='));
+        $output .= sprintf('<dt>%s</dt>', $this->entity('div', '::'));
+        $output .= sprintf('<dt>%s</dt>', $this->entity('constant', $name));
+        $output .= sprintf('<dt>%s</dt>', $this->entity('div', '='));
         $output .= sprintf('<dd>%s</dd>', $this->toHtml($value));        
         $output .= '</dl>';
       }  
@@ -309,7 +309,7 @@ class ref{
       $traitNames = array();
 
       foreach($traits as $name => $trait)
-        $traitNames[] = $this->htmlEntity('trait', $trait->getName(), $trait);
+        $traitNames[] = $this->entity('trait', $trait->getName(), $trait);
 
       $output .= sprintf('<dl><dt>%s</dt></dl>', implode(', ', $traitNames));      
     }
@@ -330,7 +330,7 @@ class ref{
           $prop->setAccessible(false);        
 
         if($prop->isProtected())
-          $modifiers .= $this->htmlEntity('protected', 'P', 'This property is protected');
+          $modifiers .= $this->entity('protected', 'P', 'This property is protected');
 
         $name = htmlspecialchars($prop->name, ENT_QUOTES);
 
@@ -339,10 +339,10 @@ class ref{
             $name = sprintf('<a href="%s" target="_blank">%s</a>', static::getPhpManUri('property', $parent->getName(), $name), $name);
 
         $output .= '<dl>';
-        $output .= sprintf('<dt>%s</dt>', $this->htmlEntity('div', $prop->isStatic() ? '::' : '-&gt;'));
+        $output .= sprintf('<dt>%s</dt>', $this->entity('div', $prop->isStatic() ? '::' : '-&gt;'));
         $output .= sprintf('<dt>%s</dt>', $modifiers);
-        $output .= sprintf('<dt>%s</dt>', $this->htmlEntity('property', $name, $prop));
-        $output .= sprintf('<dt>%s</dt>', $this->htmlEntity('div', '='));
+        $output .= sprintf('<dt>%s</dt>', $this->entity('property', $name, $prop));
+        $output .= sprintf('<dt>%s</dt>', $this->entity('div', '='));
         $output .= sprintf('<dd>%s</dd>', $this->toHtml($value));
         $output .= '</dl>';        
       }
@@ -376,12 +376,12 @@ class ref{
           $paramHint = '';
 
           if($paramClass){
-            $paramHint = $this->htmlEntity('hint', $paramClass->getName(), $paramClass);
+            $paramHint = $this->entity('hint', $paramClass->getName(), $paramClass);
             $paramHint = sprintf('<a href="%s" target="_blank">%s</a>', static::getPhpManUri('class', $paramClass->getName()), $paramHint);
           }  
 
           if($parameter->isArray())
-            $paramHint = $this->htmlEntity('arrayHint', 'Array');
+            $paramHint = $this->entity('arrayHint', 'Array');
 
           $tip = null;
           
@@ -394,9 +394,9 @@ class ref{
           }
        
           if($parameter->isOptional()){
-            $paramName  = $this->htmlEntity('param', $paramName, $tip);
+            $paramName  = $this->entity('param', $paramName, $tip);
             $paramValue = $parameter->isDefaultValueAvailable() ? $parameter->getDefaultValue() : null;
-            $paramName  = sprintf('%s%s<span class="rParamValue">%s</span>', $paramName, $this->htmlEntity('div', ' = '), $this->toHtml($paramValue));
+            $paramName  = sprintf('%s%s<span class="rParamValue">%s</span>', $paramName, $this->entity('div', ' = '), $this->toHtml($paramValue));
 
             if($paramHint)
               $paramName = $paramHint . ' ' . $paramName;
@@ -404,7 +404,7 @@ class ref{
             $paramName  = sprintf('<span class="rOptional">%s</span>', $paramName);
 
           }else{            
-            $paramName = $this->htmlEntity('param', $paramName, $tip);
+            $paramName = $this->entity('param', $paramName, $tip);
 
             if($paramHint)
               $paramName = $paramHint . ' ' . $paramName;            
@@ -420,15 +420,15 @@ class ref{
         $modTip = $inherited ? sprintf('Inherited from ::%s', $method->getDeclaringClass()->getShortName()) : null;
 
         if($method->isAbstract())
-          $modifiers .= $this->htmlEntity('abstract', 'A', 'This method is abstract');
+          $modifiers .= $this->entity('abstract', 'A', 'This method is abstract');
 
         if($method->isFinal())
-          $modifiers .= $this->htmlEntity('final', 'F', 'This method is final and cannot be overridden');
+          $modifiers .= $this->entity('final', 'F', 'This method is final and cannot be overridden');
 
         if($method->isProtected())
-          $modifiers .= $this->htmlEntity('protected', 'P', 'This method is protected');
+          $modifiers .= $this->entity('protected', 'P', 'This method is protected');
 
-        $output .= sprintf('<dt>%s</dt>', $this->htmlEntity('div', $method->isStatic() ? '::' : '-&gt;', $modTip));
+        $output .= sprintf('<dt>%s</dt>', $this->entity('div', $method->isStatic() ? '::' : '-&gt;', $modTip));
         $output .= sprintf('<dt>%s</dt>', $modifiers);
 
         $name = $method->name;
@@ -439,7 +439,7 @@ class ref{
         if($method->isInternal())
           $name = sprintf('<a href="%s" target="_blank">%s</a>', static::getPhpManUri('method', $method->getDeclaringClass()->getName(), $name), $name);
 
-        $name = $this->htmlEntity($htmlClass, $name, $method);  
+        $name = $this->entity($htmlClass, $name, $method);  
 
         $output .= sprintf('<dd>%s(%s)</dd>', $name, implode(', ', $paramStrings));
         $output .= '</dl>';        
@@ -447,19 +447,8 @@ class ref{
 
     }
 
-    return $output . '</div>' . $this->htmlEntity('object', ')');  
+    return $output . '</div>' . $this->entity('object', ')');  
   }
-
-  /**
-   * Text version of the method above -- todo
-   *
-   * @since   1.0   
-   * @param   mixed $subject    Variable to query   
-   * @return  string
-   */
-  protected function toText(&$subject){
-
-  }  
 
 
 
@@ -472,7 +461,7 @@ class ref{
    * @param   string|Reflector $tip   Tooltip content, or Reflector object from which to generate this content
    * @return  string                  SPAN tag with the provided information
    */
-  protected static function htmlEntity($class, $text = null, $tip = null){
+  protected function entity($class, $text = null, $tip = null){
 
     if($text === null)
       $text = $class;
@@ -512,15 +501,102 @@ class ref{
 
 
   /**
-   * Returns human-readable info about the given variable(s)
-   *   
+   * Scans for default classes and functions inside the provided expression,
+   * and linkifies them when possible
+   *
    * @since   1.0
-   * @param   array $args    Variable(s) to query
-   * @return  string         Information about each variable (currently only HTML output)
+   * @param   string $expression      Expression to linkify
+   * @return  string                  HTML
    */
-  public static function describe(array $args){
+  public function transformExpression($expression){
 
-    $output = array();
+    if(strpos($expression, '(') === false)
+      return $expression;
+
+    $fn = explode('(', $expression, 2);
+
+    // try to find out if this is a function
+    try{
+      $reflector = new \ReflectionFunction($fn[0]);        
+
+      if($reflector->isInternal()){
+        $fn[0] = sprintf('<a href="%s" target="_blank">%s</a>', static::getPhpManUri('function', $fn[0]), $fn[0]);
+        $fn[0] = $this->entity('srcFunction', $fn[0], $reflector);
+      }
+    
+    }catch(\Exception $e){
+
+      if(stripos($fn[0], 'new ') === 0){
+
+        $cn = explode(' ' , $fn[0], 2);
+
+        // linkify 'new keyword' (as constructor)
+        try{          
+          $reflector = new \ReflectionMethod($cn[1], '__construct');
+          if($reflector->isInternal()){
+            $cn[0] = sprintf('<a href="%s" target="_blank">%s</a>', static::getPhpManUri('method', $cn[1], '__construct'), $cn[0]);
+            $cn[0] = $this->entity('srcClass', $cn[0], $reflector);
+          }              
+        }catch(\Exception $e){
+          $reflector = null;
+        }            
+
+        // class name...
+        try{          
+          $reflector = new \ReflectionClass($cn[1]);
+          if($reflector->isInternal()){
+            $cn[1] = sprintf('<a href="%s" target="_blank">%s</a>', static::getPhpManUri('class', $cn[1]), $cn[1]);
+            $cn[1] = $this->entity('srcClass', $cn[1], $reflector);
+          }              
+        }catch(\Exception $e){
+          $reflector = null;
+        }      
+
+        $fn[0] = implode(' ', $cn);
+
+      }else{
+
+        if(strpos($expression, '::') === false)
+          return $expression;
+
+        $cn = explode('::', $fn[0], 2);
+
+        // perhaps it's a static class method; try to linkify method first
+        try{
+          $reflector = new \ReflectionMethod($cn[0], $cn[1]);
+
+          if($reflector->isInternal()){
+            $cn[1] = sprintf('<a href="%s" target="_blank">%s</a>', static::getPhpManUri('method', $cn[0], $cn[1]), $cn[1]);
+            $cn[1] = $this->entity('srcMethod', $cn[1], $reflector);
+          }  
+
+        }catch(\Exception $e){
+          $reflector = null;
+        }        
+
+        // attempt to linkify the class name as well
+        try{
+          $reflector = new \ReflectionClass($cn[0]);
+
+          if($reflector->isInternal()){
+            $cn[0] = sprintf('<a href="%s" target="_blank">%s</a>', static::getPhpManUri('class', $cn[0]), $cn[0]);
+            $cn[0] = $this->entity('srcClass', $cn[0], $reflector);
+          }  
+
+        }catch(\Exception $e){
+          $reflector = null;
+        }
+
+        // apply changes
+        $fn[0] = implode('::', $cn);
+      }  
+    }
+
+    return implode('(', $fn);
+  }
+
+
+  protected static function getExpressions(){
 
     // find caller information;
     // pull only basic info with php 5.3.6+ to save some memory
@@ -626,102 +702,31 @@ class ref{
       }  
     }
 
-    // free these variables now
-    $trace = $callee = null;
-    unset($trace, $callee);
+    return $expressions;
+  }
 
-    $expressions = array_map('trim', $expressions);
 
-    foreach($expressions as &$item){
 
-      if(strpos($item, '(') === false)
-        continue;
+  /**
+   * Returns human-readable info about the given variable(s)
+   *   
+   * @since   1.0
+   * @param   array $args    Variable(s) to query
+   * @return  string         Information about each variable (currently only HTML output)
+   */
+  public static function describe(array $args){
 
-      $fn = explode('(', $item, 2);
+    $output = array();
 
-      // try to find out if this is a function
-      try{
-        $reflector = new \ReflectionFunction($fn[0]);        
+    $expressions = array_map('trim', static::getExpressions());
 
-        if($reflector->isInternal()){
-          $fn[0] = sprintf('<a href="%s" target="_blank">%s</a>', static::getPhpManUri('function', $fn[0]), $fn[0]);
-          $fn[0] = static::htmlEntity('srcFunction', $fn[0], $reflector);
-        }
-      
-      }catch(\Exception $e){
-
-        if(stripos($fn[0], 'new ') === 0){
-
-          $cn = explode(' ' , $fn[0], 2);
-
-          // linkify 'new keyword' (as constructor)
-          try{          
-            $reflector = new \ReflectionMethod($cn[1], '__construct');
-            if($reflector->isInternal()){
-              $cn[0] = sprintf('<a href="%s" target="_blank">%s</a>', static::getPhpManUri('method', $cn[1], '__construct'), $cn[0]);
-              $cn[0] = static::htmlEntity('srcClass', $cn[0], $reflector);
-            }              
-          }catch(\Exception $e){
-            $reflector = null;
-          }            
-
-          // class name...
-          try{          
-            $reflector = new \ReflectionClass($cn[1]);
-            if($reflector->isInternal()){
-              $cn[1] = sprintf('<a href="%s" target="_blank">%s</a>', static::getPhpManUri('class', $cn[1]), $cn[1]);
-              $cn[1] = static::htmlEntity('srcClass', $cn[1], $reflector);
-            }              
-          }catch(\Exception $e){
-            $reflector = null;
-          }      
-
-          $fn[0] = implode(' ', $cn);
-
-        }else{
-
-          if(strpos($item, '::') === false)
-            continue;        
-
-          $cn = explode('::', $fn[0], 2);
-
-          // perhaps it's a static class method; try to linkify method first
-          try{
-            $reflector = new \ReflectionMethod($cn[0], $cn[1]);
-
-            if($reflector->isInternal()){
-              $cn[1] = sprintf('<a href="%s" target="_blank">%s</a>', static::getPhpManUri('method', $cn[0], $cn[1]), $cn[1]);
-              $cn[1] = static::htmlEntity('srcMethod', $cn[1], $reflector);
-            }  
-
-          }catch(\Exception $e){
-            $reflector = null;
-          }        
-
-          // attempt to linkify the class name as well
-          try{
-            $reflector = new \ReflectionClass($cn[0]);
-
-            if($reflector->isInternal()){
-              $cn[0] = sprintf('<a href="%s" target="_blank">%s</a>', static::getPhpManUri('class', $cn[0]), $cn[0]);
-              $cn[0] = static::htmlEntity('srcClass', $cn[0], $reflector);
-            }  
-
-          }catch(\Exception $e){
-            $reflector = null;
-          }
-
-          // apply changes
-          $fn[0] = implode('::', $cn);
-        }  
-      }
-
-      $item = implode('(', $fn);
-
-      $reflector = null;
-      unset($reflector);
+    foreach($expressions as &$expression){
+      $instance = new static();
+      $expression = $instance->transformExpression($expression);
     }
 
+    $instance = null;
+    unset($instance);
 
     // iterate trough the arguments and print info for each one
     foreach($args as $index => $subject){
