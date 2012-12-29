@@ -113,9 +113,11 @@ final class ClassTest extends AbstractTest implements Testable{
 	 * Class constructor
 	 *
 	 * @since   1.0
-	 * @param   mixed $list   Value to set for "B"
+	 * @param   array $list               Value to set for "B"
+	 * @param   mixed &$refTest           A referenced variable
+	 * @param   Iterator $classHintTest   An iterateable instance
 	 */
-	public function __construct(array $list, &$refTest = null, \iterator $classHintTest = null){
+	public function __construct(array $list, &$refTest = null, \Iterator $classHintTest = null){
 		$this->list = $list;
 		$this->pubVarB = $this;
 		$this->currentDate = \DateTime::createFromFormat('U', time(), new \DateTimeZone('Europe/London'));

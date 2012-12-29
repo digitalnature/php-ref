@@ -1,8 +1,6 @@
 
-.ref *, .refDfn, #rTip{
+.ref, .refDfn, #rTip{
   font:normal normal 13px/18px Consolas, Monaco, Andale Mono, Courier New, monospace;      
-  margin: 0;
-  padding: 0;
 }
 
 .ref{
@@ -47,6 +45,11 @@
 }
 
 /* emulate a table for displaying array & object members */
+.ref dl, .ref dt, .ref dd{
+  margin: 0;
+  padding: 0;  
+}
+
 .ref dl{
   display:table-row;
 }
@@ -140,7 +143,7 @@
 }
 
 /* optional method arguments */
-.rParamOpt{
+.rOptional{
   font-style: italic;
   color: #aaa;
 }

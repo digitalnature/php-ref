@@ -70,7 +70,7 @@ class ref{
    * otherwise to php.net/manual (the english one)
    *
    * @since   1.0   
-   * @param   string $scheme    Scheme to use; valid schemes are 'interface', 'class', 'function' and 'method'
+   * @param   string $scheme    Scheme to use; valid schemes are 'class', 'function' and 'method'
    * @param   string $arg1      Class or function name
    * @param   string $arg2      Method name (require only for the 'method' scheme)
    * @return  string            URI string
@@ -102,8 +102,7 @@ class ref{
     array_push($args, $docRefExt);
 
     $schemes = array(
-      'interface' => '%s/class.%s%s',
-      'class'     => '%s/book.%s%s',
+      'class'     => '%s/class.%s%s',
       'function'  => '%s/function.%s%s',
       'method'    => '%s/%s.%s%s',
     );
@@ -269,7 +268,7 @@ class ref{
         $name = $interface->getName();
 
         if($interface->isInternal())
-          $name = sprintf('<a href="%s" target="_blank">%s</a>', static::getPhpManUri('interface', $name), $name);
+          $name = sprintf('<a href="%s" target="_blank">%s</a>', static::getPhpManUri('class', $name), $name);
 
         $intfNames[] = $this->htmlEntity('interface', $name, $interface);      
       }  
@@ -357,29 +356,42 @@ class ref{
           if($parameter->isPassedByReference())
             $paramName = sprintf('&amp;%s', $paramName);
 
-          if($parameter->getClass())
-            $paramName = sprintf('%s %s', $this->htmlEntity('classHint', $parameter->getClass()->getName(), $parameter->getClass()), $paramName);
+          $paramClass = $parameter->getClass();
+          $paramHint = '';
+
+          if($paramClass){
+            $paramHint = $this->htmlEntity('hint', $paramClass->getName(), $paramClass);
+            $paramHint = sprintf('<a href="%s" target="_blank">%s</a>', static::getPhpManUri('class', $paramClass->getName()), $paramHint);
+          }  
 
           if($parameter->isArray())
-            $paramName = sprintf('%s %s', $this->htmlEntity('arrayHint', 'Array', 'Expects array'), $paramName);
+            $paramHint = $this->htmlEntity('arrayHint', 'Array');
 
           $tip = null;
           
           foreach($tags as $tag){
             list($types, $varName, $varDesc) = $tag;
-            if($varName === $parameter->getName()){
+            if(ltrim($varName, '&') === $parameter->getName()){
               $tip = $varDesc;
               break;
             }  
           }
        
           if($parameter->isOptional()){
-            $paramName  = $this->htmlEntity('paramOpt', $paramName, $tip);
+            $paramName  = $this->htmlEntity('param', $paramName, $tip);
             $paramValue = $parameter->isDefaultValueAvailable() ? $parameter->getDefaultValue() : null;
-            $paramName  = $this->htmlEntity('paramValue', $paramName) . $this->htmlEntity('div', ' = ') . $this->toHtml($paramValue);
+            $paramName  = sprintf('%s%s<span class="rParamValue">%s</span>', $paramName, $this->htmlEntity('div', ' = '), $this->toHtml($paramValue));
 
-          }else{
+            if($paramHint)
+              $paramName = $paramHint . ' ' . $paramName;
+
+            $paramName  = sprintf('<span class="rOptional">%s</span>', $paramName);
+
+          }else{            
             $paramName = $this->htmlEntity('param', $paramName, $tip);
+
+            if($paramHint)
+              $paramName = $paramHint . ' ' . $paramName;            
           }
 
           $paramStrings[] = $paramName;
@@ -757,7 +769,7 @@ class ref{
 
             switch($type = $match[1]){
               case 'param':
-                if(preg_match('/^([^\s]*)\s*(?:\$([^\s]+))?\s*(.*)$/s', $match[2], $m))
+                if(preg_match('/^([^\s]*)\s*(?:(?:\$|\&\$)([^\s]+))?\s*(.*)$/s', $match[2], $m))
                   $tag = array($type, array(static::parseCommentHint(trim($m[1])), trim($m[2]), static::normalizeString($m[3])));
               break;    
 
