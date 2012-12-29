@@ -119,7 +119,7 @@ class ref{
    * @param   mixed $subject    Variable to query   
    * @return  string
    */
-  protected function toHtml(&$subject){
+  protected function transformSubject(&$subject){
 
      // expand first level
     $expState = $this->expanded ? 'exp' : 'col';
@@ -184,7 +184,7 @@ class ref{
           $output .= '<dl>';
           $output .= '<dt>' . $this->entity('key', htmlspecialchars($key, ENT_QUOTES), $keyInfo) . '</dt>';
           $output .= '<dt>' . $this->entity('div', '=&gt') . '<dt>';
-          $output .= '<dd>' . $this->toHtml($value) . '</dd>';
+          $output .= '<dd>' . $this->transformSubject($value) . '</dd>';
           $output .= '</dl>';
         }
 
@@ -296,7 +296,7 @@ class ref{
         $output .= sprintf('<dt>%s</dt>', $this->entity('div', '::'));
         $output .= sprintf('<dt>%s</dt>', $this->entity('constant', $name));
         $output .= sprintf('<dt>%s</dt>', $this->entity('div', '='));
-        $output .= sprintf('<dd>%s</dd>', $this->toHtml($value));        
+        $output .= sprintf('<dd>%s</dd>', $this->transformSubject($value));        
         $output .= '</dl>';
       }  
       
@@ -343,7 +343,7 @@ class ref{
         $output .= sprintf('<dt>%s</dt>', $modifiers);
         $output .= sprintf('<dt>%s</dt>', $this->entity('property', $name, $prop));
         $output .= sprintf('<dt>%s</dt>', $this->entity('div', '='));
-        $output .= sprintf('<dd>%s</dd>', $this->toHtml($value));
+        $output .= sprintf('<dd>%s</dd>', $this->transformSubject($value));
         $output .= '</dl>';        
       }
 
@@ -396,7 +396,7 @@ class ref{
           if($parameter->isOptional()){
             $paramName  = $this->entity('param', $paramName, $tip);
             $paramValue = $parameter->isDefaultValueAvailable() ? $parameter->getDefaultValue() : null;
-            $paramName  = sprintf('%s%s<span class="rParamValue">%s</span>', $paramName, $this->entity('div', ' = '), $this->toHtml($paramValue));
+            $paramName  = sprintf('%s%s<span class="rParamValue">%s</span>', $paramName, $this->entity('div', ' = '), $this->transformSubject($paramValue));
 
             if($paramHint)
               $paramName = $paramHint . ' ' . $paramName;
@@ -736,7 +736,7 @@ class ref{
 
       $instance = new static();
 
-      $html = $instance->toHtml($subject);
+      $html = $instance->transformSubject($subject);
  
       // first call? include styles & js
       if(!static::$didAssets){
