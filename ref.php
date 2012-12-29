@@ -27,7 +27,7 @@ class ref{
 
     // shortcut function used to access the ::describe method below;
     // if its namespaced, the namespace must be present as well
-    SHORTCUT_FUNC      = 'r',
+    SHORTCUT_FUNC     = 'r',
 
     // regex used to parse tags in docblocks
     COMMENT_TAG_REGEX = '@([^ ]+)(?:\s+(.*?))?(?=(\n[ \t]*@|\s*$))';
@@ -59,7 +59,59 @@ class ref{
 
 
   /**
-   * Generates info report from the given variable
+   * Generates an URI to PHP's documentation page for the requested context
+   *
+   * URI will point to the local PHP manual if installed and configured,
+   * otherwise to php.net/manual (the english one)
+   *
+   * @since   1.0   
+   * @param   string $scheme    Scheme to use; valid schemes are 'interface', 'class', 'function' and 'method'
+   * @param   string $arg1      Class or function name
+   * @param   string $arg2      Method name (require only for the 'method' scheme)
+   * @return  string            URI string
+   */
+  protected static function getPhpManUri($scheme){
+
+    static
+      $docRefRoot = null,
+      $docRefExt  = null;
+
+     // most people don't have this set
+    if(!$docRefRoot)
+      $docRefRoot = rtrim(ini_get('docref_root'), '/');
+
+    if(!$docRefRoot)
+      $docRefRoot = 'http://php.net/manual/en';
+
+    if(!$docRefExt)
+      $docRefExt = ltrim(ini_get('docref_ext'), '.');
+
+    if(!$docRefExt)
+      $docRefExt = 'php';
+
+    $args   = func_get_args();
+    $scheme = array_shift($args);
+
+    foreach($args as &$arg)
+      $arg = str_replace('_', '-', ltrim(strtolower($arg), '\\_'));
+
+    array_unshift($args, $docRefRoot);
+    array_push($args, $docRefExt);
+
+    $schemes = array(
+      'interface' => '%s/class.%s.%s',
+      'class'     => '%s/book.%s.%s',
+      'function'  => '%s/function.%s.%s',
+      'method'    => '%s/%s.%s.%s',
+    );
+
+    return vsprintf($schemes[$scheme], $args);
+  }
+
+
+
+  /**
+   * Builds a HTML string with information about $subject
    *
    * @since   1.0   
    * @param   mixed $subject    Variable to query   
@@ -125,7 +177,7 @@ class ref{
           if($key === $this->arrayMarker)
             continue;
 
-          $keyInfo = is_string($key) ? sprintf('Key: %s (%d)', gettype($key), strlen($key)) : gettype($key);
+          $keyInfo = is_string($key) ? sprintf('String key (%d)', strlen($key)) : sprintf('Integer key', gettype($key));
 
           $output .= '<dl>';
           $output .= '<dt>' . $this->htmlEntity('key', htmlspecialchars($key, ENT_QUOTES), $keyInfo) . '</dt>';
@@ -167,15 +219,13 @@ class ref{
 
       if($class->isIterateable())
         $modifiers .= $this->htmlEntity('iterateable', 'X', 'Instances of this class are iterateable');            
-
+     
       $className = $class->getName();
 
       if($class->isInternal())
-        $className = sprintf('<a href="http://php.net/manual/en/book.%s.php" target="_blank">%s</a>', strtolower($className), $className);
+        $className = sprintf('<a href="%s" target="_blank">%s</a>', static::getPhpManUri('class', $className), $className);
 
-      $className = $this->htmlEntity('class', $className, $class);      
-
-      $class = $modifiers . $className;
+      $class = $modifiers . $this->htmlEntity('class', $className, $class);
     }  
 
     $objectName = implode(' :: ', array_reverse($classes));
@@ -198,7 +248,7 @@ class ref{
     $traits     = (PHP_MINOR_VERSION > 3) ? $reflector->getTraits() : array();
 
     // no data to display?
-    if(!$props && !$methods && !$constants && !$interfaces)
+    if(!$props && !$methods && !$constants && !$interfaces && !$traits)
       return $this->htmlEntity('object', $objectName . ' Object()');
 
     $output .= $this->htmlEntity('object', $objectName . ' Object(');
@@ -211,8 +261,15 @@ class ref{
 
       $intfNames = array();
 
-      foreach($interfaces as $name => $interface)
-        $intfNames[] = $this->htmlEntity('interface', $interface->getName(), $interface);
+      foreach($interfaces as $name => $interface){
+
+        $name = $interface->getName();
+
+        if($interface->isInternal())
+          $name = sprintf('<a href="%s" target="_blank">%s</a>', static::getPhpManUri('interface', $name), $name);
+
+        $intfNames[] = $this->htmlEntity('interface', $name, $interface);      
+      }  
 
       $output .= sprintf('<dl><dt>%s</dt></dl>', implode(', ', $intfNames));
     }
@@ -339,10 +396,8 @@ class ref{
 
         $name = $method->name;
 
-        if($method->isInternal()){
-          $phpName = str_replace('_', '-', ltrim(strtolower($name), '_'));
-          $name = sprintf('<a href="http://php.net/manual/en/%s.%s" target="_blank">%s</a>', strtolower($method->getDeclaringClass()->getName()), $phpName, $name);
-        }  
+        if($method->isInternal())
+          $name = sprintf('<a href="%s" target="_blank">%s</a>', static::getPhpManUri('method', $method->getDeclaringClass()->getName(), $name), $name);
 
         $name = $this->htmlEntity($htmlClass, $name, $method);  
 
@@ -369,7 +424,7 @@ class ref{
 
 
   /**
-   * Helper method, used to generate a SPAN tag with the given info
+   * Helper method, used to generate a SPAN tag with the provided class, text and tooltip content
    *
    * @since   1.0
    * @param   string $class           Entity class ('r' will be prepended to it)
@@ -551,7 +606,7 @@ class ref{
         $item = static::htmlEntity('srcFunction', $item, $reflector);
 
         if($reflector->isInternal())
-          $item = sprintf('<a href="http://php.net/manual/en/function.%s.php" target="_blank">%s</a>', str_replace('_', '-', strtolower($fn[0])), $item);
+          $item = sprintf('<a href="%s" target="_blank">%s</a>', static::getPhpManUri('function', $fn[0]), $item);
       
       }catch(\Exception $e){
 
@@ -566,7 +621,7 @@ class ref{
           $item = static::htmlEntity('srcMethod', $item, $reflector);
 
           if($reflector->isInternal())
-            $item = sprintf('<a href="http://php.net/manual/en/%s.%s.php" target="_blank">%s</a>', ltrim(strtolower($fn[0]), '\\'), strtolower($fn[1]), $item);
+            $item = sprintf('<a href="%s" target="_blank">%s</a>', static::getPhpManUri('method', $fn[0], $fn[1]), $item);
 
         }catch(\Exception $e){
           $reflector = null;
