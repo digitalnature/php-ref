@@ -105,9 +105,9 @@ final class ClassTest extends AbstractTest implements Testable{
 	  
 	  
 		/**
-		 * Stream resource
+		 * Curl resource
 		 */	  
-	  $stream      = null;	  
+	  $curl        = null;	  
 
 
 
@@ -134,17 +134,25 @@ final class ClassTest extends AbstractTest implements Testable{
 		$this->pubVarB = $this;
 		$this->currentDate = \DateTime::createFromFormat('U', time(), new \DateTimeZone('Europe/London'));
 		$this->image = imagecreate(1, 1);	
-		$this->stream = fopen('php://stdin', 'r');
+
+		$curl = curl_init();
+		curl_setopt($curl, CURLOPT_RETURNTRANSFER, 1);
+		curl_setopt($curl, CURLOPT_URL, 'http://localhost');
+		curl_setopt($curl, CURLOPT_HEADER, 0);
+		curl_exec($curl);
+
+		$this->curl = $curl;
 	}
 
 
 
 	/**
-	 * The destructor destroys the created image resource
+	 * The destructor destroys the created image resource and the curl connection
 	 *
 	 * @since   1.0
 	 */
 	public function __destruct(){
+		curl_close($this->curl);
 		imagedestroy($this->image);
 	}
 
