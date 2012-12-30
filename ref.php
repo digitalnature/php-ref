@@ -184,7 +184,7 @@ class ref{
 
           // mysql result
           case 'mysql result':
-            while($row = mysql_fetch_object($subject))
+            while($row = @mysql_fetch_object($subject))
               $meta[] = (array)$row;
 
           break;
@@ -307,7 +307,7 @@ class ref{
       $class = $this->modifiers($modifiers) . $this->entity('class', $className, $class);
     }  
 
-    $objectName = implode(' :: ', array_reverse($classes));
+    $objectName = implode($this->entity('sep', ' :: '), array_reverse($classes));
     $objectHash = spl_object_hash($subject);
 
     // already been here?
@@ -348,7 +348,7 @@ class ref{
         $intfNames[] = $this->entity('interface', $name, $interface);      
       }  
 
-      $output .= $this->section(array((array)implode(', ', $intfNames)), 'Interfaces');
+      $output .= $this->section(array((array)implode($this->entity('sep', ', '), $intfNames)), 'Implements');
     }
 
     // class constants
@@ -454,11 +454,9 @@ class ref{
 
           $paramHint = '';
 
-          if($paramClass){
-            $paramHint = $this->entity('hint', $paramClass->getName(), $paramClass);
-            $paramHint = $this->anchor($paramHint, 'class', $paramClass->getName());
-          }  
-
+          if($paramClass)
+            $paramHint = $this->entity('hint', $this->anchor($paramClass->getName(), 'class'), $paramClass);
+          
           if($parameter->isArray())
             $paramHint = $this->entity('arrayHint', 'Array');
 
@@ -522,7 +520,7 @@ class ref{
         $items[$index++] = array(
           $this->entity('sep', $method->isStatic() ? '::' : '->', $modTip),
           $this->modifiers($modifiers),
-          $name . ' (' . implode(', ', $paramStrings) . ')',
+          $name . $this->entity('sep', ' (') . implode($this->entity('sep', ', '), $paramStrings) . $this->entity('sep', ')'),
         );       
       }
 
@@ -535,7 +533,7 @@ class ref{
 
 
   /**
-   * Scans for default classes and functions inside the provided expression,
+   * Scans for internal classes and functions inside the provided expression,
    * and formats them when possible
    *
    * @since   1.0
@@ -634,7 +632,7 @@ class ref{
 
 
   /**
-   * Returns human-readable info about the given variable(s)
+   * Creates the root structure that contains all the groups and entities
    *   
    * @since   1.0
    * @param   mixed $subject           Variable to query
@@ -738,7 +736,7 @@ class ref{
 
 
   /**
-   * Creates a section
+   * Creates a group section
    *
    * @since   1.0
    * @param   array|splFixedArray $items    Array or SplFixedArray instance containing rows and columns (columns as arrays)
@@ -823,6 +821,7 @@ class ref{
    * otherwise to php.net/manual (the english one)
    *
    * @since   1.0   
+   * @todo    maybe, detect and linkify functions from popular frameworks
    * @param   string $scheme     Scheme to use; valid schemes are 'class', 'function', 'method', 'constant' (class only) and 'property'
    * @param   string $id1        Class or function name
    * @param   string|null $id2   Method name (required only for the 'method' scheme)
@@ -933,7 +932,7 @@ class ref{
 
 
   /**
-   * Generates modifier bubbles
+   * Creates modifier bubbles
    *
    * @since   1.0
    * @param   string $class           Entity class ('r' will be prepended to it, then the entire thing gets camelized)

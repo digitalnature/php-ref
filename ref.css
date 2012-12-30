@@ -39,11 +39,18 @@
 /* source expression */
 .rExp{
   margin: 2px 0 0;
-  padding: 2px 4px;
+  padding: 2px 4px 3px;
   display: block;
-  background: #333;  
   color: #ccc;
   border-radius: 4px 4px 0 0;
+  border-bottom: 1px solid #fff;
+  background-color: #333;
+  background-image: -moz-linear-gradient(top, #444, #333);
+  background-image: -ms-linear-gradient(top, #444, #333);
+  background-image: -webkit-gradient(linear, 0 0, 0 100%, from(#444), to(#333));
+  background-image: -webkit-linear-gradient(top, #444, #333);
+  background-image: -o-linear-gradient(top, #444, #333);
+  background-image: linear-gradient(top, #444, #333);  
 }
 
 /* expand/collapse toggle link for groups */
@@ -190,11 +197,12 @@
 
 /* resources */
 .rResource{
-  background: #343434;
+  background: #0057ae;
 }   
 
-.rResourceInfo{
+.rResourceInfo{  
   font: bold 11px Helvetica, Arial;   
+  color: #999;
 }
 
 /* integer or double values */

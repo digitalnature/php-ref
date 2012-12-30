@@ -133,15 +133,19 @@ final class ClassTest extends AbstractTest implements Testable{
 		$this->list = $list;
 		$this->pubVarB = $this;
 		$this->currentDate = \DateTime::createFromFormat('U', time(), new \DateTimeZone('Europe/London'));
-		$this->image = imagecreate(1, 1);	
 
-		$curl = curl_init();
-		curl_setopt($curl, CURLOPT_RETURNTRANSFER, 1);
-		curl_setopt($curl, CURLOPT_URL, 'http://localhost');
-		curl_setopt($curl, CURLOPT_HEADER, 0);
-		curl_exec($curl);
+		if(extension_loaded('gd'))
+		  $this->image = imagecreate(1, 1);	
 
-		$this->curl = $curl;
+		if(extension_loaded('curl')){
+			$curl = curl_init();
+			curl_setopt($curl, CURLOPT_RETURNTRANSFER, 1);
+			curl_setopt($curl, CURLOPT_URL, 'http://localhost');
+			curl_setopt($curl, CURLOPT_HEADER, 0);
+			curl_exec($curl);
+
+			$this->curl = $curl;
+	  }		
 	}
 
 
@@ -152,8 +156,12 @@ final class ClassTest extends AbstractTest implements Testable{
 	 * @since   1.0
 	 */
 	public function __destruct(){
-		curl_close($this->curl);
-		imagedestroy($this->image);
+
+		if(isset($this->curl))
+		  curl_close($this->curl);
+
+		if(isset($this->image))
+		  imagedestroy($this->image);
 	}
 
 
