@@ -146,13 +146,13 @@
   color:#CC0033;
 }
 
-.rMethod, .rMethodInherited{
+.rMethod{
   font-weight: bold;
   color: #0057ae;
 }
 
 /* inherited methods */
-.rMethodInherited{
+.rInherited .rMethod{
   color: #80b3e6;
 }
 

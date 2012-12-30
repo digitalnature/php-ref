@@ -1,14 +1,14 @@
 
 REF, or `r()` is a nicer alternative to PHP's [`print_r`](http://php.net/manual/en/function.print-r.php) / [`var_dump`](http://php.net/manual/en/function.var-dump.php) functions.
 
-[**DEMO**](http://dev.digitalnature.eu/php-ref/)
+## [DEMO](http://dev.digitalnature.eu/php-ref/) ##
 
-<h2>Requirements</h2>
+## Requirements ##
 
 - (server) PHP 5.3+ (5.4+  displays additional info)
 - (client) Any browser, except IE 8 and lower of course
 
-<h2>Usage and Modifiers</h2>
+## Usage and Modifiers ##
 
 To print the information as HTML, call the function normally:
        

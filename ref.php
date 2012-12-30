@@ -43,6 +43,7 @@ function r(){
     print ($mode !== 'html') ? $output : '<!DOCTYPE HTML><html><body>' . $output;    
   }  
 
+  // '~' modifier stops execution of the script
   if(in_array('~', $modifiers, true))
     exit(0);
 }
@@ -172,8 +173,8 @@ class ref{
         $index = 0;
 
         // the array might contain a huge amount of entries; splFixedArray saves us some memory usage.
-        // A more efficient way is be to build the items as a string (concatenate each item),
-        // but then we loose the flexibility that the create* methods provide us (exporting data in different formats becomes harder)
+        // A more efficient way is to build the items as a string (concatenate each item),
+        // but then we loose the flexibility that the entity/group/section methods provide us (exporting data in different formats becomes harder)
         $items = new \SplFixedArray($itemCount);
 
         foreach($subject as $key => &$value){
@@ -199,7 +200,7 @@ class ref{
     }
 
     // if we reached this point, $subject must be an object
-    $classes = $sections = $internalParents = array();
+    $classes = $internalParents = array();
     $haveParent = new \ReflectionObject($subject);
 
     // get parent/ancestor classes
@@ -283,7 +284,6 @@ class ref{
 
     // class constants
     if($constants){
-
       $itemCount = count($constants);
       $index = 0;
       $items = new \SplFixedArray($itemCount);
@@ -307,8 +307,7 @@ class ref{
     }
 
     // traits this objects' class uses
-    if($traits){
-  
+    if($traits){  
       $traitNames = array();
       foreach($traits as $name => $trait)
         $traitNames[] = $this->entity('trait', $trait->getName(), $trait);
@@ -318,7 +317,6 @@ class ref{
 
     // object/class properties
     if($props){
-
       $itemCount = count($props);
       $index = 0;
       $items = new \SplFixedArray($itemCount);
@@ -358,7 +356,6 @@ class ref{
 
     // class methods
     if($methods){
-
       $itemCount = count($methods);
       $index = 0;
       $items = new \SplFixedArray($itemCount);
@@ -422,9 +419,7 @@ class ref{
 
         // is this method inherited?
         $inherited = $reflector->getShortName() !== $method->getDeclaringClass()->getShortName();
-        $htmlClass = $inherited ? 'methodInherited' : 'method';     
-
-        $modTip = $inherited ? sprintf('Inherited from ::%s', $method->getDeclaringClass()->getShortName()) : null;
+        $modTip    = $inherited ? sprintf('Inherited from ::%s', $method->getDeclaringClass()->getShortName()) : null;
 
         if($method->isAbstract())
           $modifiers[] = array('abstract', 'A', 'This method is abstract');
@@ -443,7 +438,10 @@ class ref{
         if($method->isInternal())
           $name = $this->anchor($name, 'method', $method->getDeclaringClass()->getName(), $name);          
 
-        $name = $this->entity($htmlClass, $name, $method);  
+        $name = $this->entity('method', $name, $method);
+
+        if($inherited)
+          $name = $this->entity('inherited', $name);
 
         $items[$index++] = array(
           $this->entity('sep', $method->isStatic() ? '::' : '->', $modTip),
@@ -462,10 +460,10 @@ class ref{
 
   /**
    * Scans for default classes and functions inside the provided expression,
-   * and linkifies them when possible
+   * and formats them when possible
    *
    * @since   1.0
-   * @param   string $expression      Expression to linkify
+   * @param   string $expression      Expression to format
    * @return  string                  Formatted output
    */
   public function transformExpression($expression){
@@ -566,7 +564,7 @@ class ref{
    * @param   mixed $subject           Variable to query
    * @param   string|null $expression  Source expression string
    * @param   string $format           Output format
-   * @return  string                   Information about each variable
+   * @return  string                   Formatted information
    */
   public static function build($subject, $expression = null, $format = 'html'){
 
@@ -743,8 +741,7 @@ class ref{
 
 
   /**
-   * Generates an anchor that links to the documentation page 
-   * relevant for the requested context
+   * Generates an anchor that links to the documentation page relevant for the requested context
    *
    * The URI will point to the local PHP manual if installed and configured,
    * otherwise to php.net/manual (the english one)
@@ -813,7 +810,7 @@ class ref{
     if($text === null)
       $text = $class;
 
-    // we can't show all tips in text-mode
+    // we can't show all tip content in text-mode
     if($this->format !== 'html'){
 
       if(in_array($class, array('string', 'integer', 'double', 'true', 'false')))
@@ -892,6 +889,7 @@ class ref{
    * Determines the input expression(s) passed to the shortcut function
    *
    * @since   1.0
+   * @todo    improve this!
    * @param   array &$modifiers   If this variable is present, modifiers will be stored here
    * @return  array               Array of string expressions
    */
