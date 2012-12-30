@@ -131,6 +131,10 @@
   background: #343434;
 }   
 
+.rStreamInfo{
+  font: bold 11px Helvetica, Arial;   
+}
+
 /* integer or double values */
 .rInteger, .rDouble{
   color: #0099CC;

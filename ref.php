@@ -141,7 +141,76 @@ class ref{
 
       // resource
       case is_resource($subject):
-        return $this->entity('resource', sprintf('%s: %s', $subject, get_resource_type($subject)), gettype($subject));        
+
+        $type = get_resource_type($subject);
+        $name = $this->entity('resource', $subject, gettype($subject));        
+
+        // @see: http://php.net/manual/en/resource.php
+        // need to add more...
+        switch($type){
+
+          // curl extension resource
+          case 'curl':
+            $meta = curl_getinfo($subject);
+          break;
+
+          // gd image extension resource
+          case 'gd':
+
+            $meta = array(
+               'size'       => sprintf('%d x %d', imagesx($subject), imagesy($subject)),
+               'true_color' => imageistruecolor($subject),
+            );
+
+          break;          
+
+          // mysql connection (mysql extension is deprecated from php 5.4/5.5)
+          case 'mysql link':
+          case 'mysql link persistent':
+
+            $dbs = array();
+            $query = @mysql_list_dbs($subject);
+            while($row = @mysql_fetch_array($query))
+              $dbs[] = $row['Database'];
+
+            $meta = array(
+              'host'             => ltrim(@mysql_get_host_info ($subject), 'MySQL host info: '),
+              'server_version'   => @mysql_get_server_info($subject),
+              'protocol_version' => @mysql_get_proto_info($subject),
+              'databases'        => $dbs,
+            );
+
+          break;
+
+          // mysql result
+          case 'mysql result':
+            while($row = mysql_fetch_object($subject))
+              $meta[] = (array)$row;
+
+          break;
+
+          // stream resource (fopen, fsockopen, popen, opendir etc)
+          case 'stream':
+            $meta = stream_get_meta_data($subject);
+          break;
+
+          default:
+            $meta = array();
+
+        }
+
+        $items = array();
+
+        foreach($meta as $key => $value){
+          $key = ucwords(str_replace('_', ' ', $key));
+          $items[] = array(
+            $this->entity('streamInfo', htmlspecialchars($key, ENT_QUOTES)),
+            $this->entity('sep', ':'),
+            $this->transformSubject($value),
+          );
+        }  
+
+        return $name . $this->group($type, $items ? $expState : null, $this->section($items));
 
       // integer or double
       case is_int($subject) || is_float($subject):

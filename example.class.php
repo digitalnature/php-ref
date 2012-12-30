@@ -95,7 +95,19 @@ final class ClassTest extends AbstractTest implements Testable{
 		/**
 		 * DateTime object
 		 */
-	  $currentDate = null;	  
+	  $currentDate = null,
+	  
+
+		/**
+		 * Image resource created with GD
+		 */	  
+	  $image       = null,
+	  
+	  
+		/**
+		 * Stream resource
+		 */	  
+	  $stream      = null;	  
 
 
 
@@ -121,7 +133,21 @@ final class ClassTest extends AbstractTest implements Testable{
 		$this->list = $list;
 		$this->pubVarB = $this;
 		$this->currentDate = \DateTime::createFromFormat('U', time(), new \DateTimeZone('Europe/London'));
+		$this->image = imagecreate(1, 1);	
+		$this->stream = fopen('php://stdin', 'r');
 	}
+
+
+
+	/**
+	 * The destructor destroys the created image resource
+	 *
+	 * @since   1.0
+	 */
+	public function __destruct(){
+		imagedestroy($this->image);
+	}
+
 
 
 	/**

@@ -13,6 +13,14 @@ $array = array(
 
 $array['self'] = &$array;
 
-r(true, false,  null, fopen('php://stdin', 'r'), 24, 4.20, "Hey look a string", array(), $array);
+$curl = curl_init();
+curl_setopt($curl, CURLOPT_RETURNTRANSFER, 1);
+curl_setopt($curl, CURLOPT_URL, 'http://localhost');
+curl_setopt($curl, CURLOPT_HEADER, 0);
+curl_exec($curl);
+
+r(true, false,  null, $curl, 24, 4.20, "Hey look a string", array(), $array);
 r(new \DateTimeZone('Europe/London'));
 r($obj);
+
+curl_close($curl);
