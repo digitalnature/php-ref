@@ -1,5 +1,5 @@
 
-.ref, .refDfn, #rTip{
+.ref, .rExp, #rTip{
   font:normal normal 13px/18px Consolas, Monaco, Andale Mono, Courier New, monospace;      
 }
 
@@ -13,7 +13,7 @@
   text-shadow: #fff 0 1px 0;
 }
 
-.ref a, .refDfn a, #rTip a{
+.ref a, .rExp a, #rTip a{
   color: inherit;
   text-decoration: underline;
 }
@@ -35,13 +35,17 @@
   box-shadow:0 0 4px rgba(0,0,0, 0.25);
 }
 
-.refDfn{
+.rExp{
   margin: 2px 0 0;
   padding: 2px 4px;
   display: block;
   background: #333;  
   color: #ccc;
   border-radius: 4px 4px 0 0;
+}
+
+.ref section{
+  display: table;
 }
 
 /* emulate a table for displaying array & object members */
@@ -61,11 +65,11 @@
 }
 
 .ref dd{
-  width: 100% !important;
+  width: 100%;
 }
 
 .ref section dl:nth-child(odd){
-  background: #f6f6f6;
+  background: #f4f4f4;
 }
 
 .ref section dl:nth-child(even){
@@ -78,7 +82,7 @@
 }
 
 /* hidden content (used to generate the tooltip */
-.ref code, .refDfn code{
+.ref code, .rExp code{
   display: none;  
 }
 
@@ -88,7 +92,7 @@
 }
 
 /* key-value dividers, property & method modifiers etc. */
-.rDiv{
+.rSep{
   color: #ccc;
 }
 
@@ -135,11 +139,10 @@
 /* string values */
 .rString{
   color: #669933;
-  background: #f6f9f3; 
 }
 
 /* arrays & objects */
-.rArray, .rObject, .rInterface, .rTrait{
+.rGroup, .rArray, .rObject, .rInterface, .rTrait{
   color:#CC0033;
 }
 
@@ -159,8 +162,8 @@
   color: #aaa;
 }
 
-/* array info text */
-.rArray > b, .rObject > b{
+/* group info prefix */
+.rGroup > b{
   font: bold 11px Helvetica, Arial;  
   text-transform: lowercase;
   padding: 0 5px;
@@ -244,11 +247,11 @@
 }
 
 /* trick to hide next element when this class is present */
-.rToggle.col + section{
+.rToggle.col + div{
   display: none;
 }
 
 /* same, but displays the element */
-.rToggle.exp + section{
+.rToggle.exp + div{
   display: block;
 }

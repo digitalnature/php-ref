@@ -1,28 +1,44 @@
 
 REF, or `r()` is a nicer alternative to PHP's [`print_r`](http://php.net/manual/en/function.print-r.php) / [`var_dump`](http://php.net/manual/en/function.var-dump.php) functions.
 
-[**DEMO**](http://dev.digitalnature.eu/php-ref/) (Same example inside the index.php file)
+[**DEMO**](http://dev.digitalnature.eu/php-ref/) (Same examples inside the index.php file)
 
 <h2>Requirements</h2>
 
 - (server) PHP 5.3+ (5.4+  displays additional info)
 - (client) Any browser, except IE 8 and lower of course
 
-Some limitations:
+<h2>Usage and Modifiers</h2>
 
-- currently HTML output only
-- the source expression "parser" assumes the expression doesn't span across multiple lines (this is not meant to be a PHP parser, so don't expect this to change in the future)
+To print the information as HTML, call the function normally:
+       
+    require '/full/path/to/ref.php';
 
+    // display info about defined classes
+    r(get_declared_classes());
 
+    // display info about global variables
+    r($GLOBALS);
 
-<h2>Usage</h2>
+For convenience reasons, basic display options can be set by prepending modifiers (operators) to the `r()` function name:
 
-    <?php
+  - To print the information in plain text, call the shortcut function with the `\` modifier (namespace separator), like
 
-       require '/full/path/to/ref.php';
+        \r($subject1, $subject2 ...);
 
-       // display info about defined classes
-       r(get_declared_classes());
+    If no headers were sent, the Content-Type header will be set to `text/plain` in order for the browser to interpret the output correctly.
 
-       // display info about global variables
-       r($GLOBALS);
+  - To return the information as HTML, call the function with the `@` modifier (the error control operator), for example
+
+        echo @r($subject1, $subject2 ...);
+
+  - To return the info as text, combine them both
+
+        echo @\r($subject1, $subject2 ...);
+
+  - To stop the script after printing the info, use the `~` modifier (bitwise 'not' operator)
+
+        ~r($subject1, $subject2 ...);  // html
+        ~\r($subject1, $subject2 ...); // text
+
+If you wish to avoid these weird-ass function calling methods, you can always create your own output function that uses `ref::build()` :)

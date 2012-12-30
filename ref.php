@@ -6,14 +6,16 @@
  * Shortcut to ref::build()
  *
  * @version  1.0
- * @param    mixed $arg
+ * @param    mixed $args
  * @return   string
  */
 function r(){
 
+  $modifiers   = array();
   $args        = func_get_args();
   $output      = array();  
-  $expressions = ref::getSourceExpressions();
+  $expressions = ref::getSourceExpressions($modifiers);
+  $mode        = in_array('\\', $modifiers, true) ? 'text' : 'html';
 
   // something went wrong while trying to parse the source expressions;
   // silently ignore this part
@@ -21,24 +23,34 @@ function r(){
     $expressions = array();
 
   foreach($args as $index => $arg)
-    $output[] = ref::build($arg, isset($expressions[$index]) ? $expressions[$index] : null);
+    $output[] = ref::build($arg, isset($expressions[$index]) ? $expressions[$index] : null, $mode);
 
   $output = implode("\n\n", $output);
 
-  if(headers_sent())
-    return print $output;
+  // '@' modifier forces return only
+  if(in_array('@', $modifiers, true))
+    return $output;     
 
-  // print html tags because IE freaks out if it doesn't get them
-  return printf('<!DOCTYPE HTML><html><body>%s', $output);
+  if(headers_sent()){    
+    print $output;
+      
+  }else{
+
+    if($mode !== 'html')
+      header('Content-Type: text/plain');
+
+    // print html tags because IE freaks out if it doesn't get them
+    print ($mode !== 'html') ? $output : '<!DOCTYPE HTML><html><body>' . $output;    
+  }  
+
+  if(in_array('~', $modifiers, true))
+    exit(0);
 }
 
 
 
 /**
  * REF is a nicer alternative to PHP's print_r() / var_dump().
- *
- * Current only HTML output is supported.
- * Plain text support is on the @todo list ;)
  *
  * @version  1.0
  * @author   digitalnature, http://digitalnature.eu
@@ -58,12 +70,15 @@ class ref{
 
   protected static
 
-    // tracks style/jscript inclusion state
-    $didAssets = false,    
-
     // used to determine the position of the current call,
     // if more ::build() calls were made on the same line
-    $lineInst  = array();
+    $lineInst  = array(),
+
+    // tracks style/jscript inclusion state (html only)
+    $didAssets = false,
+
+    // instance index (gets displayed as comment in html-mode)
+    $counter   = 1;          
 
 
 
@@ -76,54 +91,23 @@ class ref{
     $objectHashes = array(),
 
     // expand/collapse state
-    $expanded     = true;
+    $expanded     = true,
+
+    // output format
+    $format       = 'html';
 
 
 
   /**
-   * Generates an URI to the PHP's documentation page for the requested context
+   * Currently the constructor will only set up the output format.
    *
-   * URI will point to the local PHP manual if installed and configured,
-   * otherwise to php.net/manual (the english one)
+   * Other options might be added in the future
    *
-   * @since   1.0   
-   * @param   string $scheme     Scheme to use; valid schemes are 'class', 'function', 'method', 'constant' (class only) and 'property'
-   * @param   string $arg1       Class or function name
-   * @param   string|null $arg2  Method name (required only for the 'method' scheme)
-   * @return  string             URI string
+   * @since   1.0
+   * @param   string $format
    */
-  protected static function getPhpManUri($scheme, $arg1, $arg2 = null){
-
-    static $docRefRoot = null, $docRefExt  = null;
-
-     // most people don't have this set
-    if(!$docRefRoot)
-      $docRefRoot = rtrim(ini_get('docref_root'), '/');
-
-    if(!$docRefRoot)
-      $docRefRoot = 'http://php.net/manual/en';
-
-    if(!$docRefExt)
-      $docRefExt = ini_get('docref_ext');
-
-    if(!$docRefExt)
-      $docRefExt = '.php';
-
-    $args   = func_get_args();
-    $scheme = array_shift($args);
-
-    foreach($args as &$arg)
-      $arg = str_replace('_', '-', ltrim(strtolower($arg), '\\_'));
-
-    $schemes = array(
-      'class'     => $docRefRoot . '/class.%s'    . $docRefExt,
-      'function'  => $docRefRoot . '/function.%s' . $docRefExt,
-      'method'    => $docRefRoot . '/%1$s.%2$s'   . $docRefExt,
-      'constant'  => $docRefRoot . '/class.%1$s'  . $docRefExt . '#%1$s.constants.%2$s',
-      'property'  => $docRefRoot . '/class.%1$s'  . $docRefExt . '#%1$s.props.%2$s',
-    );
-
-    return vsprintf($schemes[$scheme], $args);
+  public function __construct($format = 'html'){
+    $this->format = $format;
   }
 
 
@@ -141,8 +125,6 @@ class ref{
     $expState = $this->expanded ? 'exp' : 'col';
 
     $this->expanded = false;       
-
-    $output = '';   
 
     // identify variable type
     switch(true){
@@ -166,14 +148,14 @@ class ref{
 
       // string
       case is_string($subject):
-        return $this->entity('string', htmlspecialchars($subject, ENT_QUOTES), sprintf('%s (%d)', gettype($subject), strlen($subject)));        
+        return $this->entity('string', htmlspecialchars($subject, ENT_QUOTES), sprintf('%s/%d', gettype($subject), strlen($subject)));        
 
       // arrays
       case is_array($subject):
 
         // empty array?
         if(empty($subject))      
-          return $this->entity('array', 'Array()');
+          return $this->entity('array', 'Array') . $this->group();
 
         // set a marker to detect recursion
         if(!$this->arrayMarker)
@@ -181,13 +163,18 @@ class ref{
 
         // if our marker element is present in the array it means that we were here before
         if(isset($subject[$this->arrayMarker]))
-          return $this->entity('array', 'Array(<b>Recursion</b>)');
+          return $this->entity('array', 'Array') . $this->group('Recursion');
 
-        $subject[$this->arrayMarker] = true;             
+        $subject[$this->arrayMarker] = true;
 
         // note that we must substract the marker element
-        $output .= $this->entity('array', sprintf('Array(<b>%d</b>', count($subject) - 1));
-        $output .= sprintf('<a class="rToggle %s"></a><section><div>', $expState);
+        $itemCount = count($subject) - 1;
+        $index = 0;
+
+        // the array might contain a huge amount of entries; splFixedArray saves us some memory usage.
+        // A more efficient way is be to build the items as a string (concatenate each item),
+        // but then we loose the flexibility that the create* methods provide us (exporting data in different formats becomes harder)
+        $items = new \SplFixedArray($itemCount);
 
         foreach($subject as $key => &$value){
 
@@ -197,18 +184,18 @@ class ref{
 
           $keyInfo = is_string($key) ? sprintf('String key (%d)', strlen($key)) : sprintf('Integer key', gettype($key));
 
-          $output .= '<dl>';
-          $output .= '<dt>' . $this->entity('key', htmlspecialchars($key, ENT_QUOTES), $keyInfo) . '</dt>';
-          $output .= '<dt>' . $this->entity('div', '=&gt') . '<dt>';
-          $output .= '<dd>' . $this->transformSubject($value) . '</dd>';
-          $output .= '</dl>';
+          $items[$index++] = array(
+            $this->entity('key', htmlspecialchars($key, ENT_QUOTES), $keyInfo),
+            $this->entity('sep', '=>'),
+            $this->transformSubject($value),
+          );
         }
 
         // remove our temporary marker;
         // not really required, because the shortcut function doesn't take references, but we want to be nice :P
         unset($subject[$this->arrayMarker]);
 
-        return $output . '</div></section>' . $this->entity('array', ')');    
+        return $this->entity('array', 'Array') . $this->group($itemCount, $expState, $this->section($items));
     }
 
     // if we reached this point, $subject must be an object
@@ -227,27 +214,27 @@ class ref{
     
     foreach($classes as &$class){
      
-      $modifiers = '';
+      $modifiers = array();
 
       if($class->isAbstract())
-        $modifiers .= $this->entity('abstract', 'A', 'This class is abstract');
+        $modifiers[] = array('abstract', 'A', 'This class is abstract');
 
       if($class->isFinal())
-        $modifiers .= $this->entity('final', 'F', 'This class is final and cannot be extended');
+        $modifiers[] = array('final', 'F', 'This class is final and cannot be extended');
 
       // php 5.4+ only
       if((PHP_MINOR_VERSION > 3) && $class->isCloneable())
-        $modifiers .= $this->entity('cloneable', 'C', 'Instances of this class can be cloned');
+        $modifiers[] = array('cloneable', 'C', 'Instances of this class can be cloned');
 
       if($class->isIterateable())
-        $modifiers .= $this->entity('iterateable', 'X', 'Instances of this class are iterateable');            
+        $modifiers[] = array('iterateable', 'X', 'Instances of this class are iterateable');            
      
       $className = $class->getName();
 
       if($class->isInternal())
-        $className = sprintf('<a href="%s" target="_blank">%s</a>', static::getPhpManUri('class', $className), $className);
+        $className = $this->anchor($className, 'class');
 
-      $class = $modifiers . $this->entity('class', $className, $class);
+      $class = $this->modifiers($modifiers) . $this->entity('class', $className, $class);
     }  
 
     $objectName = implode(' :: ', array_reverse($classes));
@@ -255,7 +242,7 @@ class ref{
 
     // already been here?
     if(in_array($objectHash, $this->objectHashes))
-      return $this->entity('object', $objectName . ' Object(<b>Recursion</b>)');
+      return $this->entity('object', "{$objectName} Object") . $this->group('Recursion');
 
     // track hash
     $this->objectHashes[] = $objectHash;
@@ -271,15 +258,14 @@ class ref{
 
     // no data to display?
     if(!$props && !$methods && !$constants && !$interfaces && !$traits)
-      return $this->entity('object', $objectName . ' Object()');
+      return $this->entity('object', "{$objectName} Object") . $this->group();
 
-    $output .= $this->entity('object', $objectName . ' Object(');
-    $output .= sprintf('<a class="rToggle %s"></a><section>', $expState);
+    $output = '';
 
     // display the interfaces this objects' class implements
     if($interfaces){
 
-      $output .= '<h4>Interfaces:</h4>';
+      // no splFixedArray here because we don't expect one zillion interfaces to be implemented by this object
       $intfNames = array();
 
       foreach($interfaces as $name => $interface){
@@ -287,57 +273,58 @@ class ref{
         $name = $interface->getName();
 
         if($interface->isInternal())
-          $name = sprintf('<a href="%s" target="_blank">%s</a>', static::getPhpManUri('class', $name), $name);
+          $name = $this->anchor($name, 'class');
 
         $intfNames[] = $this->entity('interface', $name, $interface);      
       }  
 
-      $output .= sprintf('<dl><dt>%s</dt></dl>', implode(', ', $intfNames));
+      $output .= $this->section(array((array)implode(', ', $intfNames)), 'Interfaces');
     }
 
     // class constants
     if($constants){
 
-      $output .= '<h4>Constants:</h4>';
-      $output .= '<div>';
+      $itemCount = count($constants);
+      $index = 0;
+      $items = new \SplFixedArray($itemCount);
 
       foreach($constants as $name => $value){
 
-        $output .= '<dl>';
-
         foreach($internalParents as $parent)
           if($parent->hasConstant($name))
-            $name = sprintf('<a href="%s" target="_blank">%s</a>', static::getPhpManUri('constant', $parent->getName(), $name), $name);
+            $name = $this->anchor($name, 'constant', $parent->getName(), $name);
 
-        $output .= sprintf('<dt>%s</dt>', $this->entity('div', '::'));
-        $output .= sprintf('<dt>%s</dt>', $this->entity('constant', $name));
-        $output .= sprintf('<dt>%s</dt>', $this->entity('div', '='));
-        $output .= sprintf('<dd>%s</dd>', $this->transformSubject($value));        
-        $output .= '</dl>';
+        $items[$index++] = array(
+          $this->entity('sep', '::'),
+          $this->entity('constant', $name),
+          $this->entity('sep', '='),
+          $this->transformSubject($value),
+        );
+        
       }
-      
-      $output .= '</div>';
+
+      $output .= $this->section($items, 'Constants');    
     }
 
     // traits this objects' class uses
     if($traits){
-      $output .= '<h4>Uses:</h4>';
-
+  
       $traitNames = array();
-
       foreach($traits as $name => $trait)
         $traitNames[] = $this->entity('trait', $trait->getName(), $trait);
 
-      $output .= sprintf('<dl><dt>%s</dt></dl>', implode(', ', $traitNames));      
+      $output .= $this->section((array)implode(', ', $traitNames), 'Uses');
     }
 
     // object/class properties
     if($props){
-      $output .= '<h4>Properties:</h4>';
-      $output .= '<div>';
-  
+
+      $itemCount = count($props);
+      $index = 0;
+      $items = new \SplFixedArray($itemCount);
+
       foreach($props as $prop){
-        $modifiers = '';
+        $modifiers = array();
 
         if($prop->isProtected())        
           $prop->setAccessible(true);
@@ -348,38 +335,37 @@ class ref{
           $prop->setAccessible(false);        
 
         if($prop->isProtected())
-          $modifiers .= $this->entity('protected', 'P', 'This property is protected');
+          $modifiers[] = array('protected', 'P', 'This property is protected');
 
         $name = htmlspecialchars($prop->name, ENT_QUOTES);
 
         foreach($internalParents as $parent)
           if($parent->hasProperty($name))
-            $name = sprintf('<a href="%s" target="_blank">%s</a>', static::getPhpManUri('property', $parent->getName(), $name), $name);
+            $name = $this->anchor($name, 'property', $parent->getName(), $name);
 
-        $output .= '<dl>';
-        $output .= sprintf('<dt>%s</dt>', $this->entity('div', $prop->isStatic() ? '::' : '-&gt;'));
-        $output .= sprintf('<dt><span class="rModifiers">%s</span></dt>', $modifiers);
-        $output .= sprintf('<dt>%s</dt>', $this->entity('property', $name, $prop));
-        $output .= sprintf('<dt>%s</dt>', $this->entity('div', '='));
-        $output .= sprintf('<dd>%s</dd>', $this->transformSubject($value));
-        $output .= '</dl>';
+        $items[$index++] = array(
+          $this->entity('sep', $prop->isStatic() ? '::' : '->'),
+          $this->modifiers($modifiers),
+          $this->entity('property', $name, $prop),
+          $this->entity('sep', '='),
+          $this->transformSubject($value),
+        );
+
       }
 
-      $output .= '</div>';      
+      $output .= $this->section($items, 'Properties');
     }
 
     // class methods
     if($methods){
 
-      $output .= '<h4>Methods:</h4>';
-      $output .= '<div>';
+      $itemCount = count($methods);
+      $index = 0;
+      $items = new \SplFixedArray($itemCount);
 
       foreach($methods as $method){
 
-        $output .= '<dl>';        
-
-        $paramStrings = array();
-        $modifiers = '';
+        $paramStrings = $modifiers = array();
 
         $tags = static::parseComment($method->getDocComment(), 'tags');
         $tags = isset($tags['param']) ? $tags['param'] : array();
@@ -397,7 +383,7 @@ class ref{
 
           if($paramClass){
             $paramHint = $this->entity('hint', $paramClass->getName(), $paramClass);
-            $paramHint = sprintf('<a href="%s" target="_blank">%s</a>', static::getPhpManUri('class', $paramClass->getName()), $paramHint);
+            $paramHint = $this->anchor($paramHint, 'class', $paramClass->getName());
           }  
 
           if($parameter->isArray())
@@ -414,14 +400,15 @@ class ref{
           }
        
           if($parameter->isOptional()){
+            $paramValue = $parameter->isDefaultValueAvailable() ? $parameter->getDefaultValue() : null;            
             $paramName  = $this->entity('param', $paramName, $tip);
-            $paramValue = $parameter->isDefaultValueAvailable() ? $parameter->getDefaultValue() : null;
-            $paramName  = sprintf('%s%s<span class="rParamValue">%s</span>', $paramName, $this->entity('div', ' = '), $this->transformSubject($paramValue));
+            $paramName .= $this->entity('sep', ' = ');
+            $paramName .= $this->entity('paramValue', $this->transformSubject($paramValue));
 
             if($paramHint)
               $paramName = $paramHint . ' ' . $paramName;
 
-            $paramName  = sprintf('<span class="rOptional">%s</span>', $paramName);
+            $paramName  = $this->entity('optional', $paramName);
 
           }else{            
             $paramName = $this->entity('param', $paramName, $tip);
@@ -440,16 +427,13 @@ class ref{
         $modTip = $inherited ? sprintf('Inherited from ::%s', $method->getDeclaringClass()->getShortName()) : null;
 
         if($method->isAbstract())
-          $modifiers .= $this->entity('abstract', 'A', 'This method is abstract');
+          $modifiers[] = array('abstract', 'A', 'This method is abstract');
 
         if($method->isFinal())
-          $modifiers .= $this->entity('final', 'F', 'This method is final and cannot be overridden');
+          $modifiers[] = array('final', 'F', 'This method is final and cannot be overridden');
 
         if($method->isProtected())
-          $modifiers .= $this->entity('protected', 'P', 'This method is protected');
-
-        $output .= sprintf('<dt>%s</dt>', $this->entity('div', $method->isStatic() ? '::' : '-&gt;', $modTip));
-        $output .= sprintf('<dt><span class="rModifiers">%s</span></dt>', $modifiers);
+          $modifiers[] = array('protected', 'P', 'This method is protected');        
 
         $name = $method->name;
 
@@ -457,24 +441,366 @@ class ref{
           $name = '&' . $name;
 
         if($method->isInternal())
-          $name = sprintf('<a href="%s" target="_blank">%s</a>', static::getPhpManUri('method', $method->getDeclaringClass()->getName(), $name), $name);
+          $name = $this->anchor($name, 'method', $method->getDeclaringClass()->getName(), $name);          
 
         $name = $this->entity($htmlClass, $name, $method);  
 
-        $output .= sprintf('<dd>%s(%s)</dd>', $name, implode(', ', $paramStrings));
-        $output .= '</dl>';        
+        $items[$index++] = array(
+          $this->entity('sep', $method->isStatic() ? '::' : '->', $modTip),
+          $this->modifiers($modifiers),
+          $name . ' (' . implode(', ', $paramStrings) . ')',
+        );       
       }
 
-      $output .= '</div>';
+      $output .= $this->section($items, 'Methods');
     }
 
-    return $output . '</section>' . $this->entity('object', ')');  
+    return $this->entity('object', "{$objectName} Object") . $this->group('', $expState, $output);
   }
 
 
 
   /**
-   * Helper method, used to generate a SPAN tag with the provided class, text and tooltip content
+   * Scans for default classes and functions inside the provided expression,
+   * and linkifies them when possible
+   *
+   * @since   1.0
+   * @param   string $expression      Expression to linkify
+   * @return  string                  Formatted output
+   */
+  public function transformExpression($expression){
+
+    $prefix = $this->entity('sep', '> ');
+
+    if(strpos($expression, '(') === false)
+      return $this->entity('exp', $prefix . $expression);
+
+    $fn = explode('(', $expression, 2);
+
+    // try to find out if this is a function
+    try{
+      $reflector = new \ReflectionFunction($fn[0]);        
+
+      if($reflector->isInternal()){
+        $fn[0] = $this->anchor($fn[0], 'function');
+        $fn[0] = $this->entity('srcFunction', $fn[0], $reflector);
+      }
+    
+    }catch(\Exception $e){
+
+      if(stripos($fn[0], 'new ') === 0){
+
+        $cn = explode(' ' , $fn[0], 2);
+
+        // linkify 'new keyword' (as constructor)
+        try{          
+          $reflector = new \ReflectionMethod($cn[1], '__construct');
+          if($reflector->isInternal()){
+            $cn[0] = $this->anchor($cn[0], 'method', $cn[1], '__construct');
+            $cn[0] = $this->entity('srcClass', $cn[0], $reflector);
+          }              
+        }catch(\Exception $e){
+          $reflector = null;
+        }            
+
+        // class name...
+        try{          
+          $reflector = new \ReflectionClass($cn[1]);
+          if($reflector->isInternal()){
+            $cn[1] = $this->anchor($cn[1], 'class');
+            $cn[1] = $this->entity('srcClass', $cn[1], $reflector);
+          }              
+        }catch(\Exception $e){
+          $reflector = null;
+        }      
+
+        $fn[0] = implode(' ', $cn);
+
+      }else{
+
+        if(strpos($expression, '::') === false)
+          return $this->entity('exp', $prefix . $expression);
+
+        $cn = explode('::', $fn[0], 2);
+
+        // perhaps it's a static class method; try to linkify method first
+        try{
+          $reflector = new \ReflectionMethod($cn[0], $cn[1]);
+
+          if($reflector->isInternal()){
+            $cn[1] = $this->anchor($cn[1], 'method', $cn[0], $cn[1]);
+            $cn[1] = $this->entity('srcMethod', $cn[1], $reflector);
+          }  
+
+        }catch(\Exception $e){
+          $reflector = null;
+        }        
+
+        // attempt to linkify the class name as well
+        try{
+          $reflector = new \ReflectionClass($cn[0]);
+
+          if($reflector->isInternal()){
+            $cn[0] = $this->anchor($cn[0], 'class');
+            $cn[0] = $this->entity('srcClass', $cn[0], $reflector);
+          }  
+
+        }catch(\Exception $e){
+          $reflector = null;
+        }
+
+        // apply changes
+        $fn[0] = implode('::', $cn);
+      }  
+    }
+
+    return $this->entity('exp', $prefix . implode('(', $fn));
+  }
+
+
+
+  /**
+   * Returns human-readable info about the given variable(s)
+   *   
+   * @since   1.0
+   * @param   mixed $subject           Variable to query
+   * @param   string|null $expression  Source expression string
+   * @param   string $format           Output format
+   * @return  string                   Information about each variable
+   */
+  public static function build($subject, $expression = null, $format = 'html'){
+
+    $startTime = microtime(true);  
+    $startMem = memory_get_usage();
+
+    $instance = new static($format);
+
+    $varOutput = $instance->transformSubject($subject);    
+    $expOutput = ($expression !== null) ? $instance->transformExpression($expression) : '';
+
+    $memUsage = abs(round((memory_get_usage() - $startMem) / 1024, 2));
+    $cpuUsage = round(microtime(true) - $startTime, 4);
+
+    $instance = null;
+    unset($instance);    
+
+    switch($format){
+
+      // HTML output
+      case 'html':
+
+        // first call? include styles and javascript
+        if(!static::$didAssets){
+
+          ob_start();
+          ?>
+
+          <style scoped>
+            /*<![CDATA[*/
+            <?php readfile(__DIR__ . '/ref.css'); ?>
+            /*]]>*/
+          </style>
+
+          <script>
+            /*<![CDATA[*/
+            <?php readfile(__DIR__ . '/ref.js'); ?>
+            /*]]>*/
+          </script>       
+          
+          <?php    
+          $varOutput = preg_replace('/\s+/', ' ', trim(ob_get_clean())) . $varOutput;
+          static::$didAssets = true;
+        }
+
+        $output = sprintf('%s<div class="ref">%s</div>', $expOutput, $varOutput);
+
+        return sprintf('<!-- ref #%d -->%s<!-- /ref (took %ss, %sK) -->', static::$counter++, $output, $cpuUsage, $memUsage);        
+
+      // text output
+      default:
+        return sprintf("%s\n%s\n%s\n", $expOutput, str_repeat('^', strlen($expOutput)), $varOutput);
+
+    }
+
+  }
+
+
+
+  /**
+   * Creates a group
+   *
+   * @since   1.0
+   * @param   string $prefix
+   * @param   string|null $toggleState
+   * @param   string $toggledText
+   * @return  string
+   */
+  protected function group($prefix = '', $toggleState = null, $toggledText = ''){
+
+    $content = ($toggleState !== null) ? $toggledText : '';
+
+    switch($this->format){
+
+      // HTML output
+      case 'html':
+        $content = ($toggleState !== null) ? '<a class="rToggle ' . $toggleState . '"></a><div>' . $content . '</div>' : '';
+
+        if($prefix !== '')
+          $prefix = '<b>' . $prefix . '</b>';
+
+        return '<span class="rGroup">(' . $prefix . '</span>' . $content . '<span class="rGroup">)</span>';
+
+      // text-only output
+      default:
+
+        if($content !== '')
+          $content =  $content . "\n";
+
+        return '(' . $prefix . $content . ')';
+      
+    }    
+  }
+
+
+
+  /**
+   * Creates a section
+   *
+   * @since   1.0
+   * @param   array|splFixedArray $items    Array or SplFixedArray instance containing rows and columns (columns as arrays)
+   * @param   string $title                 Section title, optional
+   * @return  string
+   */
+  protected function section($items, $title = ''){
+
+    switch($this->format){
+      
+      // HTML output
+      case 'html':
+
+        if($title !== '')
+          $title = '<h4>' . $title .'</h4>';
+
+        $content = '';
+
+        foreach($items as $item){
+          $last = array_pop($item);
+          $defs = $item ? '<dt>' . implode('</dt><dt>', $item) . '</dt>' : '';
+          $content .= '<dl><dt>' . $defs . '</dt><dd>' . $last . '</dd></dl>';
+        }
+
+        return $title . '<section>' . $content . '</section>';
+
+      // text-only output
+      default:
+
+        $output = '';
+
+        if($title !== '')
+          $output .= sprintf("\n\n %s\n %s", $title, str_repeat('-', strlen($title)));
+
+        $lengths = array();
+
+        // determine maximum column width
+        foreach($items as $item)
+          foreach($item as $colIdx => $c)
+            if(!isset($lengths[$colIdx]) || $lengths[$colIdx] < strlen($c))
+              $lengths[$colIdx] = strlen($c);
+
+        foreach($items as $item){
+
+          $lastColIdx = count($item) - 1;
+          $padLen     = 0;
+          $output    .= "\n  ";
+
+          foreach($item as $colIdx => $c){
+
+            // skip empty columns
+            if($lengths[$colIdx] < 1)
+              continue;
+
+            if($colIdx < $lastColIdx){
+              $output .= str_pad($c, $lengths[$colIdx]). ' ';
+              $padLen += $lengths[$colIdx] + 1;
+              continue;
+            }
+        
+            $lines   = explode("\n", $c);
+            $output .= array_shift($lines);
+
+            // we must indent the entire block
+            foreach($lines as &$line)
+              $line = str_repeat(' ', $padLen)  . $line;
+
+            $output .= $lines ? "\n  " . implode("\n  ", $lines) : '';
+          }         
+        }
+
+        return $output;
+    }
+  }
+
+
+
+  /**
+   * Generates an anchor that links to the documentation page 
+   * relevant for the requested context
+   *
+   * The URI will point to the local PHP manual if installed and configured,
+   * otherwise to php.net/manual (the english one)
+   *
+   * @since   1.0   
+   * @param   string $scheme     Scheme to use; valid schemes are 'class', 'function', 'method', 'constant' (class only) and 'property'
+   * @param   string $id1        Class or function name
+   * @param   string|null $id2   Method name (required only for the 'method' scheme)
+   * @return  string             URI string
+   */
+  protected function anchor($linkText, $scheme, $id1 = null, $id2 = null){
+
+    // no links in text-mode :)
+    if($this->format !== 'html')
+      return $linkText;
+
+    static $docRefRoot = null, $docRefExt  = null;
+
+     // most people don't have this set
+    if(!$docRefRoot)
+      $docRefRoot = rtrim(ini_get('docref_root'), '/');
+
+    if(!$docRefRoot)
+      $docRefRoot = 'http://php.net/manual/en';
+
+    if(!$docRefExt)
+      $docRefExt = ini_get('docref_ext');
+
+    if(!$docRefExt)
+      $docRefExt = '.php';
+
+    if($id1 === null)
+      $id1 = $linkText;
+
+    $args = array_filter(array($id1, $id2));
+
+    foreach($args as &$arg)
+      $arg = str_replace('_', '-', ltrim(strtolower($arg), '\\_'));
+
+    $schemes = array(
+      'class'     => $docRefRoot . '/class.%s'    . $docRefExt,
+      'function'  => $docRefRoot . '/function.%s' . $docRefExt,
+      'method'    => $docRefRoot . '/%1$s.%2$s'   . $docRefExt,
+      'constant'  => $docRefRoot . '/class.%1$s'  . $docRefExt . '#%1$s.constants.%2$s',
+      'property'  => $docRefRoot . '/class.%1$s'  . $docRefExt . '#%1$s.props.%2$s',
+    );
+
+    $uri = vsprintf($schemes[$scheme], $args);
+
+    return sprintf('<a href="%s" target="_blank">%s</a>', $uri, $linkText);     
+  }
+
+
+
+  /**
+   * Creates a single entity with the provided class, text and tooltip content
    *
    * @since   1.0
    * @param   string $class           Entity class ('r' will be prepended to it, then the entire thing gets camelized)
@@ -486,6 +812,18 @@ class ref{
 
     if($text === null)
       $text = $class;
+
+    // we can't show all tips in text-mode
+    if($this->format !== 'html'){
+
+      if(in_array($class, array('string', 'integer', 'double', 'true', 'false')))
+        $text = $tip . ': ' . $text;
+
+      return $text;
+    }
+
+    if($class === 'sep')
+      $class = htmlspecialchars($class, ENT_QUOTES);
 
     if($tip instanceof \Reflector){
 
@@ -522,98 +860,30 @@ class ref{
 
 
   /**
-   * Scans for default classes and functions inside the provided expression,
-   * and linkifies them when possible
+   * Generates modifier bubbles
    *
    * @since   1.0
-   * @param   string $expression      Expression to linkify
-   * @return  string                  HTML
+   * @param   string $class           Entity class ('r' will be prepended to it, then the entire thing gets camelized)
+   * @param   string $text            Entity text content   
+   * @return  string                  SPAN tag with the provided information
    */
-  public function transformExpression($expression){
+  protected function modifiers(array $modifiers){
 
-    if(strpos($expression, '(') === false)
-      return $expression;
+    switch($this->format){
+      case 'html':
 
-    $fn = explode('(', $expression, 2);
+        foreach($modifiers as &$modifier)
+          $modifier = $this->entity($modifier[0], $modifier[1], $modifier[2]);
+        
+        return '<span class="rModifiers">' . implode('', $modifiers) . '</span>';
 
-    // try to find out if this is a function
-    try{
-      $reflector = new \ReflectionFunction($fn[0]);        
+      default:
+        foreach($modifiers as &$modifier)
+          $modifier = '[' . $modifier[1] . '] ';
 
-      if($reflector->isInternal()){
-        $fn[0] = sprintf('<a href="%s" target="_blank">%s</a>', static::getPhpManUri('function', $fn[0]), $fn[0]);
-        $fn[0] = $this->entity('srcFunction', $fn[0], $reflector);
-      }
-    
-    }catch(\Exception $e){
+        return implode('', $modifiers);
 
-      if(stripos($fn[0], 'new ') === 0){
-
-        $cn = explode(' ' , $fn[0], 2);
-
-        // linkify 'new keyword' (as constructor)
-        try{          
-          $reflector = new \ReflectionMethod($cn[1], '__construct');
-          if($reflector->isInternal()){
-            $cn[0] = sprintf('<a href="%s" target="_blank">%s</a>', static::getPhpManUri('method', $cn[1], '__construct'), $cn[0]);
-            $cn[0] = $this->entity('srcClass', $cn[0], $reflector);
-          }              
-        }catch(\Exception $e){
-          $reflector = null;
-        }            
-
-        // class name...
-        try{          
-          $reflector = new \ReflectionClass($cn[1]);
-          if($reflector->isInternal()){
-            $cn[1] = sprintf('<a href="%s" target="_blank">%s</a>', static::getPhpManUri('class', $cn[1]), $cn[1]);
-            $cn[1] = $this->entity('srcClass', $cn[1], $reflector);
-          }              
-        }catch(\Exception $e){
-          $reflector = null;
-        }      
-
-        $fn[0] = implode(' ', $cn);
-
-      }else{
-
-        if(strpos($expression, '::') === false)
-          return $expression;
-
-        $cn = explode('::', $fn[0], 2);
-
-        // perhaps it's a static class method; try to linkify method first
-        try{
-          $reflector = new \ReflectionMethod($cn[0], $cn[1]);
-
-          if($reflector->isInternal()){
-            $cn[1] = sprintf('<a href="%s" target="_blank">%s</a>', static::getPhpManUri('method', $cn[0], $cn[1]), $cn[1]);
-            $cn[1] = $this->entity('srcMethod', $cn[1], $reflector);
-          }  
-
-        }catch(\Exception $e){
-          $reflector = null;
-        }        
-
-        // attempt to linkify the class name as well
-        try{
-          $reflector = new \ReflectionClass($cn[0]);
-
-          if($reflector->isInternal()){
-            $cn[0] = sprintf('<a href="%s" target="_blank">%s</a>', static::getPhpManUri('class', $cn[0]), $cn[0]);
-            $cn[0] = $this->entity('srcClass', $cn[0], $reflector);
-          }  
-
-        }catch(\Exception $e){
-          $reflector = null;
-        }
-
-        // apply changes
-        $fn[0] = implode('::', $cn);
-      }  
-    }
-
-    return implode('(', $fn);
+    } 
   }
 
 
@@ -622,9 +892,10 @@ class ref{
    * Determines the input expression(s) passed to the shortcut function
    *
    * @since   1.0
-   * @return  array   Array of string expressions passed to the shortcut function
+   * @param   array &$modifiers   If this variable is present, modifiers will be stored here
+   * @return  array               Array of string expressions
    */
-  public static function getSourceExpressions(){
+  public static function getSourceExpressions(&$modifiers = null){
 
     // pull only basic info with php 5.3.6+ to save some memory
     $trace = debug_backtrace(defined('DEBUG_BACKTRACE_IGNORE_ARGS') ? DEBUG_BACKTRACE_IGNORE_ARGS : null);
@@ -648,14 +919,33 @@ class ref{
       // if there are multiple calls to this function on the same line, make sure this is the one we're after;
       // note that calls that span across multiple lines will produce incorrect expression info :(
       while($instIdx < static::$lineInst[$callee['line']]){
-        $code = trim(substr($code, strpos($code, $codeContext) + strlen($codeContext)));
+
+        $fnPos = 0;
+        
+        while(isset($code[$fnPos])){
+          $fnPos = strpos($code, $codeContext);
+          if(isset($code[$fnPos - 1]) && ctype_alpha($code[$fnPos - 1])){
+            $code = substr($code, $fnPos + strlen(static::SHORTCUT_FUNC));
+            continue;
+          }
+          break;  
+        }        
+
+        // gather modifiers
+        if($modifiers !== null){
+          $modifiers = array();
+          $i = $fnPos;
+
+          while(isset($code[--$i]) && in_array($code[$i], array('@', '+', '-', '!', '~', '\\')))
+            $modifiers[] = $code[$i];
+        }
+
+        $code = trim(substr($code, $fnPos + strlen($codeContext)));
         $code = substr($code, 1);
 
-        $inSQuotes = $inDQuotes = false;
+        $inSQuotes   = $inDQuotes = false;
         $expressions = array(0 => '');
-        $index = 0;
-        $sBracketLvl = 0;
-        $cBracketLvl = 0;
+        $index       = $sBracketLvl = $cBracketLvl = 0;
 
         for($i = 0, $len = strlen($code); $i < $len; $i++){
 
@@ -734,67 +1024,6 @@ class ref{
     }
 
     return array_map('trim', $expressions);
-  }
-
-
-
-  /**
-   * Returns human-readable info about the given variable(s)
-   *   
-   * @since   1.0
-   * @param   mixed $subject      Variable to query
-   * @param   string $expression  Source expression string
-   * @param   string $format      Output format
-   * @return  string              Information about each variable (currently only HTML output)
-   */
-  public static function build($subject, $expression = null, $format = 'html'){
-
-    static
-      $counter = 1;
-
-    $startTime = microtime(true);  
-    $startMem = memory_get_usage();
-
-    $instance = new static();
-    $output = $instance->transformSubject($subject);
-
-    // first call? include styles & js
-    if(!static::$didAssets){
-
-      ob_start();
-      ?>
-
-      <style scoped>
-        /*<![CDATA[*/
-        <?php readfile(__DIR__ . '/ref.css'); ?>
-        /*]]>*/
-      </style>
-
-      <script>
-        /*<![CDATA[*/
-        <?php readfile(__DIR__ . '/ref.js'); ?>
-        /*]]>*/
-      </script>       
-      
-      <?php    
-      $output = preg_replace('/\s+/', ' ', trim(ob_get_clean())) . $output;
-      static::$didAssets = true;
-    }
-
-    $source = '';
-
-    if($expression !== null)
-      $source = sprintf('<dfn class="refDfn">&gt; %s</dfn>', $instance->transformExpression($expression));    
-
-    $instance = null;
-    unset($instance);
-
-    $endTime = microtime(true);
-
-    $memUsage = abs(round((memory_get_usage() - $startMem) / 1024, 2));
-    $cpuUsage = round(microtime(true) - $startTime, 4);
-
-    return sprintf('<!-- ref #%d -->%s<div class="ref">%s</div><!-- /ref (took %ss, %sK) -->', $counter++, $source, $output, $cpuUsage, $memUsage);
   }
 
 
