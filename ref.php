@@ -375,7 +375,14 @@ class ref{
           if($parameter->isPassedByReference())
             $paramName = sprintf('&amp;%s', $paramName);
 
-          $paramClass = $parameter->getClass();
+          try{
+            $paramClass = $parameter->getClass();
+
+          // @see https://bugs.php.net/bug.php?id=32177&edit=1
+          }catch(\Exception $e){
+
+          }
+
           $paramHint = '';
 
           if($paramClass){
