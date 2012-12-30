@@ -13,6 +13,7 @@
   text-shadow: #fff 0 1px 0;
 }
 
+/* links */
 .ref a, .rExp a, #rTip a{
   color: inherit;
   text-decoration: underline;
@@ -35,6 +36,7 @@
   box-shadow:0 0 4px rgba(0,0,0, 0.25);
 }
 
+/* source expression */
 .rExp{
   margin: 2px 0 0;
   padding: 2px 4px;
@@ -44,8 +46,64 @@
   border-radius: 4px 4px 0 0;
 }
 
+/* expand/collapse toggle link for groups */
+.rToggle{
+  width: 14px;
+  height: 14px;        
+  display: inline-block;              
+  background: transparent none no-repeat center bottom;        
+  vertical-align: -3px;
+  cursor: pointer;
+  background-image: url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAA4AAAAKCAYAAACE2W/HAAAAjklEQVR42mM8xWCwmIGBIYaBNLCUCUjkAvFDEjSB1OaANH4A4kQg/keEpn9QtR+YoAL7gbiXCI19ULUMTEiCtUB8CY8mkFwNjIOs8ScQR0NpdPATGoA/sWkEgStAXIVFI0jsMrIAExZF/UC8D4m/HyrGQEjjfyBOAOL3UBwPFUMBLDgC4jEQZwMxI5SNAQAT3x/BDuoigAAAAABJRU5ErkJggg==);  
+          transition: all ease-in .15s;  
+       -o-transition: all ease-in .15s;          
+      -ms-transition: all ease-in .15s;          
+     -moz-transition: all ease-in .15s;   
+  -webkit-transition: all ease-in .15s;
+}
+
+/* expand graphic */
+.rToggle.exp{
+          transform: rotate(0deg);
+       -o-transform: rotate(0deg);
+      -ms-transform: rotate(0deg);
+     -moz-transform: rotate(0deg);
+  -webkit-transform: rotate(0deg);
+}
+
+/* collapse graphic */
+.rToggle.col{
+          transform: rotate(090deg);
+       -o-transform: rotate(-90deg);
+      -ms-transform: rotate(-90deg);
+     -moz-transform: rotate(-90deg);
+  -webkit-transform: rotate(-90deg);   
+}
+
+/* trick to hide next element when this class is present */
+.rToggle.col + div{
+  display: none;
+}
+
+/* same, but displays the element */
+.rToggle.exp + div{
+  display: block;
+}
+
+/* group sections */
 .ref section{
   display: table;
+  width: 100%;
+}
+
+/* section titles */
+.ref h4{
+  font: bold 11px Helvetica, Arial;
+  color: #bcbcbc;
+  text-transform: lowercase;
+  border-bottom: 1px dotted #ccc;
+  display: block; 
+  margin: 7px 0 5px 10px;
 }
 
 /* emulate a table for displaying array & object members */
@@ -54,21 +112,25 @@
   padding: 0;
 }
 
+/* section row */
 .ref dl{
   display: table-row;
 }
 
+/* section cells */
 .ref dt, .ref dd{
   display: table-cell;
   vertical-align: top;
   padding-left: 10px;
 }
 
+/* last cell of a section */
 .ref dd{
   width: 100%;
 }
 
-.ref section dl:nth-child(odd){
+/* zebra */
+.ref dl:nth-child(odd){
   background: #f4f4f4;
 }
 
@@ -76,7 +138,7 @@
   background: #f9f9f9;
 }
 
-/* base */
+/* base entity */
 .ref span{
   white-space: pre;
 }
@@ -131,7 +193,7 @@
   background: #343434;
 }   
 
-.rStreamInfo{
+.rResourceInfo{
   font: bold 11px Helvetica, Arial;   
 }
 
@@ -206,56 +268,3 @@
   background: #bdd7d1;
 }
 
-/* section title (for objects) */
-.ref h4{
-  font: bold 11px Helvetica, Arial;
-  color: #bcbcbc;
-  text-transform: lowercase;
-  border-bottom: 1px dotted #ccc;
-  display: block; 
-  margin: 7px 0 5px 10px;
-}
-
-/* expand/collapse toggle link */
-.rToggle{
-  width: 14px;
-  height: 14px;        
-  display: inline-block;              
-  background: transparent none no-repeat center bottom;        
-  vertical-align: -3px;
-  cursor: pointer;
-  background-image: url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAA4AAAAKCAYAAACE2W/HAAAAjklEQVR42mM8xWCwmIGBIYaBNLCUCUjkAvFDEjSB1OaANH4A4kQg/keEpn9QtR+YoAL7gbiXCI19ULUMTEiCtUB8CY8mkFwNjIOs8ScQR0NpdPATGoA/sWkEgStAXIVFI0jsMrIAExZF/UC8D4m/HyrGQEjjfyBOAOL3UBwPFUMBLDgC4jEQZwMxI5SNAQAT3x/BDuoigAAAAABJRU5ErkJggg==);  
-          transition: all ease-in .15s;  
-       -o-transition: all ease-in .15s;          
-      -ms-transition: all ease-in .15s;          
-     -moz-transition: all ease-in .15s;   
-  -webkit-transition: all ease-in .15s;
-}
-
-/* expand graphic */
-.rToggle.exp{
-          transform: rotate(0deg);
-       -o-transform: rotate(0deg);
-      -ms-transform: rotate(0deg);
-     -moz-transform: rotate(0deg);
-  -webkit-transform: rotate(0deg);
-}
-
-/* collapse graphic */
-.rToggle.col{
-          transform: rotate(090deg);
-       -o-transform: rotate(-90deg);
-      -ms-transform: rotate(-90deg);
-     -moz-transform: rotate(-90deg);
-  -webkit-transform: rotate(-90deg);   
-}
-
-/* trick to hide next element when this class is present */
-.rToggle.col + div{
-  display: none;
-}
-
-/* same, but displays the element */
-.rToggle.exp + div{
-  display: block;
-}

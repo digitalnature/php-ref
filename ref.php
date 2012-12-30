@@ -143,7 +143,7 @@ class ref{
       case is_resource($subject):
 
         $type = get_resource_type($subject);
-        $name = $this->entity('resource', $subject, gettype($subject));        
+        $name = $this->entity('resource', $subject);        
 
         // @see: http://php.net/manual/en/resource.php
         // need to add more...
@@ -204,7 +204,7 @@ class ref{
         foreach($meta as $key => $value){
           $key = ucwords(str_replace('_', ' ', $key));
           $items[] = array(
-            $this->entity('streamInfo', htmlspecialchars($key, ENT_QUOTES)),
+            $this->entity('resourceInfo', htmlspecialchars($key, ENT_QUOTES)),
             $this->entity('sep', ':'),
             $this->transformSubject($value),
           );
