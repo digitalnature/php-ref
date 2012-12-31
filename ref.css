@@ -162,11 +162,11 @@
 
 /* key-value dividers, property & method modifiers etc. */
 .rSep{
-  color: #ccc;
+  color: #bbb;
 }
 
 /* tag-like appearance for boolean, null and resource types */
-.rTrue, .rFalse, .rNull, .rResource{
+.rTrue, .rFalse, .rNull, .rResource, .rJson, .rSerialized, .rDate{
   font: bold 11px Helvetica, Arial; 
   background: #eee;
   color:#fff;        
@@ -215,6 +215,12 @@
   color: #669933;
 }
 
+.rJson, .rSerialized, .rDate{
+  margin-left: 5px;
+  background: #d78035;
+  position: relative;
+}
+
 /* arrays & objects */
 .rGroup, .rArray, .rObject, .rInterface, .rTrait{
   color:#CC0033;
@@ -239,7 +245,6 @@
 /* group info prefix */
 .rGroup > b{
   font: bold 11px Helvetica, Arial;  
-  text-transform: lowercase;
   padding: 0 5px;
   color: #333;
 }

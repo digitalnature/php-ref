@@ -107,7 +107,13 @@ final class ClassTest extends AbstractTest implements Testable{
 		/**
 		 * Curl resource
 		 */	  
-	  $curl        = null;	  
+	  $curl        = null,
+
+
+		/**
+		 * A json-encoded object
+		 */	  
+	  $jsonString  = null;
 
 
 
@@ -145,7 +151,9 @@ final class ClassTest extends AbstractTest implements Testable{
 			curl_exec($curl);
 
 			$this->curl = $curl;
-	  }		
+	  }
+
+	  $this->json = json_encode($this->currentDate);
 	}
 
 

@@ -13,7 +13,7 @@ $array = array(
 
 $array['self'] = &$array;
 
-\r(true, false,  null, fopen('php://stdin', 'r'), 24, 4.20, "Hey look a string", array(), $array);
+\r(true, false, '2010-09-17 14:00:00', null, function($x, $d){}, fopen('php://stdin', 'r'), 24, 4.20, "Hey look a string", serialize(array('A', 'serialized', 'string')), array(), $array);
 \r(new \DateTimeZone('Europe/London'));
 \r($obj);
 

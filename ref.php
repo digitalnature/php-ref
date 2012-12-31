@@ -114,13 +114,57 @@ class ref{
 
 
   /**
+   * Generates a human readable date string from a given timestamp
+   *
+   * @since    1.0
+   * @param    int $timestamp      Date in UNIX time format
+   * @param    int $currentTime    Optional. Use a custom date instead of the current time returned by the server
+   * @return   string              Human readable date string
+   */
+  public function humanTime($time, $currentTime = null){
+
+    $prefix      = '-';
+    $customDate  = ($currentTime !== null);
+    $time        = (int)$time;
+    $currentTime = $customDate ? (int)$currentTime : time();
+
+    if($currentTime === $time)
+      return 'now';
+
+    // swap values if the given time occurs in the future,
+    // or if it's higher than the given current time
+    if($currentTime < $time){
+      $time  ^= $currentTime ^= $time ^= $currentTime;
+      $prefix = '+';
+    }
+
+    $units = array(
+      'y' => 31536000,   // 60 * 60 * 24 * 365 seconds
+      'm' => 2592000,    // 60 * 60 * 24 * 30
+      'w' => 604800,     // 60 * 60 * 24 * 7
+      'd' => 86400,      // 60 * 60 * 24
+      'h' => 3600,       // 60 * 60
+      'i' => 60,
+      's' => 1,
+    );
+
+    foreach($units as $unit => $seconds)
+      if(($count = (int)floor(($currentTime - $time) / $seconds)) !== 0)
+        break;
+
+    return $prefix . $count . $unit;
+  }
+
+
+  /**
    * Builds a report with information about $subject
    *
    * @since   1.0
-   * @param   mixed $subject    Variable to query   
-   * @return  string
+   * @param   mixed $subject       Variable to query   
+   * @param   bool $stringChecks   Perform advanced string checks
+   * @return  string                Result
    */
-  protected function transformSubject(&$subject){
+  protected function transformSubject(&$subject, $stringChecks = true){
 
      // expand first level
     $expState = $this->expanded ? 'exp' : 'col';
@@ -154,6 +198,14 @@ class ref{
             $meta = curl_getinfo($subject);
           break;
 
+          case 'FTP Buffer':
+            $meta = array(
+              'time_out'  => ftp_get_option($subject, FTP_TIMEOUT_SEC),
+              'auto_seek' => ftp_get_option($subject, FTP_AUTOSEEK),
+            );
+
+          break;
+
           // gd image extension resource
           case 'gd':
 
@@ -162,7 +214,30 @@ class ref{
                'true_color' => imageistruecolor($subject),
             );
 
-          break;          
+          break;  
+
+
+          case 'ldap link':
+
+            $constants = get_defined_constants();
+
+            array_walk($constants, function($value, $key) use(&$constants){
+
+              if(strpos($key, 'LDAP_OPT_') !== 0)
+                unset($constants[$key]);
+
+            });
+
+            // this seems to fail on my setup :(
+            unset($constants['LDAP_OPT_NETWORK_TIMEOUT']);
+
+            $meta = array();
+
+            foreach(array_slice($constants, 3) as $key => $value)
+              if(ldap_get_option($subject, (int)$value, $ret))
+                $meta[strtolower(substr($key, 9))] = $ret;
+
+          break;
 
           // mysql connection (mysql extension is deprecated from php 5.4/5.5)
           case 'mysql link':
@@ -204,9 +279,9 @@ class ref{
         foreach($meta as $key => $value){
           $key = ucwords(str_replace('_', ' ', $key));
           $items[] = array(
-            $this->entity('resourceInfo', htmlspecialchars($key, ENT_QUOTES)),
+            $this->entity('resourceInfo', $key),
             $this->entity('sep', ':'),
-            $this->transformSubject($value),
+            $this->transformSubject($value, false),
           );
         }  
 
@@ -218,7 +293,39 @@ class ref{
 
       // string
       case is_string($subject):
-        return $this->entity('string', htmlspecialchars($subject, ENT_QUOTES), sprintf('%s/%d', gettype($subject), strlen($subject)));        
+
+        $length = strlen($subject);
+        $string = $this->entity('string', $subject, sprintf('%s/%d', gettype($subject), $length));
+
+        // skip advanced checks if the string appears to have numeric appearance,
+        // or if it's shorter than 5 characters
+        if(!$stringChecks || is_numeric($subject) || ($length < 4))
+          return $string;
+
+        // date?
+        if(($date = @strtotime($subject)) !== false)
+          return $string . ' ' . $this->entity('date', 'Date:') . ' ' . $this->humanTime($date);
+
+        // attempt to detect if this is a serialized string     
+        $token = $subject[0];
+        $mapStart = array('s' => 1, 'a' => 1, 'O' => 1);
+
+        if(isset($mapStart[$token]) && ($subject[1] === ':'))                    
+          if(($subject[$length - 1] === ';') || ($subject[$length - 1] === '}'))
+            if((($token === 's') && ($subject[$length - 2] !== '"')) || preg_match("/^{$token}:[0-9]+:/s", $subject))
+              return $string . ' ' . $this->entity('serialized', 'Unserialized:') . ' ' . $this->transformSubject(($unserialized = unserialize($subject)), false);
+
+        // try to find out if it's a json-encoded string;
+        // only do this for json-encoded arrays or objects, because other types have too generic formats
+        if((strpos($subject, '{') !== 0) && (strpos($subject, '[') !== 0))
+          return $string;
+
+        $json = json_decode($subject);
+
+        if(json_last_error() !== JSON_ERROR_NONE)
+          return $string;
+
+        return $string . ' ' . $this->entity('json', 'Json.Decoded:') . ' ' . $this->transformSubject($json, false);
 
       // arrays
       case is_array($subject):
@@ -255,9 +362,9 @@ class ref{
           $keyInfo = is_string($key) ? sprintf('String key (%d)', strlen($key)) : sprintf('Integer key', gettype($key));
 
           $items[$index++] = array(
-            $this->entity('key', htmlspecialchars($key, ENT_QUOTES), $keyInfo),
+            $this->entity('key', $key, $keyInfo),
             $this->entity('sep', '=>'),
-            $this->transformSubject($value),
+            $this->transformSubject($value, $stringChecks),
           );
         }
 
@@ -367,7 +474,7 @@ class ref{
           $this->entity('sep', '::'),
           $this->entity('constant', $name),
           $this->entity('sep', '='),
-          $this->transformSubject($value),
+          $this->transformSubject($value, $stringChecks),
         );
         
       }
@@ -404,10 +511,10 @@ class ref{
         if($prop->isProtected())
           $modifiers[] = array('protected', 'P', 'This property is protected');
 
-        $name = htmlspecialchars($prop->name, ENT_QUOTES);
+        $name = $prop->name;
 
         foreach($internalParents as $parent)
-          if($parent->hasProperty($name))
+          if($parent->hasProperty($name) && ($parent->name !== 'stdClass'))
             $name = $this->anchor($name, 'property', $parent->getName(), $name);
 
         $items[$index++] = array(
@@ -415,7 +522,7 @@ class ref{
           $this->modifiers($modifiers),
           $this->entity('property', $name, $prop),
           $this->entity('sep', '='),
-          $this->transformSubject($value),
+          $this->transformSubject($value, $stringChecks),
         );
 
       }
@@ -425,9 +532,9 @@ class ref{
 
     // class methods
     if($methods){
-      $itemCount = count($methods);
-      $index = 0;
-      $items = new \SplFixedArray($itemCount);
+      $index     = 0;
+      $itemCount = count($methods);      
+      $items     = new \SplFixedArray($itemCount);
 
       foreach($methods as $method){
 
@@ -474,7 +581,7 @@ class ref{
             $paramValue = $parameter->isDefaultValueAvailable() ? $parameter->getDefaultValue() : null;            
             $paramName  = $this->entity('param', $paramName, $tip);
             $paramName .= $this->entity('sep', ' = ');
-            $paramName .= $this->entity('paramValue', $this->transformSubject($paramValue));
+            $paramName .= $this->entity('paramValue', $this->transformSubject($paramValue, $stringChecks));
 
             if($paramHint)
               $paramName = $paramHint . ' ' . $paramName;
@@ -866,7 +973,7 @@ class ref{
 
     $uri = vsprintf($schemes[$scheme], $args);
 
-    return sprintf('<a href="%s" target="_blank">%s</a>', $uri, $linkText);     
+    return sprintf('<a href="%s" target="_blank">%s</a>', $uri, htmlspecialchars($linkText, ENT_QUOTES));
   }
 
 
@@ -894,14 +1001,15 @@ class ref{
       return $text;
     }
 
-    if($class === 'sep')
-      $class = htmlspecialchars($class, ENT_QUOTES);
+    if(in_array($class, array('string', 'key', 'sep', 'resourceInfo'), true))
+      $text = htmlspecialchars($text, ENT_QUOTES);
 
     if($tip instanceof \Reflector){
 
       // function/class/method is part of the core
       if(method_exists($tip, 'isInternal') && $tip->isInternal()){
-        $tip = sprintf('Internal - part of %s (%s)', $tip->getExtensionName(), $tip->getExtension()->getVersion());
+        $extension = $tip->getExtension();
+        $tip = ($extension !== null) ? sprintf('Internal - part of %s (%s)', $tip->getExtensionName(), $extension->getVersion()) : 'Internal';
 
       // user-defined; attempt to get doc comments
       }else{
