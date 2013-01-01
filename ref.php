@@ -40,7 +40,7 @@ function r(){
 
   // IE goes funky if there's no doctype
   if(!headers_sent())    
-    print '<!DOCTYPE HTML><html><body>';
+    print '<!DOCTYPE HTML><html><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" /><body>';
 
   print $output;
 
@@ -75,7 +75,7 @@ function rt(){
     return $output;  
 
   if(!headers_sent())    
-    header('Content-Type: text/plain');
+    header('Content-Type: text/plain; charset=utf-8');
 
   print $output;
 
@@ -283,8 +283,14 @@ class ref{
       // string
       case is_string($subject):
 
-        $length = strlen($subject);
-        $string = $this->entity('string', $subject, sprintf('%s/%d', gettype($subject), $length));
+        $length   = function_exists('mb_strlen') ? mb_strlen($subject) : strlen($subject);
+        $info     = gettype($subject) . '/' . $length;
+        $encoding = function_exists('mb_detect_encoding') ? mb_detect_encoding($subject) : '';
+
+        if($encoding)
+          $info = $encoding . ' ' . $info;
+
+        $string = $this->entity('string', $subject, $info);
 
         // skip advanced checks if the string appears to have numeric appearance,
         // or if it's shorter than 5 characters

@@ -14,7 +14,7 @@ $array = array(
 $array['self'] = &$array;
 
 r(true, false, '2010-09-17 14:00:00', null, function($x, $d){});
-r(fopen('php://stdin', 'r'), 24, 4.20, "Hey look a string"); 
+r(fopen('php://stdin', 'r'), 24, 4.20, "Hey look a 강남스타일 string"); 
 r(serialize(array('A', 'serialized', 'string')), array(), $array);
 r(new \DateTimeZone('Europe/London'));
 r($obj);
