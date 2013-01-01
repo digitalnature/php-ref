@@ -1017,8 +1017,8 @@ class ref{
         if(!empty($comments['title']))
           $tip .= $comments['title'];
 
-        if(!empty($comments['desc']))
-          $tip .= "\n\n" . $comments['desc'];        
+        if(!empty($comments['description']))
+          $tip .= "\n\n" . $comments['description'];        
       }
 
     }
