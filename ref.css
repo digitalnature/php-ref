@@ -39,7 +39,7 @@
 /* source expression */
 .rExp{
   margin: 2px 0 0;
-  padding: 2px 4px 3px;
+  padding: 2px 7px 3px 4px;
   display: block;
   color: #ccc;
   border-radius: 4px 4px 0 0;
@@ -95,6 +95,7 @@
 /* same, but displays the element */
 .rToggle.exp + div{
   display: block;
+  overflow: auto;
 }
 
 /* group sections */
@@ -212,13 +213,12 @@
 
 /* string values */
 .rString{
-  color: #669933;
+  color: #669933;  
 }
 
 .rJson, .rSerialized, .rDate{
-  margin-left: 5px;
   background: #d78035;
-  position: relative;
+  margin-right: 0;
 }
 
 /* arrays & objects */

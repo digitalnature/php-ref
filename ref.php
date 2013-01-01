@@ -1,51 +1,86 @@
 <?php
+error_reporting(E_ALL | E_STRICT);
+
+
+/**
+ * Shortcut to ref::build(), HTML mode
+ *
+ * @version  1.0
+ * @param    mixed $args
+ */
+function r(){
+
+  // arguments passed to this function
+  $args = func_get_args();
+
+  // options (operators) gathered by the expression parser;
+  // this variable gets passed as reference to getInputExpressions(), which will store the operators in it
+  $options = array();
+
+  // doh
+  $output = array();
+
+  // names of the arguments that were passed to this function
+  $expressions = ref::getInputExpressions($options);
+
+  // something went wrong while trying to parse the source expressions?
+  // if so, silently ignore this part and leave out the expression info
+  if(func_num_args() !== count($expressions))
+    $expressions = array();
+
+  // get the info
+  foreach($args as $index => $arg)
+    $output[] = ref::build($arg, isset($expressions[$index]) ? $expressions[$index] : null, 'html');
+
+  $output = implode("\n\n", $output);
+
+  // return the results if this function was called with the error suppression operator 
+  if(in_array('@', $options, true))
+    return $output;
+
+  // IE goes funky if there's no doctype
+  if(!headers_sent())    
+    print '<!DOCTYPE HTML><html><body>';
+
+  print $output;
+
+  // stop the script if this function was called with the bitwise not operator
+  if(in_array('~', $options, true))
+    exit(0);
+}  
 
 
 
 /**
- * Shortcut to ref::build()
+ * Shortcut to ref::build(), plain text mode
  *
  * @version  1.0
  * @param    mixed $args
- * @return   string
  */
-function r(){
-
-  $modifiers   = array();
+function rt(){
   $args        = func_get_args();
+  $options     = array();  
   $output      = array();  
-  $expressions = ref::getSourceExpressions($modifiers);
-  $mode        = in_array('\\', $modifiers, true) ? 'text' : 'html';
+  $expressions = ref::getInputExpressions($options);
 
-  // something went wrong while trying to parse the source expressions;
-  // silently ignore this part
   if(func_num_args() !== count($expressions))
     $expressions = array();
 
   foreach($args as $index => $arg)
-    $output[] = ref::build($arg, isset($expressions[$index]) ? $expressions[$index] : null, $mode);
+    $output[] = ref::build($arg, isset($expressions[$index]) ? $expressions[$index] : null, 'text');
 
   $output = implode("\n\n", $output);
 
-  // '@' modifier forces return only
-  if(in_array('@', $modifiers, true))
-    return $output;     
+  if(in_array('@', $options, true))
+    return $output;  
 
-  if(headers_sent()){    
-    print $output;
-      
-  }else{
+  if(!headers_sent())    
+    header('Content-Type: text/plain');
 
-    if($mode !== 'html')
-      header('Content-Type: text/plain');
+  print $output;
 
-    // print html tags because IE freaks out if it doesn't get them
-    print ($mode !== 'html') ? $output : '<!DOCTYPE HTML><html><body>' . $output;    
-  }  
-
-  // '~' modifier stops execution of the script
-  if(in_array('~', $modifiers, true))
-    exit(0);
+  if(in_array('~', $options, true))
+    exit(0);  
 }
 
 
@@ -58,14 +93,11 @@ function r(){
  */
 class ref{
 
-  const
+  public static
 
-    // shortcut function used to access the ::build() method below;
-    // if its namespaced, the namespace must be present as well
-    SHORTCUT_FUNC     = 'r',
-
-    // regex used to parse tags in docblocks
-    COMMENT_TAG_REGEX = '@([^ ]+)(?:\s+(.*?))?(?=(\n[ \t]*@|\s*$))';
+    // shortcut functions used to access the ::build() method below;
+    // if they are namespaced, the namespace must be present as well (methods are not supported)
+    $shortcutFuncs = array('r', 'rt');
 
 
 
@@ -79,7 +111,7 @@ class ref{
     $didAssets = false,
 
     // instance index (gets displayed as comment in html-mode)
-    $counter   = 1;          
+    $counter   = 1;
 
 
 
@@ -111,49 +143,6 @@ class ref{
     $this->format = $format;
   }
 
-
-
-  /**
-   * Generates a human readable date string from a given timestamp
-   *
-   * @since    1.0
-   * @param    int $timestamp      Date in UNIX time format
-   * @param    int $currentTime    Optional. Use a custom date instead of the current time returned by the server
-   * @return   string              Human readable date string
-   */
-  public function humanTime($time, $currentTime = null){
-
-    $prefix      = '-';
-    $customDate  = ($currentTime !== null);
-    $time        = (int)$time;
-    $currentTime = $customDate ? (int)$currentTime : time();
-
-    if($currentTime === $time)
-      return 'now';
-
-    // swap values if the given time occurs in the future,
-    // or if it's higher than the given current time
-    if($currentTime < $time){
-      $time  ^= $currentTime ^= $time ^= $currentTime;
-      $prefix = '+';
-    }
-
-    $units = array(
-      'y' => 31536000,   // 60 * 60 * 24 * 365 seconds
-      'm' => 2592000,    // 60 * 60 * 24 * 30
-      'w' => 604800,     // 60 * 60 * 24 * 7
-      'd' => 86400,      // 60 * 60 * 24
-      'h' => 3600,       // 60 * 60
-      'i' => 60,
-      's' => 1,
-    );
-
-    foreach($units as $unit => $seconds)
-      if(($count = (int)floor(($currentTime - $time) / $seconds)) !== 0)
-        break;
-
-    return $prefix . $count . $unit;
-  }
 
 
   /**
@@ -302,30 +291,36 @@ class ref{
         if(!$stringChecks || is_numeric($subject) || ($length < 4))
           return $string;
 
+        $ret = $this->entity('sep', "\n");
+
         // date?
         if(($date = @strtotime($subject)) !== false)
-          return $string . ' ' . $this->entity('date', 'Date:') . ' ' . $this->humanTime($date);
+          return $string . $ret . $this->entity('date') . ' ' . static::humanTime($date);
 
         // attempt to detect if this is a serialized string     
         $token = $subject[0];
         $mapStart = array('s' => 1, 'a' => 1, 'O' => 1);
 
-        if(isset($mapStart[$token]) && ($subject[1] === ':'))                    
-          if(($subject[$length - 1] === ';') || ($subject[$length - 1] === '}'))
-            if((($token === 's') && ($subject[$length - 2] !== '"')) || preg_match("/^{$token}:[0-9]+:/s", $subject))
-              return $string . ' ' . $this->entity('serialized', 'Unserialized:') . ' ' . $this->transformSubject(($unserialized = unserialize($subject)), false);
+        if(isset($mapStart[$token]) && ($subject[1] === ':')){
+          if(($subject[$length - 1] === ';') || ($subject[$length - 1] === '}')){
+            if((($token === 's') && ($subject[$length - 2] !== '"')) || preg_match("/^{$token}:[0-9]+:/s", $subject)){
+              $unserialized = unserialize($subject);
+              return $string . $ret . $this->entity('serialized', 'Unserialized') . ' ' . $this->transformSubject($unserialized, false);
+            }
+          }
+        }  
 
         // try to find out if it's a json-encoded string;
         // only do this for json-encoded arrays or objects, because other types have too generic formats
-        if((strpos($subject, '{') !== 0) && (strpos($subject, '[') !== 0))
-          return $string;
+        if((strpos($subject, '{') === 0) || (strpos($subject, '[') === 0)){
+        
+          $json = json_decode($subject);
 
-        $json = json_decode($subject);
+          if(json_last_error() === JSON_ERROR_NONE)
+            return $string . $ret . $this->entity('json', 'Json.Decoded') . ' ' . $this->transformSubject($json, false);
+        }  
 
-        if(json_last_error() !== JSON_ERROR_NONE)
-          return $string;
-
-        return $string . ' ' . $this->entity('json', 'Json.Decoded:') . ' ' . $this->transformSubject($json, false);
+        return $string;  
 
       // arrays
       case is_array($subject):
@@ -514,7 +509,7 @@ class ref{
         $name = $prop->name;
 
         foreach($internalParents as $parent)
-          if($parent->hasProperty($name) && ($parent->name !== 'stdClass'))
+          if($parent->hasProperty($name))
             $name = $this->anchor($name, 'property', $parent->getName(), $name);
 
         $items[$index++] = array(
@@ -549,7 +544,7 @@ class ref{
           $paramName = sprintf('$%s', $parameter->getName());
 
           if($parameter->isPassedByReference())
-            $paramName = sprintf('&amp;%s', $paramName);
+            $paramName = sprintf('&%s', $paramName);
 
           try{
             $paramClass = $parameter->getClass();
@@ -616,7 +611,7 @@ class ref{
         if($method->returnsReference())
           $name = '&' . $name;
 
-        if($method->isInternal())
+        if($method->isInternal() && !(($method->class === 'Closure') && ($method->name === '__invoke')))
           $name = $this->anchor($name, 'method', $method->getDeclaringClass()->getName(), $name);          
 
         $name = $this->entity('method', $name, $method);
@@ -936,8 +931,11 @@ class ref{
    */
   protected function anchor($linkText, $scheme, $id1 = null, $id2 = null){
 
-    // no links in text-mode :)
-    if($this->format !== 'html')
+    if($id1 === null)
+      $id1 = $linkText;    
+
+    // no links in text-mode, or if the class is a 'stdClass'
+    if(($this->format !== 'html') || ($id1 === 'stdClass'))
       return $linkText;
 
     static $docRefRoot = null, $docRefExt  = null;
@@ -955,15 +953,12 @@ class ref{
     if(!$docRefExt)
       $docRefExt = '.php';
 
-    if($id1 === null)
-      $id1 = $linkText;
-
     $args = array_filter(array($id1, $id2));
 
     foreach($args as &$arg)
       $arg = str_replace('_', '-', ltrim(strtolower($arg), '\\_'));
 
-    $schemes = array(
+    $phpNetSchemes = array(
       'class'     => $docRefRoot . '/class.%s'    . $docRefExt,
       'function'  => $docRefRoot . '/function.%s' . $docRefExt,
       'method'    => $docRefRoot . '/%1$s.%2$s'   . $docRefExt,
@@ -971,7 +966,7 @@ class ref{
       'property'  => $docRefRoot . '/class.%1$s'  . $docRefExt . '#%1$s.props.%2$s',
     );
 
-    $uri = vsprintf($schemes[$scheme], $args);
+    $uri = vsprintf($phpNetSchemes[$scheme], $args);
 
     return sprintf('<a href="%s" target="_blank">%s</a>', $uri, htmlspecialchars($linkText, ENT_QUOTES));
   }
@@ -1001,7 +996,8 @@ class ref{
       return $text;
     }
 
-    if(in_array($class, array('string', 'key', 'sep', 'resourceInfo'), true))
+    // escape text that is known to contain html entities
+    if(in_array($class, array('string', 'key', 'param', 'sep', 'resourceInfo'), true))
       $text = htmlspecialchars($text, ENT_QUOTES);
 
     if($tip instanceof \Reflector){
@@ -1068,278 +1064,305 @@ class ref{
 
 
 
-  /**
+/**
    * Determines the input expression(s) passed to the shortcut function
    *
    * @since   1.0
-   * @todo    improve this!
-   * @param   array &$modifiers   If this variable is present, modifiers will be stored here
-   * @return  array               Array of string expressions
+   * @param   array &$options   Optional, options to gather (from operators)
+   * @return  array             Array of string expressions
    */
-  public static function getSourceExpressions(&$modifiers = null){
+  public static function getInputExpressions(array &$options = null){    
 
     // pull only basic info with php 5.3.6+ to save some memory
     $trace = debug_backtrace(defined('DEBUG_BACKTRACE_IGNORE_ARGS') ? DEBUG_BACKTRACE_IGNORE_ARGS : null);
     
     while($callee = array_pop($trace)){
 
+      // extract only the information we neeed
+      extract(array_intersect_key($callee, array_fill_keys(array('file', 'function', 'line'), false)));      
+
       // skip, if the called function doesn't match the shortcut function name
-      if(strcasecmp($callee['function'], static::SHORTCUT_FUNC) > 0)
+      if(!$function || !preg_grep("/{$function}/i" , static::$shortcutFuncs))
         continue;
 
-      $codeContext = empty($callee['class']) ? $callee['function'] : $callee['function'];     
+      if(!$line || !$file)
+        return array();
     
-      $code = file($callee['file']);
-      $code = array_slice($code, $callee['line'] - 1);
-      $code = implode('', $code);
+      $code     = file($file);
+      $code     = $code[$line - 1]; // multiline expressions not supported!
+      $instIndx = 0;
+      $tokens   = token_get_all("<?php {$code}");
 
-      $instIdx = 0;
+      // locate the caller position in the line, and isolate argument tokens
+      foreach($tokens as $i => $token){
 
-      static::$lineInst[$callee['line']] = isset(static::$lineInst[$callee['line']]) ? static::$lineInst[$callee['line']] + 1 : 1;
+        // match token with our shortcut function name
+        if(is_string($token) || ($token[0] !== T_STRING) || (strcasecmp($token[1], $function) !== 0))
+          continue;
 
-      // if there are multiple calls to this function on the same line, make sure this is the one we're after;
-      // note that calls that span across multiple lines will produce incorrect expression info :(
-      while($instIdx < static::$lineInst[$callee['line']]){
+        // is this some method that happens to have the same name as the shortcut function?
+        if(isset($tokens[$i - 1]) && is_array($tokens[$i - 1]) && in_array($tokens[$i - 1][0], array(T_DOUBLE_COLON, T_OBJECT_OPERATOR), true))
+          continue;
 
-        $fnPos = 0;
-        
-        while(isset($code[$fnPos])){
-          $fnPos = strpos($code, $codeContext);
-          if(isset($code[$fnPos - 1]) && ctype_alpha($code[$fnPos - 1])){
-            $code = substr($code, $fnPos + strlen(static::SHORTCUT_FUNC));
+        // find argument definition start, just after '('
+        if(isset($tokens[$i + 1]) && ($tokens[$i + 1][0] === '(')){
+          $instIndx++;
+
+          if(!isset(static::$lineInst[$line]))
+            static::$lineInst[$line] = 0;
+
+          if($instIndx <= static::$lineInst[$line])
             continue;
-          }
-          break;  
-        }        
 
-        // gather modifiers
-        if($modifiers !== null){
-          $modifiers = array();
-          $i = $fnPos;
+          static::$lineInst[$line]++;
 
-          while(isset($code[--$i]) && in_array($code[$i], array('@', '+', '-', '!', '~', '\\')))
-            $modifiers[] = $code[$i];
-        }
+          // gather options
+          if($options !== null){
+            $j = $i - 1;
+            while(isset($tokens[$j]) && is_string($tokens[$j]) && in_array($tokens[$j], array('@', '+', '-', '!', '~')))
+              $options[] = $tokens[$j--];
+          }  
+         
+          $lvl = $index = $curlies = 0;
+          $expressions = array();
 
-        $code = trim(substr($code, $fnPos + strlen($codeContext)));
-        $code = substr($code, 1);
+          // get the expressions
+          foreach(array_slice($tokens, $i + 2) as $token){
 
-        $inSQuotes   = $inDQuotes = false;
-        $expressions = array(0 => '');
-        $index       = $sBracketLvl = $cBracketLvl = 0;
+            if(is_array($token)){
+              $expressions[$index][] = $token[1];
+              continue;
+            }
 
-        for($i = 0, $len = strlen($code); $i < $len; $i++){
+            if($token === '{')
+              $curlies++;
 
-          switch($code[$i]){
+            if($token === '}')
+              $curlies--;        
 
-            case '\'':
-              if(!$inDQuotes)
-                $inSQuotes = !$inSQuotes;
+            if($token === '(')
+              $lvl++;
 
-              $expressions[$index] .= $code[$i];              
-              break;
+            if($token === ')')
+              $lvl--;
 
-            case '"':
-              if(!$inSQuotes)
-                $inDQuotes = !$inDQuotes;
+            // assume next argument if a comma was encountered, and we're not insde a curly bracket or inner parentheses
+            if(($curlies < 1) && ($lvl === 0) && ($token === ',')){
+              $index++;
+              continue;
+            }  
 
-              $expressions[$index] .= $code[$i];                            
-              break;              
+            // negative parentheses count means we reached the end of argument definitions
+            if($lvl < 0){         
+              foreach($expressions as &$expression)
+                $expression = trim(implode('', $expression));
 
-            case '{':
-              if(!$inSQuotes && !$inDQuotes)
-                $cBracketLvl++;
+              return $expressions;
+            }
 
-              $expressions[$index] .= $code[$i];
-              break;            
-
-            case '}':
-              $expressions[$index] .= $code[$i];
-
-              if(!$inSQuotes && !$inDQuotes)
-                $cBracketLvl--;
-
-              break;  
-
-            case '(':
-              if(!$inSQuotes && !$inDQuotes)
-                $sBracketLvl++;
-
-              $expressions[$index] .= $code[$i];
-              break;
-                
-            case ')':
-              if($sBracketLvl > 0)
-                $expressions[$index] .= $code[$i];
-
-              if(!$inSQuotes && !$inDQuotes){
-                $sBracketLvl--;
-
-                if($sBracketLvl < 0){
-                  $code = substr($code, $i + 1);
-                  break 2;
-                }  
-
-              }
-
-              break;                
-
-            case ',':
-              if(!$inSQuotes && !$inDQuotes && ($sBracketLvl === 0) && ($cBracketLvl === 0)){
-                $index++;
-                $expressions[$index] = '';
-                break;
-              }
-
-            default:
-              $expressions[$index] .= $code[$i];
+            $expressions[$index][] = $token;      
           }
 
-        }
-
-        $instIdx++;
-      }
-
-      // further entries are irrelevant
-      break;    
+          break;
+        }    
+      }     
     }
-
-    return array_map('trim', $expressions);
   }
+
+
+
+  /**
+   * Executes a function the given number of times and returns the elapsed time.
+   *
+   * Keep in mind that the returned time includes function call
+   * overhead (including microtime calls) x iteration count.   
+   * This is why this is better suited for determining which of two ore more functions
+   * is the fastest, rather than finding out how fast is a single function.
+   *
+   * @since   1.0
+   * @param   int $iterations
+   * @param   callable $function
+   * @param   mixed &$output
+   * @return  double
+   */
+  public static function timeFunc($iterations, $function, &$output = null){
+    
+    $time = 0;
+
+    for($i = 0; $i < $iterations; $i++){
+      $start = microtime(true);
+      $output = call_user_func($function);
+      $time += microtime(true) - $start;
+    }
+    
+    return round($time, 4);
+  }  
 
 
 
   /**
    * Parses a DocBlock comment into a data structure.
    *
-   * A comment is expected to contain a title, description and tags
-   * denoting parameter descriptions or return values.
-   *
-   * Code based on Sami - https://github.com/fabpot/Sami
-   *
    * @since   1.0
-   * @todo    rewrite and optimize for this class
-   * @link    https://github.com/fabpot/Sami
+   * @link    http://pear.php.net/manual/en/standards.sample.php
    * @param   string $comment   Comment string
    * @param   string $key       Field to return (optional)
    * @return  array|string      Array containing all fields, or array/string with the contents of the requested field
    */
-  public static function parseComment($comment, $key = false){
-   
-    $docBlockLine   = 1;
-    $docBlockCursor = 0;
+  public static function parseComment($comment, $key = null){
 
-    // remove comment characters and normalize
-    $comment = preg_replace(array('#^/\*\*\s*#', '#\s*\*/$#', '#^\s*\*#m'), '', trim($comment));
-    $comment = "\n" . preg_replace('/(\r\n|\r)/', "\n", $comment);
+    $title       = '';
+    $description = '';
+    $tags        = array();
+    $tag         = null;
+    $pointer     = null;
+    $padding     = false;
 
-    $position = 'desc';
-    $doc = array();
+    foreach(array_slice(preg_split('/\r\n|\r|\n/', $comment), 1, -1) as $line){
 
-    while($docBlockCursor < strlen($comment)){
+      // drop any leading spaces
+      $line = ltrim($line);
 
-      switch($position){
+      // drop "* "
+      if($line !== '')
+        $line = substr($line, 2);      
 
-        case 'desc':
-          if(preg_match('/(.*?)(\n[ \t]*' . static::COMMENT_TAG_REGEX . '|$)/As', $comment, $match, null, $docBlockCursor)){
+      if(strpos($line, '@') === 0){
+        $padding = false;        
+        $pos     = strpos($line, ' ');
+        $tag     = substr($line, 1, $pos - 1);
+        $line    = trim(substr($line, $pos));
 
-            $docBlockLine += substr_count($match[1], "\n");
-            $docBlockCursor += strlen($match[1]);
+        // tags that have two or more values;
+        // note that 'throws' may also have two values, however most people use it like "@throws ExceptioClass if whatever...",
+        // which, if broken into two values, leads to an inconsistent description sentence...
+        if(in_array($tag, array('global', 'param', 'return', 'var'))){
+          $parts = array();
 
-            $short = trim($match[1]);
-            $long = '';
+          if(($pos = strpos($line, ' ')) !== false){
+            $parts[] = substr($line, 0, $pos);
+            $line = ltrim(substr($line, $pos));
 
-            // short desc ends at the first dot or when \n\n occurs
-            if(preg_match('/(.*?)(\.\s|\n\n|$)/s', $short, $match)){
-              $long = trim(substr($short, strlen($match[0])));
-              $short = trim($match[0]);
+            if(($pos = strpos($line, ' ')) !== false){
+
+              // we expect up to 3 elements in 'param' tags
+              if(($tag === 'param') && in_array($line[0], array('&', '$'), true)){
+                $parts[] = substr($line, 0, $pos);
+                $parts[] = ltrim(substr($line, $pos));
+                
+              }else{
+                if($tag === 'param')
+                  $parts[] = '';
+
+                $parts[] = ltrim($line);
+              }
+
+            }else{
+              $parts[] = $line;
             }
-          }
-
-          $position = 'tag';
-
-          $doc['title'] = str_replace("\n", '', $short);
-          $doc['desc'] = $long;
-        break;
-
-        case 'tag':
-
-          if(preg_match('/\n\s*' . static::COMMENT_TAG_REGEX . '/As', $comment, $match, null, $docBlockCursor)){
-         
-            $docBlockLine += substr_count($match[0], "\n");
-            $docBlockCursor += strlen($match[0]);            
-
-            switch($type = $match[1]){
-              case 'param':
-                if(preg_match('/^([^\s]*)\s*(?:(?:\$|\&\$)([^\s]+))?\s*(.*)$/s', $match[2], $m))
-                  $tag = array($type, array(static::parseCommentHint(trim($m[1])), trim($m[2]), static::normalizeString($m[3])));
-              break;    
-
-              case 'return':
-              case 'var':
-                if(preg_match('/^([^\s]+)\s*(.*)$/s', $match[2], $m))
-                  $tag = array($type, array(static::parseCommentHint(trim($m[1])), static::normalizeString($m[2])));
-              break;    
-
-              case 'throws':
-                if(preg_match('/^([^\s]+)\s*(.*)$/s', $match[2], $m))
-                  $tag = array($type, array(trim($m[1]), static::normalizeString($m[2])));
-              break;    
-
-              default:
-                $tag = array($type, static::normalizeString($match[2]));
-            }
-
-          // skip
+          
           }else{
-            $docBlockCursor = strlen($comment);
+            $parts[] = $line;            
           }
 
-          list($type, $values) = $tag;
-          $doc['tags'][$type][] = $values;
+          $parts += array_fill(0, ($tag !== 'param') ? 2 : 3, '');
 
-        break;
+          // maybe we should leave out empty (invalid) entries?
+          if(array_filter($parts)){
+            $tags[$tag][] = $parts;
+            $pointer = &$tags[$tag][count($tags[$tag]) - 1][count($parts) - 1];
+          }  
+
+        // tags that have only one value (eg. 'link', 'license', 'author' ...)
+        }else{
+          $tags[$tag][] = trim($line);
+          $pointer = &$tags[$tag][count($tags[$tag]) - 1];
+        }
+
+        continue;
       }
 
-      if(preg_match('/\s*$/As', $comment, $match, null, $docBlockCursor))
-        $docBlockCursor = strlen($comment);
+      // preserve formatting of tag descriptions, because
+      // in some frameworks (like Lithium) they span across multiple lines
+      if($tag !== null){
+
+        $trimmed = trim($line);
+
+        if($padding !== false){
+          $trimmed = str_pad($trimmed, strlen($line) - $padding, ' ', STR_PAD_LEFT);
+          
+        }else{
+          $padding = strlen($line) - strlen($trimmed);
+        }  
+
+        $pointer .=  "\n{$trimmed}";
+        continue;
+      }
       
+      // tag definitions have not started yet;
+      // assume this is title / description text
+      $description .= "\n{$line}";
     }
-   
-    if($key !== false)
-      return isset($doc[$key]) ? $doc[$key] : '';
-
-    return $doc;
-  }
-
-
-
-  /**
-   * Extracts hints from an param tag expression
-   *
-   * @since   1.0
-   * @param   string $hint  
-   * @return  array
-   */
-  protected static function parseCommentHint($hint){
-    $hints = array();
-    foreach(explode('|', $hint) as $hint)
-      $hints[] = (substr($hint, -2) === '[]') ? array(substr($hint, 0, -2), true) : array($hint, false);
     
-    return $hints;
+    $description = trim($description);
+
+    // determine the real title and description by splitting the text
+    // at the nearest encountered [dot + space] or [2x new line]
+    if($description !== ''){
+      $stop = min(array_filter(array(strlen($description), strpos($description, '. '), strpos($description, "\n\n"))));
+      $title = substr($description, 0, $stop + 1);
+      $description = trim(substr($description, $stop + 1));
+    }  
+    
+    $data = compact('title', 'description', 'tags');
+
+    if($key !== null)
+      return isset($data[$key]) ? $data[$key] : null;
+
+    return $data;
   }
 
 
 
   /**
-   * Removes extra whitespaces from a string
-   *  
-   * @since   1.0
-   * @param   string $str
-   * @return  string
+   * Generates a human readable date string from a given timestamp
+   *
+   * @since    1.0
+   * @param    int $timestamp      Date in UNIX time format
+   * @param    int $currentTime    Optional. Use a custom date instead of the current time returned by the server
+   * @return   string              Human readable date string
    */
-  protected static function normalizeString($str){
-    return preg_replace('/\s*\n\s*/', ' ', trim($str));
-  }
+  public static function humanTime($time, $currentTime = null){
+
+    $prefix      = '-';
+    $time        = (int)$time;
+    $currentTime = $currentTime !== null ? (int)$currentTime : time();
+
+    if($currentTime === $time)
+      return 'now';
+
+    // swap values if the given time occurs in the future,
+    // or if it's higher than the given current time
+    if($currentTime < $time){
+      $time  ^= $currentTime ^= $time ^= $currentTime;
+      $prefix = '+';
+    }
+
+    $units = array(
+      'y' => 31536000,   // 60 * 60 * 24 * 365 seconds
+      'm' => 2592000,    // 60 * 60 * 24 * 30
+      'w' => 604800,     // 60 * 60 * 24 * 7
+      'd' => 86400,      // 60 * 60 * 24
+      'h' => 3600,       // 60 * 60
+      'i' => 60,
+      's' => 1,
+    );
+
+    foreach($units as $unit => $seconds)
+      if(($count = (int)floor(($currentTime - $time) / $seconds)) !== 0)
+        break;
+
+    return $prefix . $count . $unit;
+  }  
 
 }
