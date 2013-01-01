@@ -1,4 +1,5 @@
 <?php
+
 error_reporting(E_ALL | E_STRICT);
 
 
@@ -283,9 +284,9 @@ class ref{
       // string
       case is_string($subject):
 
-        $length   = function_exists('mb_strlen') ? mb_strlen($subject) : strlen($subject);
-        $info     = gettype($subject) . '/' . $length;
         $encoding = function_exists('mb_detect_encoding') ? mb_detect_encoding($subject) : '';
+        $length   = function_exists('mb_strlen') ? mb_strlen($subject, $encoding) : strlen($subject);
+        $info     = gettype($subject) . '/' . $length;
 
         if($encoding)
           $info = $encoding . ' ' . $info;
@@ -349,9 +350,10 @@ class ref{
         $itemCount = count($subject) - 1;
         $index = 0;
 
-        // the array might contain a huge amount of entries; splFixedArray saves us some memory usage.
-        // A more efficient way is to build the items as a string (concatenate each item),
-        // but then we loose the flexibility that the entity/group/section methods provide us (exporting data in different formats becomes harder)
+        // note that we build the item list using splFixedArray() to save up some memory, because the subject array
+        // might contain a huge amount of entries. A more efficient way is to build the items as we go as strings,
+        // by concatenating the info foreach entry, but then we loose the flexibility that the
+        // entity/group/section methods provide us (exporting data in different formats would become harder)
         $items = new \SplFixedArray($itemCount);
 
         foreach($subject as $key => &$value){
@@ -1085,7 +1087,8 @@ class ref{
     while($callee = array_pop($trace)){
 
       // extract only the information we neeed
-      extract(array_intersect_key($callee, array_fill_keys(array('file', 'function', 'line'), false)));      
+      $calee = array_intersect_key($callee, array_fill_keys(array('file', 'function', 'line'), false));
+      extract($calee);
 
       // skip, if the called function doesn't match the shortcut function name
       if(!$function || !preg_grep("/{$function}/i" , static::$shortcutFuncs))

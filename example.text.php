@@ -13,10 +13,11 @@ $array = array(
 
 $array['self'] = &$array;
 
-rt(true, false, '2010-09-17 14:00:00', null, function($x, $d){});
-rt(fopen('php://stdin', 'r'), 24, 4.20, "Hey look a 강남스타일 string"); 
-rt(serialize(array('A', 'serialized', 'string')), array(), $array);
+rt(true, false, "Hey look a 강남스타일 string", '2010-09-17 14:00:00', null, 24, 4.20);
+rt(fopen('php://stdin', 'r'), function($x, $d){}); 
+rt(array(), $array, serialize(array('A', 'serialized', 'string')));
 rt(new \DateTimeZone('Europe/London'));
 rt($obj);
+
 
 
