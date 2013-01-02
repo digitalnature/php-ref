@@ -169,41 +169,50 @@
 /* tag-like appearance for boolean, null and resource types */
 .rTrue, .rFalse, .rNull, .rResource, .rJson, .rSerialized, .rDate{
   font: bold 11px Helvetica, Arial; 
-  background: #eee;
   color:#fff;        
   padding:1px 3px;
   text-transform: lowercase;
   text-shadow: none;
   border-radius: 2px;        
   margin-right: 5px;
+  background-color: #eee;  
+  background-image: -moz-linear-gradient(top, rgba(255,255,255,0.1) 40%, rgba(0,0,0,0.1) 100%);
+  background-image: -webkit-linear-gradient(top, rgba(255,255,255,0.1) 40%,rgba(0,0,0,0.1) 100%);
+  background-image: -ms-linear-gradient(top, rgba(255,255,255,0.1) 40%,rgba(0,0,0,0.1) 100%);
+  background-image: linear-gradient(to bottom, rgba(255,255,255,0.1) 40%,rgba(0,0,0,0.1) 100%);
 }
 
 /* boolean true value */
 .rTrue{
-  background:#339900;
+  background-color:#339900;
 }
 
 /* boolean false value */
 .rFalse{
-  background:#CC0033;
+  background-color:#CC0033;
   color:#fff;
 }   
 
 /* null value */
 .rNull{
-  background:#eee;
+  background-color:#eee;
   color:#999;
   text-shadow: #fff 0 1px 1px;
 }
 
 /* resources */
 .rResource{
-  background: #0057ae;
+  background-color: #0057ae;
 }   
 
 .rResourceInfo{  
   font: bold 11px Helvetica, Arial;   
   color: #999;
+}
+
+.rJson, .rSerialized, .rDate{
+  background-color: #d78035;
+  margin-right: 0;
 }
 
 /* integer or double values */
@@ -214,11 +223,6 @@
 /* string values */
 .rString{
   color: #669933;  
-}
-
-.rJson, .rSerialized, .rDate{
-  background: #d78035;
-  margin-right: 0;
 }
 
 /* arrays & objects */
@@ -251,8 +255,7 @@
 
 /* tiny bubbles that indicate visibility info */
 .rFinal, .rAbstract, .rProtected, .rIterateable, .rCloneable{
-  font: normal 11px Helvetica, Arial;    
-  background: #78bded;
+  font: bold 11px Helvetica, Arial;    
   color:#fff;        
   width: 14px;
   height: 14px;
@@ -263,21 +266,22 @@
   border-radius: 30px;
   margin: 0 2px;
   display: inline-block;
+  background-color: #78bded;  
 }
 
 .rAbstract{
-  background: #baed78;
+  background-color: #baed78;
 }
 
 .rProtected{
-  background: #edd078;
+  background-color: #edd078;
 }
 
 .rIterateable{
-  background: #d5dea5;
+  background-color: #d5dea5;
 }
 
 .rCloneable{
-  background: #bdd7d1;
+  background-color: #bdd7d1;
 }
 

@@ -112,7 +112,10 @@ class ref{
     $didAssets = false,
 
     // instance index (gets displayed as comment in html-mode)
-    $counter   = 1;
+    $counter   = 1,
+
+    // cpu time used
+    $time      = 0;
 
 
 
@@ -152,7 +155,7 @@ class ref{
    * @since   1.0
    * @param   mixed $subject       Variable to query   
    * @param   bool $stringChecks   Perform advanced string checks
-   * @return  string                Result
+   * @return  string               Result
    */
   protected function transformSubject(&$subject, $stringChecks = true){
 
@@ -160,222 +163,211 @@ class ref{
     $expState = $this->expanded ? 'exp' : 'col';
 
     $this->expanded = false;       
+    
+    // null value
+    if(is_null($subject))
+      return $this->entity('null');
 
-    // identify variable type
-    switch(true){
+    // integer or double
+    if(is_int($subject) || is_float($subject))
+      return $this->entity(gettype($subject), $subject, gettype($subject));    
 
-      // null value
-      case is_null($subject):        
-        return $this->entity('null');
+    // boolean
+    if(is_bool($subject)){
+      $text = $subject ? 'true' : 'false';
+      return $this->entity($text, $text, gettype($subject));        
+    }  
 
-      // boolean
-      case is_bool($subject):
-        $text = $subject ? 'true' : 'false';
-        return $this->entity($text, $text, gettype($subject));        
+    // resource
+    if(is_resource($subject)){
 
-      // resource
-      case is_resource($subject):
+      $type = get_resource_type($subject);
+      $name = $this->entity('resource', $subject);        
 
-        $type = get_resource_type($subject);
-        $name = $this->entity('resource', $subject);        
+      // @see: http://php.net/manual/en/resource.php
+      // need to add more...
+      switch($type){
 
-        // @see: http://php.net/manual/en/resource.php
-        // need to add more...
-        switch($type){
+        // curl extension resource
+        case 'curl':
+          $meta = curl_getinfo($subject);
+        break;
 
-          // curl extension resource
-          case 'curl':
-            $meta = curl_getinfo($subject);
-          break;
-
-          case 'FTP Buffer':
-            $meta = array(
-              'time_out'  => ftp_get_option($subject, FTP_TIMEOUT_SEC),
-              'auto_seek' => ftp_get_option($subject, FTP_AUTOSEEK),
-            );
-
-          break;
-
-          // gd image extension resource
-          case 'gd':
-
-            $meta = array(
-               'size'       => sprintf('%d x %d', imagesx($subject), imagesy($subject)),
-               'true_color' => imageistruecolor($subject),
-            );
-
-          break;  
-
-
-          case 'ldap link':
-
-            $constants = get_defined_constants();
-
-            array_walk($constants, function($value, $key) use(&$constants){
-
-              if(strpos($key, 'LDAP_OPT_') !== 0)
-                unset($constants[$key]);
-
-            });
-
-            // this seems to fail on my setup :(
-            unset($constants['LDAP_OPT_NETWORK_TIMEOUT']);
-
-            $meta = array();
-
-            foreach(array_slice($constants, 3) as $key => $value)
-              if(ldap_get_option($subject, (int)$value, $ret))
-                $meta[strtolower(substr($key, 9))] = $ret;
-
-          break;
-
-          // mysql connection (mysql extension is deprecated from php 5.4/5.5)
-          case 'mysql link':
-          case 'mysql link persistent':
-
-            $dbs = array();
-            $query = @mysql_list_dbs($subject);
-            while($row = @mysql_fetch_array($query))
-              $dbs[] = $row['Database'];
-
-            $meta = array(
-              'host'             => ltrim(@mysql_get_host_info ($subject), 'MySQL host info: '),
-              'server_version'   => @mysql_get_server_info($subject),
-              'protocol_version' => @mysql_get_proto_info($subject),
-              'databases'        => $dbs,
-            );
-
-          break;
-
-          // mysql result
-          case 'mysql result':
-            while($row = @mysql_fetch_object($subject))
-              $meta[] = (array)$row;
-
-          break;
-
-          // stream resource (fopen, fsockopen, popen, opendir etc)
-          case 'stream':
-            $meta = stream_get_meta_data($subject);
-          break;
-
-          default:
-            $meta = array();
-
-        }
-
-        $items = array();
-
-        foreach($meta as $key => $value){
-          $key = ucwords(str_replace('_', ' ', $key));
-          $items[] = array(
-            $this->entity('resourceInfo', $key),
-            $this->entity('sep', ':'),
-            $this->transformSubject($value, false),
+        case 'FTP Buffer':
+          $meta = array(
+            'time_out'  => ftp_get_option($subject, FTP_TIMEOUT_SEC),
+            'auto_seek' => ftp_get_option($subject, FTP_AUTOSEEK),
           );
-        }  
 
-        return $name . $this->group($type, $items ? $expState : null, $this->section($items));
+        break;
 
-      // integer or double
-      case is_int($subject) || is_float($subject):
-        return $this->entity(gettype($subject), $subject, gettype($subject));
+        // gd image extension resource
+        case 'gd':
 
-      // string
-      case is_string($subject):
-
-        $encoding = function_exists('mb_detect_encoding') ? mb_detect_encoding($subject) : '';
-        $length   = function_exists('mb_strlen') ? mb_strlen($subject, $encoding) : strlen($subject);
-        $info     = gettype($subject) . '/' . $length;
-
-        if($encoding)
-          $info = $encoding . ' ' . $info;
-
-        $string = $this->entity('string', $subject, $info);
-
-        // skip advanced checks if the string appears to have numeric appearance,
-        // or if it's shorter than 5 characters
-        if(!$stringChecks || is_numeric($subject) || ($length < 4))
-          return $string;
-
-        $ret = $this->entity('sep', "\n");
-
-        // date?
-        if(($date = @strtotime($subject)) !== false)
-          return $string . $ret . $this->entity('date') . ' ' . static::humanTime($date);
-
-        // attempt to detect if this is a serialized string     
-        $token = $subject[0];
-        $mapStart = array('s' => 1, 'a' => 1, 'O' => 1);
-
-        if(isset($mapStart[$token]) && ($subject[1] === ':')){
-          if(($subject[$length - 1] === ';') || ($subject[$length - 1] === '}')){
-            if((($token === 's') && ($subject[$length - 2] !== '"')) || preg_match("/^{$token}:[0-9]+:/s", $subject)){
-              $unserialized = unserialize($subject);
-              return $string . $ret . $this->entity('serialized', 'Unserialized') . ' ' . $this->transformSubject($unserialized, false);
-            }
-          }
-        }  
-
-        // try to find out if it's a json-encoded string;
-        // only do this for json-encoded arrays or objects, because other types have too generic formats
-        if((strpos($subject, '{') === 0) || (strpos($subject, '[') === 0)){
-        
-          $json = json_decode($subject);
-
-          if(json_last_error() === JSON_ERROR_NONE)
-            return $string . $ret . $this->entity('json', 'Json.Decoded') . ' ' . $this->transformSubject($json, false);
-        }  
-
-        return $string;  
-
-      // arrays
-      case is_array($subject):
-
-        // empty array?
-        if(empty($subject))      
-          return $this->entity('array', 'Array') . $this->group();
-
-        // set a marker to detect recursion
-        if(!$this->arrayMarker)
-          $this->arrayMarker = uniqid('', true);
-
-        // if our marker element is present in the array it means that we were here before
-        if(isset($subject[$this->arrayMarker]))
-          return $this->entity('array', 'Array') . $this->group('Recursion');
-
-        $subject[$this->arrayMarker] = true;
-
-        // note that we must substract the marker element
-        $itemCount = count($subject) - 1;
-        $index = 0;
-
-        // note that we build the item list using splFixedArray() to save up some memory, because the subject array
-        // might contain a huge amount of entries. A more efficient way is to build the items as we go as strings,
-        // by concatenating the info foreach entry, but then we loose the flexibility that the
-        // entity/group/section methods provide us (exporting data in different formats would become harder)
-        $items = new \SplFixedArray($itemCount);
-
-        foreach($subject as $key => &$value){
-
-          // ignore our marker
-          if($key === $this->arrayMarker)
-            continue;
-
-          $keyInfo = is_string($key) ? sprintf('String key (%d)', strlen($key)) : sprintf('Integer key', gettype($key));
-
-          $items[$index++] = array(
-            $this->entity('key', $key, $keyInfo),
-            $this->entity('sep', '=>'),
-            $this->transformSubject($value, $stringChecks),
+          $meta = array(
+             'size'       => sprintf('%d x %d', imagesx($subject), imagesy($subject)),
+             'true_color' => imageistruecolor($subject),
           );
-        }
 
-        // remove our temporary marker;
-        // not really required, because the shortcut function doesn't take references, but we want to be nice :P
-        unset($subject[$this->arrayMarker]);
+        break;  
 
-        return $this->entity('array', 'Array') . $this->group($itemCount, $expState, $this->section($items));
+
+        case 'ldap link':
+
+          $constants = get_defined_constants();
+
+          array_walk($constants, function($value, $key) use(&$constants){
+
+            if(strpos($key, 'LDAP_OPT_') !== 0)
+              unset($constants[$key]);
+
+          });
+
+          // this seems to fail on my setup :(
+          unset($constants['LDAP_OPT_NETWORK_TIMEOUT']);
+
+          $meta = array();
+
+          foreach(array_slice($constants, 3) as $key => $value)
+            if(ldap_get_option($subject, (int)$value, $ret))
+              $meta[strtolower(substr($key, 9))] = $ret;
+
+        break;
+
+        // mysql connection (mysql extension is deprecated from php 5.4/5.5)
+        case 'mysql link':
+        case 'mysql link persistent':
+
+          $dbs = array();
+          $query = @mysql_list_dbs($subject);
+          while($row = @mysql_fetch_array($query))
+            $dbs[] = $row['Database'];
+
+          $meta = array(
+            'host'             => ltrim(@mysql_get_host_info ($subject), 'MySQL host info: '),
+            'server_version'   => @mysql_get_server_info($subject),
+            'protocol_version' => @mysql_get_proto_info($subject),
+            'databases'        => $dbs,
+          );
+
+        break;
+
+        // mysql result
+        case 'mysql result':
+          while($row = @mysql_fetch_object($subject))
+            $meta[] = (array)$row;
+
+        break;
+
+        // stream resource (fopen, fsockopen, popen, opendir etc)
+        case 'stream':
+          $meta = stream_get_meta_data($subject);
+        break;
+
+        default:
+          $meta = array();
+
+      }
+
+      $items = array();
+
+      foreach($meta as $key => $value){
+        $key = ucwords(str_replace('_', ' ', $key));
+        $items[] = array(
+          $this->entity('resourceInfo', $key),
+          $this->entity('sep', ':'),
+          $this->transformSubject($value, false),
+        );
+      }  
+
+      return $name . $this->group($type, $items ? $expState : null, $this->section($items));
+    }    
+
+    // string
+    if(is_string($subject)){
+      $encoding = function_exists('mb_detect_encoding') ? mb_detect_encoding($subject) : '';
+      $length   = function_exists('mb_strlen') ? mb_strlen($subject, $encoding) : strlen($subject);
+      $info     = gettype($subject) . '/' . $length;
+
+      if($encoding)
+        $info = $encoding . ' ' . $info;
+
+      $string = $this->entity('string', $subject, $info);
+
+      // skip advanced checks if the string appears to be numeric,
+      // or if it's shorter than 5 characters
+      if(!$stringChecks || is_numeric($subject) || ($length < 4))
+        return $string;
+
+      $ret = $this->entity('sep', "\n");
+
+      // date?
+      if(($date = @strtotime($subject)) !== false)
+        return $string . $ret . $this->entity('date') . ' ' . static::humanTime($date);
+
+      // attempt to detect if this is a serialized string     
+      if(in_array($subject[0], array('s', 'a', 'O'), true) && (($unserialized = @unserialize($subject)) !== false))
+        return $string . $ret . $this->entity('serialized', 'Unserialized') . ' ' . $this->transformSubject($unserialized, false);      
+
+      // try to find out if it's a json-encoded string;
+      // only do this for json-encoded arrays or objects, because other types have too generic formats
+      if(in_array($subject[0], array('{', '['), true)){     
+        $json = json_decode($subject);
+
+        if(json_last_error() === JSON_ERROR_NONE)
+          return $string . $ret . $this->entity('json', 'Json.Decoded') . ' ' . $this->transformSubject($json, false);
+      }  
+
+      return $string;
+    }    
+
+    // arrays
+    if(is_array($subject)){
+
+      // empty array?
+      if(empty($subject))      
+        return $this->entity('array', 'Array') . $this->group();
+
+      // set a marker to detect recursion
+      if(!$this->arrayMarker)
+        $this->arrayMarker = uniqid('', true);
+
+      // if our marker element is present in the array it means that we were here before
+      if(isset($subject[$this->arrayMarker]))
+        return $this->entity('array', 'Array') . $this->group('Recursion');
+
+      $subject[$this->arrayMarker] = true;
+
+      // note that we must substract the marker element
+      $itemCount = count($subject) - 1;
+      $index = 0;
+
+      // note that we build the item list using splFixedArray() to save up some memory, because the subject array
+      // might contain a huge amount of entries. A more efficient way is to build the items as we go as strings,
+      // by concatenating the info foreach entry, but then we loose the flexibility that the
+      // entity/group/section methods provide us (exporting data in different formats would become harder)
+      $items = new \SplFixedArray($itemCount);
+
+      foreach($subject as $key => &$value){
+
+        // ignore our marker
+        if($key === $this->arrayMarker)
+          continue;
+
+        $keyInfo = is_string($key) ? sprintf('String key (%d)', strlen($key)) : sprintf('Integer key', gettype($key));
+
+        $items[$index++] = array(
+          $this->entity('key', $key, $keyInfo),
+          $this->entity('sep', '=>'),
+          $this->transformSubject($value, $stringChecks),
+        );
+      }
+
+      // remove our temporary marker;
+      // not really required, because ::build() doesn't take references, but we want to be nice :P
+      unset($subject[$this->arrayMarker]);
+
+      return $this->entity('array', 'Array') . $this->group($itemCount, $expState, $this->section($items));
     }
 
     // if we reached this point, $subject must be an object
@@ -740,6 +732,11 @@ class ref{
   }
 
 
+  public static function getTime(){
+    return static::$time;
+  }
+
+
 
   /**
    * Creates the root structure that contains all the groups and entities
@@ -752,6 +749,8 @@ class ref{
    */
   public static function build($subject, $expression = null, $format = 'html'){
 
+    //$errorReporting = error_reporting(0);
+
     $startTime = microtime(true);  
     $startMem = memory_get_usage();
 
@@ -763,20 +762,24 @@ class ref{
     $memUsage = abs(round((memory_get_usage() - $startMem) / 1024, 2));
     $cpuUsage = round(microtime(true) - $startTime, 4);
 
+    static::$time += $cpuUsage;
+
     $instance = null;
-    unset($instance);    
+    unset($instance);
+
+    //error_reporting($errorReporting);
 
     switch($format){
 
       // HTML output
       case 'html':
+        $assets = '';      
 
         // first call? include styles and javascript
         if(!static::$didAssets){
 
           ob_start();
           ?>
-
           <style scoped>
             /*<![CDATA[*/
             <?php readfile(__DIR__ . '/ref.css'); ?>
@@ -787,16 +790,19 @@ class ref{
             /*<![CDATA[*/
             <?php readfile(__DIR__ . '/ref.js'); ?>
             /*]]>*/
-          </script>       
-          
+          </script>
           <?php    
-          $varOutput = preg_replace('/\s+/', ' ', trim(ob_get_clean())) . $varOutput;
+          // normalize space and remove comments
+          $assets = preg_replace('/\s+/', ' ', trim(ob_get_clean()));
+          $assets = preg_replace('!/\*.*?\*/!s', '', $assets);
+          $assets = preg_replace('/\n\s*\n/', "\n", $assets);
+
           static::$didAssets = true;
         }
 
         $output = sprintf('%s<div class="ref">%s</div>', $expOutput, $varOutput);
 
-        return sprintf('<!-- ref #%d -->%s<!-- /ref (took %ss, %sK) -->', static::$counter++, $output, $cpuUsage, $memUsage);        
+        return sprintf('<!-- ref #%d -->%s%s<!-- /ref (took %ss, %sK) -->', static::$counter++, $assets, $output, $cpuUsage, $memUsage);        
 
       // text output
       default:
@@ -1017,16 +1023,9 @@ class ref{
 
       // user-defined; attempt to get doc comments
       }else{
-
         $comments = static::parseComment($tip->getDocComment());
 
-        $tip = '';
-
-        if(!empty($comments['title']))
-          $tip .= $comments['title'];
-
-        if(!empty($comments['description']))
-          $tip .= "\n\n" . $comments['description'];        
+        $tip = $comments ? implode("\n", array($comments['title'], $comments['description'])) : '';
       }
 
     }
@@ -1321,9 +1320,12 @@ class ref{
       $stop = min(array_filter(array(strlen($description), strpos($description, '. '), strpos($description, "\n\n"))));
       $title = substr($description, 0, $stop + 1);
       $description = trim(substr($description, $stop + 1));
-    }  
+    }
     
     $data = compact('title', 'description', 'tags');
+
+    if(!array_filter($data))
+      return null;
 
     if($key !== null)
       return isset($data[$key]) ? $data[$key] : null;
