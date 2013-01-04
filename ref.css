@@ -167,7 +167,8 @@
 }
 
 /* tag-like appearance for boolean, null and resource types */
-.rTrue, .rFalse, .rNull, .rResource, .rJson, .rSerialized, .rDate{
+.rTrue, .rFalse, .rNull, .rResource,
+.rStrJson, .rStrSerialized, .rStrDate, .rStrClass{
   font: bold 11px Helvetica, Arial; 
   color:#fff;        
   padding:1px 3px;
@@ -210,7 +211,7 @@
   color: #999;
 }
 
-.rJson, .rSerialized, .rDate{
+.rStrJson, .rStrSerialized, .rStrDate, .rStrClass{
   background-color: #d78035;
   margin-right: 0;
 }

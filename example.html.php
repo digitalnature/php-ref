@@ -7,7 +7,8 @@ $obj = new \Tests\ClassTest(array('foo', 'bar', 'abc def'));
 
 $array = array(
   'foo'         => 'bar',
-  'abc def xyz' => 5,
+  'abc def xyz' => 5,  
+  'a class'     => 'ref',
   'child'       => array(4, 'five', 6),
 );
 

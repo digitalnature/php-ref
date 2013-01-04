@@ -70,7 +70,7 @@ function rt(){
   foreach($args as $index => $arg)
     $output[] = ref::build($arg, isset($expressions[$index]) ? $expressions[$index] : null, 'text');
 
-  $output = implode("\n\n", $output);
+  $output = implode('', $output);
 
   if(in_array('@', $options, true))
     return $output;  
@@ -150,14 +150,82 @@ class ref{
 
 
   /**
+   * Get all parent classes of a class
+   *
+   * @since   1.0
+   * @param   string|object $class   Class name or object
+   * @param   bool $internalOnly     Retrieve only PHP-internal classes
+   * @return  string
+   */
+  protected function getParentClasses($class, $internalOnly = false){
+
+    $haveParent = ($class instanceof \Reflector) ? $class : new \ReflectionClass($class);
+    $parents = array();
+
+    while($haveParent !== false){
+      if(!$internalOnly || ($internalOnly && $haveParent->isInternal()))
+        $parents[] = $haveParent;
+
+      $haveParent = $haveParent->getParentClass();
+    }
+
+    return $parents;
+  }
+
+
+
+  /**
+   * Generate class info
+   *
+   * @since   1.0
+   * @param   string|object $class   Class name or object
+   * @return  string
+   */
+  protected function transformClassString($class){
+
+    if(!($class instanceof \Reflector))
+      $class = new \ReflectionClass($class);
+
+    $classes = $this->getParentClasses($class) + array($class);
+
+    foreach($classes as &$class){
+
+      $modifiers = array();
+
+      if($class->isAbstract())
+        $modifiers[] = array('abstract', 'A', 'This class is abstract');
+
+      if($class->isFinal())
+        $modifiers[] = array('final', 'F', 'This class is final and cannot be extended');
+
+      // php 5.4+ only
+      if((PHP_MINOR_VERSION > 3) && $class->isCloneable())
+        $modifiers[] = array('cloneable', 'C', 'Instances of this class can be cloned');
+
+      if($class->isIterateable())
+        $modifiers[] = array('iterateable', 'X', 'Instances of this class are iterateable');            
+     
+      $className = $class->getName();
+
+      if($class->isInternal())
+        $className = $this->anchor($className, 'class');
+
+      $class = $this->modifiers($modifiers) . $this->entity('class', $className, $class);
+    }   
+
+    return implode($this->entity('sep', ' :: '), array_reverse($classes));
+  }
+
+
+
+  /**
    * Builds a report with information about $subject
    *
    * @since   1.0
    * @param   mixed $subject       Variable to query   
-   * @param   bool $stringChecks   Perform advanced string checks
    * @return  string               Result
    */
-  protected function transformSubject(&$subject, $stringChecks = true){
+  protected function transformSubject(&$subject){
 
      // expand first level
     $expState = $this->expanded ? 'exp' : 'col';
@@ -183,6 +251,7 @@ class ref{
 
       $type = get_resource_type($subject);
       $name = $this->entity('resource', $subject);        
+      $meta = array();
 
       // @see: http://php.net/manual/en/resource.php
       // need to add more...
@@ -203,7 +272,6 @@ class ref{
 
         // gd image extension resource
         case 'gd':
-
           $meta = array(
              'size'       => sprintf('%d x %d', imagesx($subject), imagesy($subject)),
              'true_color' => imageistruecolor($subject),
@@ -211,22 +279,16 @@ class ref{
 
         break;  
 
-
         case 'ldap link':
-
           $constants = get_defined_constants();
 
           array_walk($constants, function($value, $key) use(&$constants){
-
             if(strpos($key, 'LDAP_OPT_') !== 0)
               unset($constants[$key]);
-
           });
 
           // this seems to fail on my setup :(
           unset($constants['LDAP_OPT_NETWORK_TIMEOUT']);
-
-          $meta = array();
 
           foreach(array_slice($constants, 3) as $key => $value)
             if(ldap_get_option($subject, (int)$value, $ret))
@@ -237,7 +299,6 @@ class ref{
         // mysql connection (mysql extension is deprecated from php 5.4/5.5)
         case 'mysql link':
         case 'mysql link persistent':
-
           $dbs = array();
           $query = @mysql_list_dbs($subject);
           while($row = @mysql_fetch_array($query))
@@ -264,9 +325,6 @@ class ref{
           $meta = stream_get_meta_data($subject);
         break;
 
-        default:
-          $meta = array();
-
       }
 
       $items = array();
@@ -276,7 +334,7 @@ class ref{
         $items[] = array(
           $this->entity('resourceInfo', $key),
           $this->entity('sep', ':'),
-          $this->transformSubject($value, false),
+          $this->transformSubject($value),
         );
       }  
 
@@ -293,30 +351,55 @@ class ref{
         $info = $encoding . ' ' . $info;
 
       $string = $this->entity('string', $subject, $info);
+      $matches = array();
 
-      // skip advanced checks if the string appears to be numeric,
+      // class name?
+      if(ctype_alpha($subject) && class_exists($subject, false))        
+        $matches[] = $this->entity('strClass', 'Class') . ' ' . $this->transformClassString($subject);
+
+      // skip more advanced checks if the string appears to be numeric,
       // or if it's shorter than 5 characters
-      if(!$stringChecks || is_numeric($subject) || ($length < 4))
-        return $string;
+      if(!is_numeric($subject) && ($length > 4)){
 
-      $ret = $this->entity('sep', "\n");
+        // date?
+        if($length > 4){
+          $date = date_parse($subject);
+          if(($date !== false) && empty($date['errors']))
+            $matches[] = $this->entity('strDate', 'Date') . ' ' . static::humanTime(strtotime($subject));
+        }
 
-      // date?
-      if(($date = @strtotime($subject)) !== false)
-        return $string . $ret . $this->entity('date') . ' ' . static::humanTime($date);
+        // attempt to detect if this is a serialized string     
+        static $unserializing = false;      
 
-      // attempt to detect if this is a serialized string     
-      if(in_array($subject[0], array('s', 'a', 'O'), true) && (($unserialized = @unserialize($subject)) !== false))
-        return $string . $ret . $this->entity('serialized', 'Unserialized') . ' ' . $this->transformSubject($unserialized, false);      
+        if(!$unserializing && in_array($subject[0], array('s', 'a', 'O'), true)){
+          $unserializing = true;
+          if(($subject[$length - 1] === ';') || ($subject[$length - 1] === '}'))
+            if((($subject[0] === 's') && ($subject[$length - 2] !== '"')) || preg_match("/^{$subject[0]}:[0-9]+:/s", $subject))
+              if(($unserialized = @unserialize($subject)) !== false)
+                $matches[] = $this->entity('strSerialized', 'Unserialized:') . ' ' . $this->transformSubject($unserialized);
 
-      // try to find out if it's a json-encoded string;
-      // only do this for json-encoded arrays or objects, because other types have too generic formats
-      if(in_array($subject[0], array('{', '['), true)){     
-        $json = json_decode($subject);
+          $unserializing = false;
 
-        if(json_last_error() === JSON_ERROR_NONE)
-          return $string . $ret . $this->entity('json', 'Json.Decoded') . ' ' . $this->transformSubject($json, false);
-      }  
+        }else{
+
+          // try to find out if it's a json-encoded string;
+          // only do this for json-encoded arrays or objects, because other types have too generic formats
+          static $decodingJson = false;
+
+          if(!$decodingJson && in_array($subject[0], array('{', '['), true)){     
+            $decodingJson = true;
+            $json = json_decode($subject);
+
+            if(json_last_error() === JSON_ERROR_NONE)
+              $matches[] = $this->entity('strJson', 'Json.Decoded') . ' ' . $this->transformSubject($json);
+
+            $decodingJson = false;
+          }
+        }
+      }
+
+      if($matches)
+        $string = $string . $this->entity('sep', "\n") . implode($this->entity('sep', "\n"), $matches);
 
       return $string;
     }    
@@ -359,7 +442,7 @@ class ref{
         $items[$index++] = array(
           $this->entity('key', $key, $keyInfo),
           $this->entity('sep', '=>'),
-          $this->transformSubject($value, $stringChecks),
+          $this->transformSubject($value),
         );
       }
 
@@ -370,46 +453,8 @@ class ref{
       return $this->entity('array', 'Array') . $this->group($itemCount, $expState, $this->section($items));
     }
 
-    // if we reached this point, $subject must be an object
-    $classes = $internalParents = array();
-    $haveParent = new \ReflectionObject($subject);
-
-    // get parent/ancestor classes
-    while($haveParent !== false){
-      $classes[] = $haveParent;
-
-      if($haveParent->isInternal())
-        $internalParents[] = $haveParent;
-
-      $haveParent = $haveParent->getParentClass();
-    }
-    
-    foreach($classes as &$class){
-     
-      $modifiers = array();
-
-      if($class->isAbstract())
-        $modifiers[] = array('abstract', 'A', 'This class is abstract');
-
-      if($class->isFinal())
-        $modifiers[] = array('final', 'F', 'This class is final and cannot be extended');
-
-      // php 5.4+ only
-      if((PHP_MINOR_VERSION > 3) && $class->isCloneable())
-        $modifiers[] = array('cloneable', 'C', 'Instances of this class can be cloned');
-
-      if($class->isIterateable())
-        $modifiers[] = array('iterateable', 'X', 'Instances of this class are iterateable');            
-     
-      $className = $class->getName();
-
-      if($class->isInternal())
-        $className = $this->anchor($className, 'class');
-
-      $class = $this->modifiers($modifiers) . $this->entity('class', $className, $class);
-    }  
-
-    $objectName = implode($this->entity('sep', ' :: '), array_reverse($classes));
+    // if we reached this point, $subject must be an object     
+    $objectName = $this->transformClassString($subject);
     $objectHash = spl_object_hash($subject);
 
     // already been here?
@@ -427,6 +472,8 @@ class ref{
     $constants  = $reflector->getConstants();
     $interfaces = $reflector->getInterfaces();
     $traits     = (PHP_MINOR_VERSION > 3) ? $reflector->getTraits() : array();
+
+    $internalParents = $this->getParentClasses($reflector, true);
 
     // no data to display?
     if(!$props && !$methods && !$constants && !$interfaces && !$traits)
@@ -469,7 +516,7 @@ class ref{
           $this->entity('sep', '::'),
           $this->entity('constant', $name),
           $this->entity('sep', '='),
-          $this->transformSubject($value, $stringChecks),
+          $this->transformSubject($value),
         );
         
       }
@@ -517,7 +564,7 @@ class ref{
           $this->modifiers($modifiers),
           $this->entity('property', $name, $prop),
           $this->entity('sep', '='),
-          $this->transformSubject($value, $stringChecks),
+          $this->transformSubject($value),
         );
 
       }
@@ -566,7 +613,7 @@ class ref{
           
           foreach($tags as $tag){
             list($types, $varName, $varDesc) = $tag;
-            if(ltrim($varName, '&') === $parameter->getName()){
+            if(ltrim($varName, '&$') === $parameter->getName()){
               $tip = $varDesc;
               break;
             }  
@@ -576,7 +623,7 @@ class ref{
             $paramValue = $parameter->isDefaultValueAvailable() ? $parameter->getDefaultValue() : null;            
             $paramName  = $this->entity('param', $paramName, $tip);
             $paramName .= $this->entity('sep', ' = ');
-            $paramName .= $this->entity('paramValue', $this->transformSubject($paramValue, $stringChecks));
+            $paramName .= $this->entity('paramValue', $this->transformSubject($paramValue));
 
             if($paramHint)
               $paramName = $paramHint . ' ' . $paramName;
@@ -725,13 +772,20 @@ class ref{
 
         // apply changes
         $fn[0] = implode('::', $cn);
-      }  
+      }
     }
 
     return $this->entity('exp', $prefix . implode('(', $fn));
   }
 
 
+
+  /**
+   * Total CPU time used by the class
+   *   
+   * @since   1.0
+   * @return  double
+   */
   public static function getTime(){
     return static::$time;
   }
@@ -752,15 +806,12 @@ class ref{
     //$errorReporting = error_reporting(0);
 
     $startTime = microtime(true);  
-    $startMem = memory_get_usage();
-
-    $instance = new static($format);
-
+    $startMem  = memory_get_usage();
+    $instance  = new static($format);
     $varOutput = $instance->transformSubject($subject);    
     $expOutput = ($expression !== null) ? $instance->transformExpression($expression) : '';
-
-    $memUsage = abs(round((memory_get_usage() - $startMem) / 1024, 2));
-    $cpuUsage = round(microtime(true) - $startTime, 4);
+    $memUsage  = abs(round((memory_get_usage() - $startMem) / 1024, 2));
+    $cpuUsage  = round(microtime(true) - $startTime, 4);
 
     static::$time += $cpuUsage;
 
@@ -791,7 +842,8 @@ class ref{
             <?php readfile(__DIR__ . '/ref.js'); ?>
             /*]]>*/
           </script>
-          <?php    
+          <?php
+
           // normalize space and remove comments
           $assets = preg_replace('/\s+/', ' ', trim(ob_get_clean()));
           $assets = preg_replace('!/\*.*?\*/!s', '', $assets);
@@ -806,7 +858,7 @@ class ref{
 
       // text output
       default:
-        return sprintf("%s\n%s\n%s\n", $expOutput, str_repeat('^', strlen($expOutput)), $varOutput);
+        return sprintf("\n%s\n%s\n%s\n", $expOutput, str_repeat('=', strlen($expOutput)), $varOutput);
 
     }
 
@@ -844,7 +896,7 @@ class ref{
         if($content !== '')
           $content =  $content . "\n";
 
-        return '(' . $prefix . $content . ')';
+        return '( ' . $prefix . $content . ')';
       
     }    
   }
@@ -1024,7 +1076,6 @@ class ref{
       // user-defined; attempt to get doc comments
       }else{
         $comments = static::parseComment($tip->getDocComment());
-
         $tip = $comments ? implode("\n", array($comments['title'], $comments['description'])) : '';
       }
 
@@ -1071,7 +1122,7 @@ class ref{
 
 
 
-/**
+  /**
    * Determines the input expression(s) passed to the shortcut function
    *
    * @since   1.0
@@ -1081,7 +1132,7 @@ class ref{
   public static function getInputExpressions(array &$options = null){    
 
     // pull only basic info with php 5.3.6+ to save some memory
-    $trace = debug_backtrace(defined('DEBUG_BACKTRACE_IGNORE_ARGS') ? DEBUG_BACKTRACE_IGNORE_ARGS : null);
+    $trace = defined('DEBUG_BACKTRACE_IGNORE_ARGS') ? debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS) : debug_backtrace();
     
     while($callee = array_pop($trace)){
 
@@ -1154,7 +1205,8 @@ class ref{
             if($token === ')')
               $lvl--;
 
-            // assume next argument if a comma was encountered, and we're not insde a curly bracket or inner parentheses
+            // assume next argument if a comma was encountered,
+            // and we're not insde a curly bracket or inner parentheses
             if(($curlies < 1) && ($lvl === 0) && ($token === ',')){
               $index++;
               continue;
