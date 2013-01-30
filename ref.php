@@ -4,7 +4,7 @@ error_reporting(E_ALL | E_STRICT);
 
 
 /**
- * Shortcut to ref::build(), HTML mode
+ * Shortcut to ref::transform(), HTML mode
  *
  * @version  1.0
  * @param    mixed $args
@@ -31,7 +31,7 @@ function r(){
 
   // get the info
   foreach($args as $index => $arg)
-    $output[] = ref::build($arg, isset($expressions[$index]) ? $expressions[$index] : null, 'html');
+    $output[] = ref::transform($arg, isset($expressions[$index]) ? $expressions[$index] : null, 'html');
 
   $output = implode("\n\n", $output);
 
@@ -53,7 +53,7 @@ function r(){
 
 
 /**
- * Shortcut to ref::build(), plain text mode
+ * Shortcut to ref::transform(), plain text mode
  *
  * @version  1.0
  * @param    mixed $args
@@ -68,7 +68,7 @@ function rt(){
     $expressions = array();
 
   foreach($args as $index => $arg)
-    $output[] = ref::build($arg, isset($expressions[$index]) ? $expressions[$index] : null, 'text');
+    $output[] = ref::transform($arg, isset($expressions[$index]) ? $expressions[$index] : null, 'text');
 
   $output = implode('', $output);
 
@@ -94,31 +94,28 @@ function rt(){
  */
 class ref{
 
-  public static
-
-    // shortcut functions used to access the ::build() method below;
-    // if they are namespaced, the namespace must be present as well (methods are not supported)
-    $shortcutFuncs = array('r', 'rt');
-
-
-
   protected static
 
     // initial expand depth (for HTML mode only)
-    $expDepth  = 1,  
+    $expandDepth  = 1,  
 
-    // used to determine the position of the current call,
-    // if more ::build() calls were made on the same line
-    $lineInst  = array(),
+    // shortcut functions used to access the ::build() method below;
+    // if they are namespaced, the namespace must be present as well (methods are not supported)
+    $shortcutFunc = array('r', 'rt'),
+    
+    // default output format
+    $outputFormat = 'html',
 
-    // tracks style/jscript inclusion state (html only)
-    $didAssets = false,
+    // stylesheet path (for HTML only);
+    // 'false' means no styles
+    $stylePath    = '{:dir}/ref.css',
 
-    // instance index (gets displayed as comment in html-mode)
-    $counter   = 1,
+    // javascript path (for HTML only);
+    // 'false' means no js
+    $scriptPath   = '{:dir}/ref.js',
 
     // cpu time used
-    $time      = 0;
+    $time         = 0;
 
 
 
@@ -153,16 +150,33 @@ class ref{
 
 
   /**
-   * Set expand depth (relevant for HTML mode only)
-   *
-   * If $depth >= 0, groups nested beyond this level are collapsed
-   * If $depth < 0, all groups are expanded
+   * Set or get configuration options
    *
    * @since   1.0
-   * @param   int $depth
+   * @param   string $key
+   * @param   mixed|null $value
+   * @return  mixed
    */
-  public static function setExpandDepth($depth){
-    static::$expDepth = $depth;
+  public static function config($key, $value = null){
+
+    $validKeys = array(
+      'shortcutFunc',
+      'expandDepth',
+      'outputFormat',
+      'stylePath',
+      'scriptPath',
+    );
+
+    if(!in_array($key, $validKeys, true))
+      throw new Exception(sprintf('Unrecognized option: "%s". Valid options are: %s', $key, implode(', ', $validKeys)));
+
+    if($value === null)
+      return static::${$key};
+
+    if(is_array(static::${$key}))
+      return static::${$key}[] = $value;
+
+    return static::${$key} = $value;
   }
 
 
@@ -904,10 +918,20 @@ class ref{
    * @since   1.0
    * @param   mixed $subject           Variable to query
    * @param   string|null $expression  Source expression string
-   * @param   string $format           Output format
+   * @param   string|null $format      Output format, defaults to the 'outputFormat' config setting
    * @return  string                   Formatted information
    */
-  public static function build($subject, $expression = null, $format = 'html'){
+  public static function transform($subject, $expression = null, $format = null){
+
+    // tracks style/jscript inclusion state (html only)
+    static $didAssets = false;
+ 
+    // instance index (gets displayed as comment in html-mode)
+    static $counter = 1;
+
+
+    if(!$format)
+      $format = static::$outputFormat;
 
     //$errorReporting = error_reporting(0);
 
@@ -933,34 +957,37 @@ class ref{
         $assets = '';      
 
         // first call? include styles and javascript
-        if(!static::$didAssets){
+        if(!$didAssets){
 
           ob_start();
-          ?>
-          <style scoped>
-            /*<![CDATA[*/
-            <?php readfile(__DIR__ . '/ref.css'); ?>
-            /*]]>*/
-          </style>
 
-          <script>
-            /*<![CDATA[*/
-            <?php readfile(__DIR__ . '/ref.js'); ?>
-            /*]]>*/
-          </script>
-          <?php
+          if(static::$stylePath !== false){
+            ?>
+            <style scoped>
+              <?php readfile(str_replace('{:dir}', __DIR__, static::$stylePath)); ?>
+            </style>
+            <?php
+          }
+
+          if(static::$scriptPath !== false){
+            ?>
+            <script>
+              <?php readfile(str_replace('{:dir}', __DIR__, static::$scriptPath)); ?>
+            </script>
+            <?php
+          }  
 
           // normalize space and remove comments
           $assets = preg_replace('/\s+/', ' ', trim(ob_get_clean()));
           $assets = preg_replace('!/\*.*?\*/!s', '', $assets);
           $assets = preg_replace('/\n\s*\n/', "\n", $assets);
 
-          static::$didAssets = true;
+          $didAssets = true;
         }
 
         $output = sprintf('%s<div class="ref">%s</div>', $expOutput, $varOutput);
 
-        return sprintf('<!-- ref #%d -->%s%s<!-- /ref (took %ss, %sK) -->', static::$counter++, $assets, $output, $cpuUsage, $memUsage);        
+        return sprintf('<!-- ref #%d -->%s%s<!-- /ref (took %ss, %sK) -->', $counter++, $assets, $output, $cpuUsage, $memUsage);        
 
       // text output
       default:
@@ -987,7 +1014,7 @@ class ref{
       // HTML output
       case 'html':
 
-       $toggleState = (static::$expDepth < 0) || ((static::$expDepth > 0) && ($this->level <= static::$expDepth)) ? 'exp' : 'col';
+       $toggleState = (static::$expandDepth < 0) || ((static::$expandDepth > 0) && ($this->level <= static::$expandDepth)) ? 'exp' : 'col';
 
         $content = ($content !== '') ? '<a class="rToggle ' . $toggleState . '"></a><div>' . $content . '</div>' : '';
 
@@ -1297,6 +1324,10 @@ class ref{
    */
   public static function getInputExpressions(array &$options = null){    
 
+    // used to determine the position of the current call,
+    // if more ::build() calls were made on the same line
+    static $lineInst = array();
+
     // pull only basic info with php 5.3.6+ to save some memory
     $trace = defined('DEBUG_BACKTRACE_IGNORE_ARGS') ? debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS) : debug_backtrace();
     
@@ -1307,7 +1338,7 @@ class ref{
       extract($calee);
 
       // skip, if the called function doesn't match the shortcut function name
-      if(!$function || !preg_grep("/{$function}/i" , static::$shortcutFuncs))
+      if(!$function || !preg_grep("/{$function}/i" , static::$shortcutFunc))
         continue;
 
       if(!$line || !$file)
@@ -1333,13 +1364,13 @@ class ref{
         if(isset($tokens[$i + 1]) && ($tokens[$i + 1][0] === '(')){
           $instIndx++;
 
-          if(!isset(static::$lineInst[$line]))
-            static::$lineInst[$line] = 0;
+          if(!isset($lineInst[$line]))
+            $lineInst[$line] = 0;
 
-          if($instIndx <= static::$lineInst[$line])
+          if($instIndx <= $lineInst[$line])
             continue;
 
-          static::$lineInst[$line]++;
+          $lineInst[$line]++;
 
           // gather options
           if($options !== null){
