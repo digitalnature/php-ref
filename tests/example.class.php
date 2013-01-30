@@ -3,6 +3,7 @@
 namespace Tests;
 
 
+
 /**
  * An example interface
  *
@@ -67,6 +68,7 @@ abstract class AbstractTest implements \Iterator{
   abstract public function getList();
 
 }
+
 
 
 /**

@@ -1,6 +1,5 @@
 <?php
 
-error_reporting(E_ALL | E_STRICT);
 
 
 /**
@@ -174,7 +173,7 @@ class ref{
       return static::${$key};
 
     if(is_array(static::${$key}))
-      return static::${$key}[] = $value;
+      return static::${$key} = (array)$value;
 
     return static::${$key} = $value;
   }
@@ -187,7 +186,7 @@ class ref{
    * @since   1.0
    * @param   string|object $class   Class name or object
    * @param   bool $internalOnly     Retrieve only PHP-internal classes
-   * @return  string
+   * @return  array
    */
   protected function getParentClasses($class, $internalOnly = false){
 
@@ -237,12 +236,7 @@ class ref{
       if($class->isIterateable())
         $modifiers[] = array('iterateable', 'X', 'Instances of this class are iterateable');            
      
-      $className = $class->getName();
-
-      if($class->isInternal())
-        $className = $this->anchor($className, 'class');
-
-      $class = $this->modifiers($modifiers) . $this->entity('class', $className, $class);
+      $class = $this->modifiers($modifiers) . $this->entity('class', $this->anchor($class, 'class'), $class);
     }   
 
     return implode($this->entity('sep', ' :: '), array_reverse($classes));
@@ -262,12 +256,7 @@ class ref{
     if(!($func instanceof \Reflector))
       $func = new \ReflectionFunction($func);
 
-    $funcName = $func->getName();
-    
-    if($func->isInternal())
-      $funcName = $this->anchor($funcName, 'function');
-
-    return $this->entity('function', $funcName, $func);
+    return $this->entity('function', $this->anchor($func, 'function'), $func);
   }
 
 
@@ -617,15 +606,8 @@ class ref{
       // no splFixedArray here because we don't expect one zillion interfaces to be implemented by this object
       $intfNames = array();
 
-      foreach($interfaces as $name => $interface){
-
-        $name = $interface->getName();
-
-        if($interface->isInternal())
-          $name = $this->anchor($name, 'class');
-
-        $intfNames[] = $this->entity('interface', $name, $interface);      
-      }  
+      foreach($interfaces as $name => $interface)
+        $intfNames[] = $this->entity('interface', $this->anchor($interface, 'class'), $interface);      
 
       $output .= $this->section(array((array)implode($this->entity('sep', ', '), $intfNames)), 'Implements');
     }
@@ -822,10 +804,7 @@ class ref{
     try{
       $reflector = new \ReflectionFunction($fn[0]);        
 
-      if($reflector->isInternal()){
-        $fn[0] = $this->anchor($fn[0], 'function');
-        $fn[0] = $this->entity('srcFunction', $fn[0], $reflector);
-      }
+      $fn[0] = $this->entity('srcFunction', $this->anchor($reflector, 'function'), $reflector);
     
     }catch(\Exception $e){
 
@@ -836,10 +815,12 @@ class ref{
         // linkify 'new keyword' (as constructor)
         try{          
           $reflector = new \ReflectionMethod($cn[1], '__construct');
+
           if($reflector->isInternal()){
             $cn[0] = $this->anchor($cn[0], 'method', $cn[1], '__construct');
             $cn[0] = $this->entity('srcClass', $cn[0], $reflector);
-          }              
+          }
+
         }catch(\Exception $e){
           $reflector = null;
         }            
@@ -847,10 +828,8 @@ class ref{
         // class name...
         try{          
           $reflector = new \ReflectionClass($cn[1]);
-          if($reflector->isInternal()){
-            $cn[1] = $this->anchor($cn[1], 'class');
-            $cn[1] = $this->entity('srcClass', $cn[1], $reflector);
-          }              
+          $cn[1] = $this->entity('srcClass', $this->anchor($reflector, 'class'), $reflector);
+
         }catch(\Exception $e){
           $reflector = null;
         }      
@@ -867,11 +846,7 @@ class ref{
         // perhaps it's a static class method; try to linkify method first
         try{
           $reflector = new \ReflectionMethod($cn[0], $cn[1]);
-
-          if($reflector->isInternal()){
-            $cn[1] = $this->anchor($cn[1], 'method', $cn[0], $cn[1]);
-            $cn[1] = $this->entity('srcMethod', $cn[1], $reflector);
-          }  
+          $cn[1] = $this->entity('srcMethod', $this->anchor($reflector, 'method', $cn[0], $cn[1]), $reflector);    
 
         }catch(\Exception $e){
           $reflector = null;
@@ -880,11 +855,7 @@ class ref{
         // attempt to linkify the class name as well
         try{
           $reflector = new \ReflectionClass($cn[0]);
-
-          if($reflector->isInternal()){
-            $cn[0] = $this->anchor($cn[0], 'class');
-            $cn[0] = $this->entity('srcClass', $cn[0], $reflector);
-          }  
+          $cn[0] = $this->entity('srcClass', $this->anchor($reflector, 'class'), $reflector);          
 
         }catch(\Exception $e){
           $reflector = null;
@@ -1054,6 +1025,23 @@ class ref{
 
 
   /**
+   * Safe str_pad alternative
+   *
+   * @since   1.0
+   * @param   string $string
+   * @param   int $padLen
+   * @param   string $padStr
+   * @param   int $padType
+   * @return  string
+   */
+  protected static function strPad($input, $padLen, $padStr = ' ', $padType = STR_PAD_RIGHT){
+    $diff = static::strlen($input) - static::strLen($input);
+    return str_pad($input, $padLen + $diff, $padStr, $padType);
+  }
+
+
+
+  /**
    * Creates a group section
    *
    * @since   1.0
@@ -1110,7 +1098,7 @@ class ref{
               continue;
 
             if($colIdx < $lastColIdx){
-              $output .= str_pad($c, $lengths[$colIdx]). ' ';
+              $output .= static::strPad($c, $lengths[$colIdx]). ' ';
               $padLen += $lengths[$colIdx] + 1;
               continue;
             }
@@ -1139,22 +1127,26 @@ class ref{
    * otherwise to php.net/manual (the english one)
    *
    * @since   1.0   
-   * @todo    maybe, detect and linkify functions from popular frameworks
-   * @param   string $scheme     Scheme to use; valid schemes are 'class', 'function', 'method', 'constant' (class only) and 'property'
-   * @param   string $id1        Class or function name
-   * @param   string|null $id2   Method name (required only for the 'method' scheme)
-   * @return  string             URI string
+   * @param   string|Reflector $text  Text to linky of reflector object to extract text from (name)
+   * @param   string $scheme          Scheme to use; valid schemes are 'class', 'function', 'method', 'constant' (class only) and 'property'
+   * @param   string $id1             Class or function name
+   * @param   string|null $id2        Method name (required only for the 'method' scheme)
+   * @return  string                  HTML link
    */
-  protected function anchor($linkText, $scheme, $id1 = null, $id2 = null){
+  protected function anchor($text, $scheme, $id1 = null, $id2 = null){
+
+    static $docRefRoot = null, $docRefExt = null;
+
+    $linkText = ($text instanceof \Reflector) ? $text->getName() : $text;
 
     if($id1 === null)
-      $id1 = $linkText;    
+      $id1 = $linkText;
 
     // no links in text-mode, or if the class is a 'stdClass'
-    if(($this->format !== 'html') || ($id1 === 'stdClass'))
+    if(($this->format !== 'html') || (($scheme !== 'function') && ($id1 === 'stdClass')))
       return $linkText;
 
-    static $docRefRoot = null, $docRefExt  = null;
+    $args = array_filter(array($id1, $id2));
 
      // most people don't have this set
     if(!$docRefRoot)
@@ -1167,10 +1159,35 @@ class ref{
       $docRefExt = ini_get('docref_ext');
 
     if(!$docRefExt)
-      $docRefExt = '.php';
+      $docRefExt = '.php';    
 
-    $args = array_filter(array($id1, $id2));
+    if(($text instanceof \Reflector) && !$text->isInternal()){
 
+      $uri = false;
+      $sourceFile = $text->getFileName();      
+
+      switch(true){      
+
+        // WordPress function;
+        // like pretty much everything else in WordPress, API links are inconsistent as well;
+        // so we're using queryposts.com as doc source for API
+        case ($scheme === 'function') && class_exists('WP') && defined('ABSPATH') && defined('WPINC'):
+
+          if(strpos($sourceFile, realpath(ABSPATH . WPINC)) === 0){
+            $uri = sprintf('http://queryposts.com/function/%s', urlencode(strtolower($text->getName())));
+            break;
+          }
+
+        // @todo: handle more apps
+      }
+
+      if($uri)
+        return sprintf('<a href="%s" target="_blank">%s</a>', $uri, htmlspecialchars($linkText, ENT_QUOTES));
+
+      return $linkText;
+    }
+
+    // PHP-internal function or class
     foreach($args as &$arg)
       $arg = str_replace('_', '-', ltrim(strtolower($arg), '\\_'));
 
@@ -1182,7 +1199,7 @@ class ref{
       'property'  => $docRefRoot . '/class.%1$s'  . $docRefExt . '#%1$s.props.%2$s',
     );
 
-    $uri = vsprintf($phpNetSchemes[$scheme], $args);
+    $uri = vsprintf($phpNetSchemes[$scheme], $args);    
 
     return sprintf('<a href="%s" target="_blank">%s</a>', $uri, htmlspecialchars($linkText, ENT_QUOTES));
   }
@@ -1546,7 +1563,7 @@ class ref{
         $trimmed = trim($line);
 
         if($padding !== false){
-          $trimmed = str_pad($trimmed, static::strLen($line) - $padding, ' ', STR_PAD_LEFT);
+          $trimmed = static::strPad($trimmed, static::strLen($line) - $padding, ' ', STR_PAD_LEFT);
           
         }else{
           $padding = static::strLen($line) - static::strLen($trimmed);
