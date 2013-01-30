@@ -129,7 +129,7 @@
 .ref dt, .ref dd{
   display: table-cell;
   vertical-align: top;
-  padding-left: 10px;
+  padding: 1px 0 1px 10px;
 }
 
 /* last cell of a section */
@@ -167,8 +167,7 @@
 }
 
 /* tag-like appearance for boolean, null and resource types */
-.rTrue, .rFalse, .rNull, .rResource,
-.rStrJson, .rStrSerialized, .rStrDate, .rStrClass{
+.rTrue, .rFalse, .rNull, .rResource, .rStrMatch{
   font: bold 11px Helvetica, Arial; 
   color:#fff;        
   padding:1px 3px;
@@ -211,7 +210,7 @@
   color: #999;
 }
 
-.rStrJson, .rStrSerialized, .rStrDate, .rStrClass{
+.rStrMatch{
   background-color: #d78035;
   margin-right: 0;
 }

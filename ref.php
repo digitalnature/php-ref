@@ -104,6 +104,9 @@ class ref{
 
   protected static
 
+    // initial expand depth (for HTML mode only)
+    $expDepth  = 1,  
+
     // used to determine the position of the current call,
     // if more ::build() calls were made on the same line
     $lineInst  = array(),
@@ -127,8 +130,8 @@ class ref{
     // tracks objects to detect recursion
     $objectHashes = array(),
 
-    // expand/collapse state
-    $expanded     = true,
+    // current nesting level
+    $level        = 0,
 
     // output format
     $format       = 'html';
@@ -145,6 +148,21 @@ class ref{
    */
   public function __construct($format = 'html'){
     $this->format = $format;
+  }
+
+
+
+  /**
+   * Set expand depth (relevant for HTML mode only)
+   *
+   * If $depth >= 0, groups nested beyond this level are collapsed
+   * If $depth < 0, all groups are expanded
+   *
+   * @since   1.0
+   * @param   int $depth
+   */
+  public static function setExpandDepth($depth){
+    static::$expDepth = $depth;
   }
 
 
@@ -219,6 +237,28 @@ class ref{
 
 
   /**
+   * Generate function info
+   *
+   * @since   1.0
+   * @param   string|object $func   Function name or reflector object
+   * @return  string
+   */
+  protected function transformFunctionString($func){
+
+    if(!($func instanceof \Reflector))
+      $func = new \ReflectionFunction($func);
+
+    $funcName = $func->getName();
+    
+    if($func->isInternal())
+      $funcName = $this->anchor($funcName, 'function');
+
+    return $this->entity('function', $funcName, $func);
+  }
+
+
+
+  /**
    * Builds a report with information about $subject
    *
    * @since   1.0
@@ -226,12 +266,7 @@ class ref{
    * @return  string               Result
    */
   protected function transformSubject(&$subject){
-
-     // expand first level
-    $expState = $this->expanded ? 'exp' : 'col';
-
-    $this->expanded = false;       
-    
+  
     // null value
     if(is_null($subject))
       return $this->entity('null');
@@ -328,6 +363,7 @@ class ref{
       }
 
       $items = array();
+      $this->level++;      
 
       foreach($meta as $key => $value){
         $key = ucwords(str_replace('_', ' ', $key));
@@ -338,24 +374,92 @@ class ref{
         );
       }  
 
-      return $name . $this->group($type, $items ? $expState : null, $this->section($items));
+      $group = $name . $this->group($type, $this->section($items));
+      $this->level--;
+
+      return $group;
     }    
 
     // string
     if(is_string($subject)){
-      $encoding = function_exists('mb_detect_encoding') ? mb_detect_encoding($subject) : '';
-      $length   = function_exists('mb_strlen') ? mb_strlen($subject, $encoding) : strlen($subject);
-      $info     = gettype($subject) . '/' . $length;
+      $encoding = function_exists('mb_detect_encoding') ? mb_detect_encoding($subject) : false;
+      $length   = static::strLen($subject);
+      $info     = $length;
+      $alpha    = ctype_alpha($subject);
 
       if($encoding)
-        $info = $encoding . ' ' . $info;
+        $info = $encoding . ' (' . $info . ')';
 
       $string = $this->entity('string', $subject, $info);
       $matches = array();
 
+      // file?
+      if(file_exists($subject)){
+
+        $file  = new \SplFileInfo($subject);
+        $info  = array();
+        $perms = $file->getPerms();
+
+        // socket
+        if(($perms & 0xC000) === 0xC000)
+          $info[] = 's';
+
+        // symlink        
+        elseif(($perms & 0xA000) === 0xA000)
+          $info[] = 'l';
+
+        // regular
+        elseif(($perms & 0x8000) === 0x8000)
+          $info[] = '-';
+
+        // block special
+        elseif(($perms & 0x6000) === 0x6000)
+          $info[] = 'b';
+
+        // directory
+        elseif(($perms & 0x4000) === 0x4000)
+          $info[] = 'd';
+
+        // character special
+        elseif(($perms & 0x2000) === 0x2000)          
+          $info[] = 'c';
+
+        // FIFO pipe
+        elseif(($perms & 0x1000) === 0x1000)          
+          $info[] = 'p';
+
+        // unknown
+        else          
+          $info[] = 'u';        
+
+        // owner
+        $info[] = (($perms & 0x0100) ? 'r' : '-');
+        $info[] = (($perms & 0x0080) ? 'w' : '-');
+        $info[] = (($perms & 0x0040) ? (($perms & 0x0800) ? 's' : 'x' ) : (($perms & 0x0800) ? 'S' : '-'));
+
+        // group
+        $info[] = (($perms & 0x0020) ? 'r' : '-');
+        $info[] = (($perms & 0x0010) ? 'w' : '-');
+        $info[] = (($perms & 0x0008) ? (($perms & 0x0400) ? 's' : 'x' ) : (($perms & 0x0400) ? 'S' : '-'));
+
+        // world
+        $info[] = (($perms & 0x0004) ? 'r' : '-');
+        $info[] = (($perms & 0x0002) ? 'w' : '-');
+        $info[] = (($perms & 0x0001) ? (($perms & 0x0200) ? 't' : 'x' ) : (($perms & 0x0200) ? 'T' : '-'));
+        
+        $matches[] = $this->entity('strMatch', 'File') . ' ' . implode('', $info) . ' ' . sprintf('%.2fK', $file->getSize() / 1024);
+      }  
+
       // class name?
-      if(ctype_alpha($subject) && class_exists($subject, false))        
-        $matches[] = $this->entity('strClass', 'Class') . ' ' . $this->transformClassString($subject);
+      if(class_exists($subject, false))
+        $matches[] = $this->entity('strMatch', 'Class') . ' ' . $this->transformClassString($subject);
+
+      if(interface_exists($subject, false))
+        $matches[] = $this->entity('strMatch', 'Interface') . ' ' . $this->transformClassString($subject);
+
+      // class name?
+      if(function_exists($subject))
+        $matches[] = $this->entity('strMatch', 'Function') . ' ' . $this->transformFunctionString($subject);      
 
       // skip more advanced checks if the string appears to be numeric,
       // or if it's shorter than 5 characters
@@ -365,7 +469,7 @@ class ref{
         if($length > 4){
           $date = date_parse($subject);
           if(($date !== false) && empty($date['errors']))
-            $matches[] = $this->entity('strDate', 'Date') . ' ' . static::humanTime(strtotime($subject));
+            $matches[] = $this->entity('strMatch', 'Date') . ' ' . static::humanTime(@strtotime($subject));
         }
 
         // attempt to detect if this is a serialized string     
@@ -376,7 +480,7 @@ class ref{
           if(($subject[$length - 1] === ';') || ($subject[$length - 1] === '}'))
             if((($subject[0] === 's') && ($subject[$length - 2] !== '"')) || preg_match("/^{$subject[0]}:[0-9]+:/s", $subject))
               if(($unserialized = @unserialize($subject)) !== false)
-                $matches[] = $this->entity('strSerialized', 'Unserialized:') . ' ' . $this->transformSubject($unserialized);
+                $matches[] = $this->entity('strMatch', 'Unserialized:') . ' ' . $this->transformSubject($unserialized);
 
           $unserializing = false;
 
@@ -391,7 +495,7 @@ class ref{
             $json = json_decode($subject);
 
             if(json_last_error() === JSON_ERROR_NONE)
-              $matches[] = $this->entity('strJson', 'Json.Decoded') . ' ' . $this->transformSubject($json);
+              $matches[] = $this->entity('strMatch', 'Json.Decoded') . ' ' . $this->transformSubject($json);
 
             $decodingJson = false;
           }
@@ -424,6 +528,7 @@ class ref{
       // note that we must substract the marker element
       $itemCount = count($subject) - 1;
       $index = 0;
+      $this->level++;      
 
       // note that we build the item list using splFixedArray() to save up some memory, because the subject array
       // might contain a huge amount of entries. A more efficient way is to build the items as we go as strings,
@@ -437,7 +542,14 @@ class ref{
         if($key === $this->arrayMarker)
           continue;
 
-        $keyInfo = is_string($key) ? sprintf('String key (%d)', strlen($key)) : sprintf('Integer key', gettype($key));
+        if(is_string($key)){
+          $encoding = function_exists('mb_detect_encoding') ? mb_detect_encoding($key) : 'ASCII';
+          $length   = static::strLen($key);
+          $keyInfo  = sprintf('String key (%s/%d)', $encoding, $length);
+        
+        }else{
+          $keyInfo = sprintf('Numeric key (%s)', gettype($key));
+        }
 
         $items[$index++] = array(
           $this->entity('key', $key, $keyInfo),
@@ -450,7 +562,10 @@ class ref{
       // not really required, because ::build() doesn't take references, but we want to be nice :P
       unset($subject[$this->arrayMarker]);
 
-      return $this->entity('array', 'Array') . $this->group($itemCount, $expState, $this->section($items));
+      $group = $this->entity('array', 'Array') . $this->group($itemCount, $this->section($items));
+      $this->level--;
+
+      return $group;
     }
 
     // if we reached this point, $subject must be an object     
@@ -480,6 +595,7 @@ class ref{
       return $this->entity('object', "{$objectName} Object") . $this->group();
 
     $output = '';
+    $this->level++;
 
     // display the interfaces this objects' class implements
     if($interfaces){
@@ -582,9 +698,6 @@ class ref{
 
         $paramStrings = $modifiers = array();
 
-        $tags = static::parseComment($method->getDocComment(), 'tags');
-        $tags = isset($tags['param']) ? $tags['param'] : array();
-
         // process arguments
         foreach($method->getParameters() as $parameter){
 
@@ -608,20 +721,10 @@ class ref{
           
           if($parameter->isArray())
             $paramHint = $this->entity('arrayHint', 'Array');
-
-          $tip = null;
-          
-          foreach($tags as $tag){
-            list($types, $varName, $varDesc) = $tag;
-            if(ltrim($varName, '&$') === $parameter->getName()){
-              $tip = $varDesc;
-              break;
-            }  
-          }
        
           if($parameter->isOptional()){
             $paramValue = $parameter->isDefaultValueAvailable() ? $parameter->getDefaultValue() : null;            
-            $paramName  = $this->entity('param', $paramName, $tip);
+            $paramName  = $this->entity('param', $paramName, $parameter);
             $paramName .= $this->entity('sep', ' = ');
             $paramName .= $this->entity('paramValue', $this->transformSubject($paramValue));
 
@@ -631,7 +734,7 @@ class ref{
             $paramName  = $this->entity('optional', $paramName);
 
           }else{            
-            $paramName = $this->entity('param', $paramName, $tip);
+            $paramName = $this->entity('param', $paramName, $parameter);
 
             if($paramHint)
               $paramName = $paramHint . ' ' . $paramName;            
@@ -676,7 +779,10 @@ class ref{
       $output .= $this->section($items, 'Methods');
     }
 
-    return $this->entity('object', "{$objectName} Object") . $this->group('', $expState, $output);
+    $group = $this->entity('object', "{$objectName} Object") . $this->group('', $output);
+    $this->level--;
+
+    return $group;
   }
 
 
@@ -858,7 +964,7 @@ class ref{
 
       // text output
       default:
-        return sprintf("\n%s\n%s\n%s\n", $expOutput, str_repeat('=', strlen($expOutput)), $varOutput);
+        return sprintf("\n%s\n%s\n%s\n", $expOutput, str_repeat('=', static::strLen($expOutput)), $varOutput);
 
     }
 
@@ -871,24 +977,24 @@ class ref{
    *
    * @since   1.0
    * @param   string $prefix
-   * @param   string|null $toggleState
    * @param   string $toggledText
    * @return  string
    */
-  protected function group($prefix = '', $toggleState = null, $toggledText = ''){
-
-    $content = ($toggleState !== null) ? $toggledText : '';
+  protected function group($prefix = '', $content = ''){
 
     switch($this->format){
 
       // HTML output
       case 'html':
-        $content = ($toggleState !== null) ? '<a class="rToggle ' . $toggleState . '"></a><div>' . $content . '</div>' : '';
+
+       $toggleState = (static::$expDepth < 0) || ((static::$expDepth > 0) && ($this->level <= static::$expDepth)) ? 'exp' : 'col';
+
+        $content = ($content !== '') ? '<a class="rToggle ' . $toggleState . '"></a><div>' . $content . '</div>' : '';
 
         if($prefix !== '')
           $prefix = '<b>' . $prefix . '</b>';
 
-        return '<span class="rGroup">(' . $prefix . '</span>' . $content . '<span class="rGroup">)</span>';
+        return '<span class="rGroup">(' . $prefix . '</span>' . $content . '<span class="rGroup">)</span>';        
 
       // text-only output
       default:
@@ -899,6 +1005,23 @@ class ref{
         return '( ' . $prefix . $content . ')';
       
     }    
+  }
+
+
+
+  /**
+   * Calculates real string length
+   *
+   * @since   1.0
+   * @param   string $string
+   * @return  int
+   */
+  protected static function strLen($string){
+
+    if(function_exists('mb_strlen'))
+      return mb_strlen($string, mb_detect_encoding($string));      
+    
+    return strlen($string);
   }
 
 
@@ -937,15 +1060,15 @@ class ref{
         $output = '';
 
         if($title !== '')
-          $output .= sprintf("\n\n %s\n %s", $title, str_repeat('-', strlen($title)));
+          $output .= sprintf("\n\n %s\n %s", $title, str_repeat('-', static::strLen($title)));
 
         $lengths = array();
 
         // determine maximum column width
         foreach($items as $item)
           foreach($item as $colIdx => $c)
-            if(!isset($lengths[$colIdx]) || $lengths[$colIdx] < strlen($c))
-              $lengths[$colIdx] = strlen($c);
+            if(!isset($lengths[$colIdx]) || $lengths[$colIdx] < static::strLen($c))
+              $lengths[$colIdx] = static::strLen($c);
 
         foreach($items as $item){
 
@@ -1057,7 +1180,7 @@ class ref{
     if($this->format !== 'html'){
 
       if(in_array($class, array('string', 'integer', 'double', 'true', 'false')))
-        $text = $tip . ': ' . $text;
+        $text = $this->tip($tip) . ': ' . $text;
 
       return $text;
     }
@@ -1066,22 +1189,7 @@ class ref{
     if(in_array($class, array('string', 'key', 'param', 'sep', 'resourceInfo'), true))
       $text = htmlspecialchars($text, ENT_QUOTES);
 
-    if($tip instanceof \Reflector){
-
-      // function/class/method is part of the core
-      if(method_exists($tip, 'isInternal') && $tip->isInternal()){
-        $extension = $tip->getExtension();
-        $tip = ($extension !== null) ? sprintf('Internal - part of %s (%s)', $tip->getExtensionName(), $extension->getVersion()) : 'Internal';
-
-      // user-defined; attempt to get doc comments
-      }else{
-        $comments = static::parseComment($tip->getDocComment());
-        $tip = $comments ? implode("\n", array($comments['title'], $comments['description'])) : '';
-      }
-
-    }
-
-    $tip = empty($tip) ? '' : sprintf('<code>%s</code>', $tip);
+    $tip = $this->tip($tip);
     
     $class = ucfirst($class);
 
@@ -1089,6 +1197,64 @@ class ref{
       $class .= ' rHasTip';
 
     return sprintf('<span class="r%s">%s%s</span>', $class, $text, $tip);
+  }
+
+
+
+  /**
+   * Creates a tooltip
+   *
+   * @since   1.0
+   * @param   string|reflector $data     Tooltip content, or reflector object from where to extract DocBlock comments
+   * @return  string
+   */
+  protected function tip($data){
+
+    $text = '';
+
+    // class or function
+    if(($data instanceof \ReflectionClass) || ($data instanceof \ReflectionFunction) || ($data instanceof \ReflectionMethod)){
+
+      // function/class/method is part of the core
+      if($data->isInternal()){
+        $extension = $data->getExtension();
+        $text = ($extension instanceof \ReflectionExtension) ? sprintf('Internal - part of %s (%s)', $extension->getName(), $extension->getVersion()) : 'Internal';
+
+      // user-defined; attempt to get doc comments
+      }else{
+        if($comments = static::parseComment($data->getDocComment()))
+          $text = implode("\n", array($comments['title'], $comments['description']));
+      }
+
+    // class property
+    }elseif($data instanceof \ReflectionProperty){
+      $comments = static::parseComment($data->getDocComment());
+      $text = $comments ? implode("\n", array($comments['title'], $comments['description'])) : '';      
+    
+    // function parameter
+    }elseif($data instanceof \ReflectionParameter){
+
+      $function = $data->getDeclaringFunction();
+
+      $tags = static::parseComment($function->getDocComment(), 'tags');
+      $tags = isset($tags['param']) ? $tags['param'] : array();
+    
+      foreach($tags as $tag){
+        list($types, $name, $description) = $tag;
+        if(ltrim($name, '&$') === $data->getName()){
+          $text = $description;
+          break;
+        }  
+      }      
+    
+    }else{
+      $text = (string)$data;
+    }
+
+    if($text && ($this->format === 'html'))
+      $text = sprintf('<code>%s</code>', $text);
+
+    return $text ? $text : '';
   }
 
 
@@ -1349,10 +1515,10 @@ class ref{
         $trimmed = trim($line);
 
         if($padding !== false){
-          $trimmed = str_pad($trimmed, strlen($line) - $padding, ' ', STR_PAD_LEFT);
+          $trimmed = str_pad($trimmed, static::strLen($line) - $padding, ' ', STR_PAD_LEFT);
           
         }else{
-          $padding = strlen($line) - strlen($trimmed);
+          $padding = static::strLen($line) - static::strLen($trimmed);
         }  
 
         $pointer .=  "\n{$trimmed}";
@@ -1369,7 +1535,7 @@ class ref{
     // determine the real title and description by splitting the text
     // at the nearest encountered [dot + space] or [2x new line]
     if($description !== ''){
-      $stop = min(array_filter(array(strlen($description), strpos($description, '. '), strpos($description, "\n\n"))));
+      $stop = min(array_filter(array(static::strLen($description), strpos($description, '. '), strpos($description, "\n\n"))));
       $title = substr($description, 0, $stop + 1);
       $description = trim(substr($description, $stop + 1));
     }
