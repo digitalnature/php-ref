@@ -23,7 +23,7 @@
 
 		$array = array(
 		  'foo'                                     => 'bar',
-		  '要'                                      => 'UTF-8 key test',
+		  'hèlló'                                   => 'UTF-8 key test',
 		  'bar'                                     => 5,  
 		  'multi'                                   => array(4, 'five', 6),  
 		  'matching class'                          => 'DateTime',

@@ -959,7 +959,7 @@ class ref{
         return sprintf('<!-- ref #%d -->%s%s<!-- /ref (took %ss, %sK) -->', $counter++, $assets, $output, $cpuUsage, $memUsage);        
 
       // text output
-      default:
+      default:      
         return sprintf("\n%s\n%s\n%s\n", $expOutput, str_repeat('=', static::strLen($expOutput)), $varOutput);
 
     }
@@ -999,7 +999,7 @@ class ref{
         if($content !== '')
           $content =  $content . "\n";
 
-        return '( ' . $prefix . $content . ')';
+        return '(' . $prefix . $content . ')';
       
     }    
   }
@@ -1074,7 +1074,7 @@ class ref{
         $output = '';
 
         if($title !== '')
-          $output .= sprintf("\n\n %s\n %s", $title, str_repeat('-', static::strLen($title)));
+          $output .= "\n\n " . $title . "\n " . str_repeat('-', static::strLen($title));
 
         $lengths = array();
 
@@ -1097,7 +1097,7 @@ class ref{
               continue;
 
             if($colIdx < $lastColIdx){
-              $output .= static::strPad($c, $lengths[$colIdx]). ' ';
+              $output .= static::strPad($c, $lengths[$colIdx]) . ' ';
               $padLen += $lengths[$colIdx] + 1;
               continue;
             }
@@ -1107,7 +1107,7 @@ class ref{
 
             // we must indent the entire block
             foreach($lines as &$line)
-              $line = str_repeat(' ', $padLen)  . $line;
+              $line = str_repeat(' ', $padLen) . $line;
 
             $output .= $lines ? "\n  " . implode("\n  ", $lines) : '';
           }         
@@ -1222,8 +1222,22 @@ class ref{
     // we can't show all tip content in text-mode
     if($this->format !== 'html'){
 
-      if(in_array($class, array('string', 'integer', 'double', 'true', 'false')))
-        $text = $this->tip($tip) . ': ' . $text;
+      switch($class){
+
+        case 'string':
+          return 'string(' . $this->tip($tip) . ') "' . $text . '"';
+
+        case 'strMatch':        
+          return '~ ' . $text . ':';
+
+        case 'integer':
+        case 'double':        
+          return $this->tip($tip) . '(' . $text . ')';
+
+        case 'key':
+          return '[' . $text . ']';
+
+      }
 
       return $text;
     }
