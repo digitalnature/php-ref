@@ -86,34 +86,48 @@ final class ClassTest extends AbstractTest implements Testable{
 
 		/**
 		 * A public variable that everyone can access		 
+		 *
+		 * @var int
 		 */
 	  $pubVarA     = 420,
 
 		/**
 		 * Another one, to test recursivity
+		 *
+		 * @var self		 
 		 */
 	  $pubVarB     = null,
 
 		/**
 		 * DateTime object
+		 *
+		 * Testing property description
+		 *
+		 * @var DateTime
 		 */
 	  $currentDate = null,
 	  
 
 		/**
 		 * Image resource created with GD
+		 *
+		 * No @var definition here
 		 */	  
 	  $image       = null,
 	  
 	  
 		/**
 		 * Curl resource
+		 *
+		 * @var resource		 
 		 */	  
 	  $curl        = null,
 
 
 		/**
 		 * A json-encoded object
+		 *
+		 * @var string
 		 */	  
 	  $jsonString  = null;
 
@@ -123,6 +137,8 @@ final class ClassTest extends AbstractTest implements Testable{
 
     /**
 		 * A protected variable that only this class and child classes can have access to
+		 *
+		 * @var array
 		 */
 	  $list = null;
 
@@ -156,7 +172,7 @@ final class ClassTest extends AbstractTest implements Testable{
 			$this->curl = $curl;
 	  }
 
-	  $this->json = json_encode($this->currentDate);
+	  $this->jsonString = json_encode($this->currentDate);
 	}
 
 

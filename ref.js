@@ -7,10 +7,13 @@ window.addEventListener('load', function(){
     this.rTip.e = document.createElement('div');
     this.rTip.e.id = 'rTip';
     this.rTip.e.className = 'ref';
-    document.getElementsByTagName('body').item(0).appendChild(this.rTip.e);
+
+    var ref = document.getElementsByClassName('ref')[0];
+
+    ref.parentNode.insertBefore(this.rTip.e, ref.nextSibling);
   }
 
-  document.onmousemove = function(evt){ 
+  document.onmousemove = function(evt){
     rTip.e.style.left = evt.pageX + 'px';
     rTip.e.style.top = evt.pageY + 'px';
   };

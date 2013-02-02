@@ -10,7 +10,7 @@ REF, or `r()` is a nicer alternative to PHP's [`print_r`](http://php.net/manual/
 
 ## Usage and Options ##
 
-To print the information as HTML:
+Basic usage:
        
     // include the class
     require '/full/path/to/ref.php';
@@ -23,14 +23,14 @@ To print the information as HTML:
 
 To print in text mode you can use the `rt()` function instead:
 
-    rt($variable);
+    rt($var);
 
 To terminate the script after the info is dumped, prepend the bitwise NOT operator:
 
-    ~r($variable);   // html
-    ~rt($variable);  // text
+    ~r($var);   // html
+    ~rt($var);  // text
 
-To return the information, prepend the error control operator:
+Prepending the error control operator (@) will return the information:
 
-    @r($variable);   // html
-    @rt($variable);  // text
+    $output = @r($var);   // html
+    $output = @rt($var);  // text

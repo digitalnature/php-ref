@@ -1181,7 +1181,7 @@ class ref{
       }
 
       if($uri)
-        return sprintf('<a href="%s" target="_blank">%s</a>', $uri, htmlspecialchars($linkText, ENT_QUOTES));
+        return sprintf('<a href="%s" target="_blank">%s</a>', $uri, static::escape($linkText));
 
       return $linkText;
     }
@@ -1200,7 +1200,7 @@ class ref{
 
     $uri = vsprintf($phpNetSchemes[$scheme], $args);    
 
-    return sprintf('<a href="%s" target="_blank">%s</a>', $uri, htmlspecialchars($linkText, ENT_QUOTES));
+    return sprintf('<a href="%s" target="_blank">%s</a>', $uri, static::escape($linkText));
   }
 
 
@@ -1230,7 +1230,7 @@ class ref{
 
     // escape text that is known to contain html entities
     if(in_array($class, array('string', 'key', 'param', 'sep', 'resourceInfo'), true))
-      $text = htmlspecialchars($text, ENT_QUOTES);
+      $text = static::escape($text);
 
     $tip = $this->tip($tip);
     
@@ -1245,15 +1245,29 @@ class ref{
 
 
   /**
+   * Escapes variable for HTML output
+   *
+   * @since   1.0
+   * @param   mixed
+   * @return  mixed
+   */
+  protected static function escape($var){
+    return is_array($var) ? array_map('static::escape', $var) : htmlspecialchars($var, ENT_QUOTES);
+  }
+
+
+
+  /**
    * Creates a tooltip
    *
+   * @todo    refactor
    * @since   1.0
    * @param   string|reflector $data     Tooltip content, or reflector object from where to extract DocBlock comments
    * @return  string
    */
   protected function tip($data){
 
-    $text = $desc = $subMeta = $leftMeta = '';
+    $text = $desc = $subMeta = $def = $leftMeta = '';
 
     // class or function
     if(($data instanceof \ReflectionClass) || ($data instanceof \ReflectionFunction) || ($data instanceof \ReflectionMethod)){
@@ -1265,6 +1279,7 @@ class ref{
 
       // user-defined; attempt to get doc comments
       }else{
+
         if($comments = static::parseComment($data->getDocComment())){
           $text = $comments['title'];
           $desc = $comments['description'];
@@ -1275,16 +1290,17 @@ class ref{
               if($tag === 'param'){
                 $value[0] = $value[0] . ' ' . $value[1];
                 unset($value[1]);
-              }  
+              }
 
-              if(is_array($value))
-                $value = implode('</b><b>', $value);
+              $value = is_array($value) ? implode('</b><b>', static::escape($value)) : static::escape($value);
 
               $subMeta .= sprintf('<i><b>@%s</b><b>%s</b></i>', $tag, $value);
             }  
           }
 
-        }  
+        }
+
+        $subMeta .= sprintf('<q>Defined in <b>%s:%d</b></q>', basename($data->getFileName()), $data->getStartLine());
       }
 
     // class property
@@ -1295,6 +1311,10 @@ class ref{
       if($comments){
         $text = $comments['title'];
         $desc = $comments['description'];
+
+        // note that we need to make the left meta area have the same height as the content
+        if(isset($comments['tags']['var'][0]))
+          $leftMeta = $comments['tags']['var'][0][0] . str_repeat("\n", substr_count(implode("\n", array_filter(array($text, $desc))), "\n") + 1);
       }  
     
     // function parameter
@@ -1308,9 +1328,8 @@ class ref{
       foreach($params as $tag){
         list($types, $name, $description) = $tag;
         if(ltrim($name, '&$') === $data->getName()){
-          $text = htmlspecialchars($description, ENT_QUOTES);
+          $text = $description;
 
-          // note that we need to make the left meta area have the same height as the content
           if($types)
             $leftMeta = $types . str_repeat("\n", substr_count($text, "\n") + 1);
 
@@ -1328,12 +1347,12 @@ class ref{
         $subMeta = sprintf('<q>%s</q>', $subMeta);
 
       if($leftMeta)
-        $leftMeta = sprintf('<b>%s</b>', $leftMeta);
+        $leftMeta = sprintf('<b>%s</b>', static::escape($leftMeta));
 
       if($desc)
-        $desc = sprintf('<i>%s</i>', $desc);
+        $desc = sprintf('<i>%s</i>', static::escape($desc));
 
-      $text = sprintf('<q>%s<i>%s</i>%s%s</q>', $leftMeta, $text, $desc, $subMeta);
+      $text = sprintf('<q>%s<i><i>%s</i>%s</i>%s</q>', $leftMeta, static::escape($text), $desc, $subMeta);
     }  
 
     return $text ? $text : '';

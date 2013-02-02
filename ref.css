@@ -17,6 +17,7 @@
 .ref q:after,
 .ref q:before{
   content: '';
+  display: none; /* FF fix */
 }
 
 .ref > div{
@@ -53,18 +54,22 @@
 }
 
 #rTip > i{
-  padding: 0 10px 10px 10px;
-  display: block;
-  overflow: hidden;  
+  float: left;
 }
 
-#rTip > i:first-of-type{
+#rTip > i > i{
+  padding: 0 10px 10px 10px;
+  display: block;
+}
+
+#rTip > i > i:first-child{
   color: #ccc;  
   padding-top: 10px;
 }
 
 #rTip > q{
   display: block;
+  clear:both;
   padding: 8px 10px 10px 10px;
   background: #444;
   border-top:1px solid #191919;
@@ -85,23 +90,39 @@
   min-height: 100%;  
 }
 
-#rTip > q i{
+#rTip > q > i{
   display: table-row;
 }
 
-#rTip > q b{
+#rTip > q > i > b{
   display: table-cell;
   padding-right: 10px;
   color: #ccc;
 }
 
-#rTip > q b:first-child{
+#rTip > q > i > b:first-child{
   font: bold 11px Helvetica, Arial;   
   color: #888;
 }
 
-#rTip > q b:nth-child(2){
+#rTip > q > i > b:nth-child(2){
   color: #edd078;
+}
+
+#rTip > q > q{
+  margin-top: 5px;
+  padding: 5px 0;
+  display: block;
+  font: bold 11px Helvetica, Arial;   
+}
+
+#rTip > q > i + q{
+  border-top:1px dotted #666;
+}
+
+#rTip > q > q > b{
+  color: #ccc;
+  font-weight: bold;
 }
 
 /* source expression */
