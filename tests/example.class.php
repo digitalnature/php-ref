@@ -136,6 +136,7 @@ final class ClassTest extends AbstractTest implements Testable{
 	 * @param   array $list               Value to set for "B"
 	 * @param   mixed &$refTest           A referenced variable
 	 * @param   Iterator $classHintTest   An iterateable instance
+	 *                                    Two line comment test
 	 */
 	public function __construct(array $list, &$refTest = null, \Iterator $classHintTest = null){
 		$this->list = $list;

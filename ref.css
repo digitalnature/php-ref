@@ -1,10 +1,26 @@
 
-.ref, .rExp, #rTip{
-  font:normal normal 13px/18px Consolas, Monaco, Andale Mono, Courier New, monospace;      
+.ref{
+  font: normal normal 13px/18px Consolas, Monaco, Andale Mono, Courier New, monospace;  
 }
 
-.ref{
-  background:#f9f9f9;        
+/* reset default styles for these elements */
+.ref i,
+.ref b,
+.ref q{
+  font-style: normal;  
+  font-weight: normal;
+  margin: 0;
+  padding: 0;
+}
+
+/* no quotes on Q */
+.ref q:after,
+.ref q:before{
+  content: '';
+}
+
+.ref > div{
+  background: #f9f9f9;        
   border: 1px solid #eee;
   padding: 2px 5px;
   border-radius: 0 0 4px 4px;
@@ -14,7 +30,7 @@
 }
 
 /* links */
-.ref a, .rExp a, #rTip a{
+.ref a{
   color: inherit;
   text-decoration: underline;
 }
@@ -27,17 +43,69 @@
   margin: 10px 0 0 15px;
   line-height: 20px;
   border: 0;
-  padding: 7px 10px;
   background: #343434;
-  color: #ccc;         
+  color: #888;         
   text-align: left;
   z-index: 1000;
   border-radius: 4px;
   box-shadow:0 0 4px rgba(0,0,0, 0.25);
+  text-shadow: 0 -1px 0 #191919;
+}
+
+#rTip > i{
+  padding: 0 10px 10px 10px;
+  display: block;
+  overflow: hidden;  
+}
+
+#rTip > i:first-of-type{
+  color: #ccc;  
+  padding-top: 10px;
+}
+
+#rTip > q{
+  display: block;
+  padding: 8px 10px 10px 10px;
+  background: #444;
+  border-top:1px solid #191919;
+  box-shadow: inset 0 1px 0 #555;  
+  border-bottom-right-radius: 4px;
+  border-bottom-left-radius: 4px;
+}
+
+#rTip > b{
+  float: left;
+  position: relative;
+  padding: 10px;
+  background: #444;
+  border-right:1px solid #191919;
+  box-shadow: inset -1px 0 0 #555;  
+  border-top-left-radius: 4px;
+  border-bottom-left-radius: 4px;  
+  min-height: 100%;  
+}
+
+#rTip > q i{
+  display: table-row;
+}
+
+#rTip > q b{
+  display: table-cell;
+  padding-right: 10px;
+  color: #ccc;
+}
+
+#rTip > q b:first-child{
+  font: bold 11px Helvetica, Arial;   
+  color: #888;
+}
+
+#rTip > q b:nth-child(2){
+  color: #edd078;
 }
 
 /* source expression */
-.rExp{
+.ref .rExp{
   margin: 2px 0 0;
   padding: 2px 7px 3px 4px;
   display: block;
@@ -53,15 +121,20 @@
   background-image: linear-gradient(top, #444, #333);  
 }
 
+.ref input{
+  display: none;
+}
+
 /* expand/collapse toggle link for groups */
-.rToggle{
+.ref label{
+  margin: 0;
+  padding: 0;
   width: 14px;
   height: 14px;        
   display: inline-block;              
-  background: transparent none no-repeat center bottom;        
+  background: transparent url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAoAAAAOCAYAAAAWo42rAAAAYklEQVQoz2M4xWCwBIgFgJgBHwYR/4H4ARA7EqMQhP8CcTcQsxNSCMMXgViXGIUg/AOIi4CYkZBCGN4HxLLEKAThd0AcRazCSEIK9xKymijPgIJHh1CAdxEKcKKicDExiQIAaIvOXmRns2sAAAAASUVORK5CYII=) no-repeat center bottom;        
   vertical-align: -3px;
   cursor: pointer;
-  background-image: url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAA4AAAAKCAYAAACE2W/HAAAAjklEQVR42mM8xWCwmIGBIYaBNLCUCUjkAvFDEjSB1OaANH4A4kQg/keEpn9QtR+YoAL7gbiXCI19ULUMTEiCtUB8CY8mkFwNjIOs8ScQR0NpdPATGoA/sWkEgStAXIVFI0jsMrIAExZF/UC8D4m/HyrGQEjjfyBOAOL3UBwPFUMBLDgC4jEQZwMxI5SNAQAT3x/BDuoigAAAAABJRU5ErkJggg==);  
           transition: all ease-in .15s;  
        -o-transition: all ease-in .15s;          
       -ms-transition: all ease-in .15s;          
@@ -69,33 +142,26 @@
   -webkit-transition: all ease-in .15s;
 }
 
-/* expand graphic */
-.rToggle.exp{
-          transform: rotate(0deg);
-       -o-transform: rotate(0deg);
-      -ms-transform: rotate(0deg);
-     -moz-transform: rotate(0deg);
-  -webkit-transform: rotate(0deg);
-}
-
 /* collapse graphic */
-.rToggle.col{
-          transform: rotate(090deg);
-       -o-transform: rotate(-90deg);
-      -ms-transform: rotate(-90deg);
-     -moz-transform: rotate(-90deg);
-  -webkit-transform: rotate(-90deg);   
+.ref input:checked + label{
+          transform: rotate(90deg);
+       -o-transform: rotate(90deg);
+      -ms-transform: rotate(90deg);
+     -moz-transform: rotate(90deg);
+  -webkit-transform: rotate(90deg);   
 }
 
-/* trick to hide next element when this class is present */
-.rToggle.col + div{
+
+/* hide next element when checkbox is not checked */
+.ref input ~ label + div{
   display: none;
+  overflow: hidden;
 }
 
-/* same, but displays the element */
-.rToggle.exp + div{
+/* show it when checkbox is checked */
+.ref input:checked ~ label + div{
   display: block;
-  overflow: auto;
+  overflow: auto;  
 }
 
 /* group sections */
@@ -115,7 +181,9 @@
 }
 
 /* emulate a table for displaying array & object members */
-.ref dl, .ref dt, .ref dd{
+.ref dl,
+.ref dt,
+.ref dd{
   margin: 0;
   padding: 0;
 }
@@ -126,7 +194,8 @@
 }
 
 /* section cells */
-.ref dt, .ref dd{
+.ref dt,
+.ref dd{
   display: table-cell;
   vertical-align: top;
   padding: 1px 0 1px 10px;
@@ -147,27 +216,33 @@
 }
 
 /* base entity */
-.ref span{
+.ref i{
   white-space: pre;
+  display: inline;
 }
 
 /* hidden content (used to generate the tooltip */
-.ref code, .rExp code{
+.ref q,
+.ref .rExp q{
   display: none;  
 }
 
-/* show help cursor when mouse is over a SPAN with a tooltip */
-.rHasTip{
+/* show help cursor when mouse is over a P with a tooltip */
+.ref .rHasTip{
   cursor: help;
 }
 
 /* key-value dividers, property & method modifiers etc. */
-.rSep{
+.ref .rSep{
   color: #bbb;
 }
 
 /* tag-like appearance for boolean, null and resource types */
-.rTrue, .rFalse, .rNull, .rResource, .rStrMatch{
+.ref .rTrue,
+.ref .rFalse,
+.ref .rNull,
+.ref .rResource,
+.ref .rStrMatch{
   font: bold 11px Helvetica, Arial; 
   color:#fff;        
   padding:1px 3px;
@@ -183,78 +258,87 @@
 }
 
 /* boolean true value */
-.rTrue{
+.ref .rTrue{
   background-color:#339900;
 }
 
 /* boolean false value */
-.rFalse{
+.ref .rFalse{
   background-color:#CC0033;
   color:#fff;
 }   
 
 /* null value */
-.rNull{
+.ref .rNull{
   background-color:#eee;
   color:#999;
   text-shadow: #fff 0 1px 1px;
 }
 
 /* resources */
-.rResource{
+.ref .rResource{
   background-color: #0057ae;
 }   
 
-.rResourceInfo{  
+.ref .rResourceInfo{  
   font: bold 11px Helvetica, Arial;   
   color: #999;
 }
 
-.rStrMatch{
+.ref .rStrMatch{
   background-color: #d78035;
   margin-right: 0;
 }
 
 /* integer or double values */
-.rInteger, .rDouble{
+.ref .rInteger,
+.rDouble{
   color: #0099CC;
 }   
 
 /* string values */
-.rString{
+.ref .rString{
   color: #669933;  
 }
 
 /* arrays & objects */
-.rGroup, .rArray, .rObject, .rInterface, .rTrait{
+.ref .rGroup,
+.ref .rArray,
+.ref .rObject,
+.ref .rInterface,
+.ref .rTrait{
   color:#CC0033;
 }
 
-.rMethod{
+.ref .rMethod{
   font-weight: bold;
   color: #0057ae;
 }
 
 /* inherited methods */
-.rInherited .rMethod{
+.ref .rInherited .rMethod{
   color: #80b3e6;
 }
 
 /* optional method arguments */
-.rOptional{
+.ref .rOptional{
   font-style: italic;
   color: #aaa;
 }
 
 /* group info prefix */
-.rGroup > b{
+.ref .rGroup > b{
   font: bold 11px Helvetica, Arial;  
   padding: 0 5px;
   color: #333;
 }
 
 /* tiny bubbles that indicate visibility info */
-.rFinal, .rAbstract, .rProtected, .rIterateable, .rCloneable{
+.ref .rFinal,
+.ref .rAbstract,
+.ref .rProtected,
+.ref .rIterateable,
+.ref .rCloneable{
   font: bold 11px Helvetica, Arial;    
   color:#fff;        
   width: 14px;
@@ -269,19 +353,18 @@
   background-color: #78bded;  
 }
 
-.rAbstract{
+.ref .rAbstract{
   background-color: #baed78;
 }
 
-.rProtected{
+.ref .rProtected{
   background-color: #edd078;
 }
 
-.rIterateable{
+.ref .rIterateable{
   background-color: #d5dea5;
 }
 
-.rCloneable{
+.ref .rCloneable{
   background-color: #bdd7d1;
 }
-

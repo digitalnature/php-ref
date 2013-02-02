@@ -39,7 +39,7 @@ function r(){
     return $output;
 
   // IE goes funky if there's no doctype
-  if(!headers_sent())    
+  if(!headers_sent() && !ob_get_length())
     print '<!DOCTYPE HTML><html><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" /><body>';
 
   print $output;
@@ -784,7 +784,7 @@ class ref{
 
 
   /**
-   * Scans for internal classes and functions inside the provided expression,
+   * Scans for known classes and functions inside the provided expression,
    * and formats them when possible
    *
    * @since   1.0
@@ -919,8 +919,6 @@ class ref{
     $instance = null;
     unset($instance);
 
-    //error_reporting($errorReporting);
-
     switch($format){
 
       // HTML output
@@ -956,7 +954,7 @@ class ref{
           $didAssets = true;
         }
 
-        $output = sprintf('%s<div class="ref">%s</div>', $expOutput, $varOutput);
+        $output = sprintf('<div class="ref">%s<div>%s</div></div>', $expOutput, $varOutput);
 
         return sprintf('<!-- ref #%d -->%s%s<!-- /ref (took %ss, %sK) -->', $counter++, $assets, $output, $cpuUsage, $memUsage);        
 
@@ -985,14 +983,15 @@ class ref{
       // HTML output
       case 'html':
 
-       $toggleState = (static::$expandDepth < 0) || ((static::$expandDepth > 0) && ($this->level <= static::$expandDepth)) ? 'exp' : 'col';
-
-        $content = ($content !== '') ? '<a class="rToggle ' . $toggleState . '"></a><div>' . $content . '</div>' : '';
+        if($content !== ''){
+          $checked = (static::$expandDepth < 0) || ((static::$expandDepth > 0) && ($this->level <= static::$expandDepth)) ? 'checked="checked"' : '';
+          $content = sprintf('<input type="checkbox" id="%1$s" %2$s/><label for="%1$s"></label><div>%3$s</div>', uniqid('x', true), $checked, $content);
+        }  
 
         if($prefix !== '')
           $prefix = '<b>' . $prefix . '</b>';
 
-        return '<span class="rGroup">(' . $prefix . '</span>' . $content . '<span class="rGroup">)</span>';        
+        return '<i class="rGroup">(' . $prefix . '</i>' . $content . '<i class="rGroup">)</i>';        
 
       // text-only output
       default:
@@ -1035,7 +1034,7 @@ class ref{
    * @return  string
    */
   protected static function strPad($input, $padLen, $padStr = ' ', $padType = STR_PAD_RIGHT){
-    $diff = static::strlen($input) - static::strLen($input);
+    $diff = strlen($input) - static::strLen($input);
     return str_pad($input, $padLen + $diff, $padStr, $padType);
   }
 
@@ -1064,7 +1063,7 @@ class ref{
         foreach($items as $item){
           $last = array_pop($item);
           $defs = $item ? '<dt>' . implode('</dt><dt>', $item) . '</dt>' : '';
-          $content .= '<dl><dt>' . $defs . '</dt><dd>' . $last . '</dd></dl>';
+          $content .= '<dl>' . $defs . '<dd>' . $last . '</dd></dl>';
         }
 
         return $title . '<section>' . $content . '</section>';
@@ -1123,8 +1122,8 @@ class ref{
   /**
    * Generates an anchor that links to the documentation page relevant for the requested context
    *
-   * The URI will point to the local PHP manual if installed and configured,
-   * otherwise to php.net/manual (the english one)
+   * For internal functions and classes, the URI will point to the local PHP manual
+   * if installed and configured, otherwise to php.net/manual (the english one)
    *
    * @since   1.0   
    * @param   string|Reflector $text  Text to linky of reflector object to extract text from (name)
@@ -1213,7 +1212,7 @@ class ref{
    * @param   string $class           Entity class ('r' will be prepended to it, then the entire thing gets camelized)
    * @param   string $text            Entity text content
    * @param   string|Reflector $tip   Tooltip content, or Reflector object from which to generate this content
-   * @return  string                  SPAN tag with the provided information
+   * @return  string                  <I> tag with the provided information
    */
   protected function entity($class, $text = null, $tip = null){
 
@@ -1240,7 +1239,7 @@ class ref{
     if($tip !== '')
       $class .= ' rHasTip';
 
-    return sprintf('<span class="r%s">%s%s</span>', $class, $text, $tip);
+    return sprintf('<i class="r%s">%s%s</i>', $class, $text, $tip);
   }
 
 
@@ -1254,7 +1253,7 @@ class ref{
    */
   protected function tip($data){
 
-    $text = '';
+    $text = $desc = $subMeta = $leftMeta = '';
 
     // class or function
     if(($data instanceof \ReflectionClass) || ($data instanceof \ReflectionFunction) || ($data instanceof \ReflectionMethod)){
@@ -1266,14 +1265,37 @@ class ref{
 
       // user-defined; attempt to get doc comments
       }else{
-        if($comments = static::parseComment($data->getDocComment()))
-          $text = implode("\n", array($comments['title'], $comments['description']));
+        if($comments = static::parseComment($data->getDocComment())){
+          $text = $comments['title'];
+          $desc = $comments['description'];
+
+          foreach($comments['tags'] as $tag => $values){
+            foreach($values as $value){
+
+              if($tag === 'param'){
+                $value[0] = $value[0] . ' ' . $value[1];
+                unset($value[1]);
+              }  
+
+              if(is_array($value))
+                $value = implode('</b><b>', $value);
+
+              $subMeta .= sprintf('<i><b>@%s</b><b>%s</b></i>', $tag, $value);
+            }  
+          }
+
+        }  
       }
 
     // class property
     }elseif($data instanceof \ReflectionProperty){
+
       $comments = static::parseComment($data->getDocComment());
-      $text = $comments ? implode("\n", array($comments['title'], $comments['description'])) : '';      
+
+      if($comments){
+        $text = $comments['title'];
+        $desc = $comments['description'];
+      }  
     
     // function parameter
     }elseif($data instanceof \ReflectionParameter){
@@ -1281,12 +1303,17 @@ class ref{
       $function = $data->getDeclaringFunction();
 
       $tags = static::parseComment($function->getDocComment(), 'tags');
-      $tags = isset($tags['param']) ? $tags['param'] : array();
+      $params = empty($tags['param']) ? array() : $tags['param'];
     
-      foreach($tags as $tag){
+      foreach($params as $tag){
         list($types, $name, $description) = $tag;
         if(ltrim($name, '&$') === $data->getName()){
-          $text = $description;
+          $text = htmlspecialchars($description, ENT_QUOTES);
+
+          // note that we need to make the left meta area have the same height as the content
+          if($types)
+            $leftMeta = $types . str_repeat("\n", substr_count($text, "\n") + 1);
+
           break;
         }  
       }      
@@ -1295,8 +1322,19 @@ class ref{
       $text = (string)$data;
     }
 
-    if($text && ($this->format === 'html'))
-      $text = sprintf('<code>%s</code>', $text);
+    if($text && ($this->format === 'html')){
+
+      if($subMeta)
+        $subMeta = sprintf('<q>%s</q>', $subMeta);
+
+      if($leftMeta)
+        $leftMeta = sprintf('<b>%s</b>', $leftMeta);
+
+      if($desc)
+        $desc = sprintf('<i>%s</i>', $desc);
+
+      $text = sprintf('<q>%s<i>%s</i>%s%s</q>', $leftMeta, $text, $desc, $subMeta);
+    }  
 
     return $text ? $text : '';
   }
@@ -1309,7 +1347,7 @@ class ref{
    * @since   1.0
    * @param   string $class           Entity class ('r' will be prepended to it, then the entire thing gets camelized)
    * @param   string $text            Entity text content   
-   * @return  string                  SPAN tag with the provided information
+   * @return  string                  <I> tag with the provided information
    */
   protected function modifiers(array $modifiers){
 
@@ -1319,7 +1357,7 @@ class ref{
         foreach($modifiers as &$modifier)
           $modifier = $this->entity($modifier[0], $modifier[1], $modifier[2]);
         
-        return '<span class="rModifiers">' . implode('', $modifiers) . '</span>';
+        return '<i class="rModifiers">' . implode('', $modifiers) . '</i>';
 
       default:
         foreach($modifiers as &$modifier)
