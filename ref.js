@@ -1,16 +1,25 @@
 
 window.addEventListener('load', function(){
 
-  this.rTip = { e: document.getElementById('rTip') };
+  this.rTip = {};
+  this.rTip.e = document.createElement('div');
+  this.rTip.e.id = 'rTip';
 
-  if(!this.rTip.e){
-    this.rTip.e = document.createElement('div');
-    this.rTip.e.id = 'rTip';
-    this.rTip.e.className = 'ref';
+  var ref = document.getElementsByClassName('ref')[0],
+      tags = document.getElementsByClassName('rHasTip');
 
-    var ref = document.getElementsByClassName('ref')[0];
+  for(var i in tags){
 
-    ref.parentNode.insertBefore(this.rTip.e, ref.nextSibling);
+    tags[i].onmouseover = function(){ 
+      rTip.e.innerHTML = this.getElementsByTagName('q')[0].innerHTML;
+      rTip.e.className = 'ref visible';
+    };
+
+    tags[i].onmouseout = function(){        
+      rTip.e.innerHTML = '';
+      rTip.e.className = '';
+    };
+  
   }
 
   document.onmousemove = function(evt){
@@ -18,25 +27,5 @@ window.addEventListener('load', function(){
     rTip.e.style.top = evt.pageY + 'px';
   };
 
-  var tags = document.getElementsByTagName('q');
-
-  for(var i in tags){
-
-    if(!tags[i].innerHTML || (tags[i].parentNode.className.indexOf('hasTip') > - 1))
-      continue;
-
-    tags[i].parentNode.setAttribute('txt', tags[i].innerHTML);
-    tags[i].parentNode.onmouseover = function(){ 
-      if(!rTip.e) return;
-      rTip.e.innerHTML = this.getAttribute('txt');
-      rTip.e.style.display = 'block';
-    };
-
-    tags[i].parentNode.onmouseout = function(){ 
-      if(!rTip.e) return;          
-      rTip.e.innerHTML = '';
-      rTip.e.style.display = 'none';
-    };
-  
-  }
+  ref.parentNode.insertBefore(this.rTip.e, ref.nextSibling);
 });      

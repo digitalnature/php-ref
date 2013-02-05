@@ -28,6 +28,15 @@ interface Testable{}
  */
 abstract class AbstractTest implements \Iterator{
 
+	protected
+
+		/**
+		 * A property that will be inherited by children
+		 *
+		 * @var bool
+		 */
+	  $parentProp = true;
+
 	private
 
 		/**
@@ -80,7 +89,7 @@ abstract class AbstractTest implements \Iterator{
  * @since   1.0
  * @author  One Trick Pony
  */
-final class ClassTest extends AbstractTest implements Testable{
+class ClassTest extends AbstractTest implements Testable{
   
 	public
 
@@ -209,7 +218,7 @@ final class ClassTest extends AbstractTest implements Testable{
 	 * @since   1.0
 	 * @return  array    Indexed array containing list items
 	 */
-	public function getList(){}
+	public function getList(ClassTest $x = null){}
 
 
 

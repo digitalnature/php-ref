@@ -1,5 +1,6 @@
 <?php
 
+
   if(isset($_GET['mode'])){
 
   	$htmlMode = ($_GET['mode'] !== 'text');
@@ -10,46 +11,48 @@
 		/**
 		 * Test class
 		 */ 
-		class Today{
+		final class Today extends \Tests\ClassTest{
 
 		}
 
 		/**
 		 * Test function
+		 *
+		 * @param   $test  Test argument
+		 * @return  void   Nothing
 		 */ 
-		function today(){
+		function today($test){
 
 		}
 
 		$array = array(
-		  'foo'                                     => 'bar',
-		  'hèlló'                                   => 'UTF-8 key test',
-		  'bar'                                     => 5,  
-		  'multi'                                   => array(4, 'five', 6),  
-		  'matching class'                          => 'DateTime',
-		  'matching file'                           => 'file.txt',
-		  'matching date, file, function and class' => 'today',
+		  'hèllo world'                       => '( ͡° ͜ʖ ͡°)',		  
+		  'empty string'                      => '',
+		  'multi'                             => array(1, 2, 3, array(4, 5, 6), 'FUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUU'),  
+		  'matching class'                    => 'DateTime',
+		  'matching file'                     => 'file.txt',
+		  'matching date/file/function/class' => 'today',
 		);
 
 		$array['reference to self'] = &$array;
 
-		$obj = new \Tests\ClassTest($array);
+		$obj = new \Tests\ClassTest($array);		
 
 		if($htmlMode){
 	  
-			r(true, false, "Hey look a 강남스타일 string", '2010-09-17 14:00:00', null, 24, 4.20);			
+			r(true, false, 'I can haz a 강남스타일 string', '2012-12-26 04:20:00', null, 17, 4.20);			
 			r(array(), $array, serialize(array('A', 'serialized', 'string')));
-			r(fopen('http://google.com', 'r'), function($x, $d){}); 
-			r(new \DateTimeZone('Europe/London'));
-			r($obj);	
+			r(fopen('php://stdin', 'r'), function($x, $d){}); 
+			r(new \DateTimeZone('Pacific/Honolulu'));
+			r($obj, new ref('A ref instance'));	
 
     }else{
 
-			rt(true, false, "Hey look a 강남스타일 string", '2010-09-17 14:00:00', null, 24, 4.20);
+			rt(true, false, 'I can haz a 강남스타일 string', '2012-12-26 04:20:00', null, 17, 4.20);
 			rt(array(), $array, serialize(array('A', 'serialized', 'string')));			
 			rt(fopen('php://stdin', 'r'), function($x, $d){}); 
-			rt(new \DateTimeZone('Europe/London'));
-			rt($obj);
+			rt(new \DateTimeZone('Pacific/Honolulu'));
+			rt($obj, new ref('A ref instance'));
 
     }		
 
@@ -92,7 +95,6 @@
 	  </style>
   </head>
   <body>
-
   	<h1><a href="https://github.com/digitalnature/php-ref">REF</a></h1>
     <h2><a href="index.php?mode=html">HTML output</a> ~ <a href="index.php?mode=text">TEXT output</a></h2>
     <h3> created by <a href="http://digitalnature.eu/">digitalnature</digitalnature></h3>

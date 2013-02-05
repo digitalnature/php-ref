@@ -1,16 +1,23 @@
-
 .ref{
-  font: normal normal 13px/18px Consolas, Monaco, Andale Mono, Courier New, monospace;  
+  font: normal normal 12px/18px Consolas, Monaco, Andale Mono, Courier New, monospace;  
 }
 
 /* reset default styles for these elements */
 .ref i,
 .ref b,
-.ref q{
+.ref q,
+.ref u,
+.ref a,
+.ref label,
+.ref dl,
+.ref dt,
+.ref dd
+.ref h4{
   font-style: normal;  
   font-weight: normal;
   margin: 0;
   padding: 0;
+  text-decoration: none;
 }
 
 /* no quotes on Q */
@@ -26,31 +33,36 @@
   padding: 2px 5px;
   border-radius: 0 0 4px 4px;
   margin: 0 0 4px;
-  overflow: auto;
-  text-shadow: #fff 0 1px 0;
+  text-shadow: 0 1px 0 #fff;
 }
 
 /* links */
 .ref a{
   color: inherit;
-  text-decoration: underline;
+  border-bottom: 1px dotted transparent;
+  border-color: inherit;
 }
 
 /* tooltip; note that the js overrides top/left properties, this is why we use margin  */
 #rTip{
+  display: none;  
   position: absolute;
-  display: none;
+  z-index: 101;  
+  margin: 10px 0 0 15px;  
+  font-size: 11px;
   white-space: pre;  
-  margin: 10px 0 0 15px;
-  line-height: 20px;
-  border: 0;
+  text-align: left;  
+  text-shadow: 0 -1px 0 #191919;  
+  line-height: 16px;
   background: #343434;
   color: #888;         
-  text-align: left;
-  z-index: 1000;
+  border: 0;  
   border-radius: 4px;
-  box-shadow:0 0 4px rgba(0,0,0, 0.25);
-  text-shadow: 0 -1px 0 #191919;
+  box-shadow:0 0 4px rgba(0,0,0, 0.25);  
+}
+
+#rTip.visible{
+  display: block;
 }
 
 #rTip > i{
@@ -67,62 +79,62 @@
   padding-top: 10px;
 }
 
-#rTip > q{
-  display: block;
-  clear:both;
-  padding: 8px 10px 10px 10px;
-  background: #444;
-  border-top:1px solid #191919;
-  box-shadow: inset 0 1px 0 #555;  
-  border-bottom-right-radius: 4px;
-  border-bottom-left-radius: 4px;
-}
-
 #rTip > b{
   float: left;
   position: relative;
   padding: 10px;
   background: #444;
+  box-shadow: inset -1px 0 0 #555;    
   border-right:1px solid #191919;
-  box-shadow: inset -1px 0 0 #555;  
   border-top-left-radius: 4px;
   border-bottom-left-radius: 4px;  
   min-height: 100%;  
 }
 
-#rTip > q > i{
+#rTip > u{
+  display: block;
+  clear: both;
+  padding: 8px 10px 10px 10px;
+  background: #444;
+  box-shadow: inset 0 1px 0 #555;    
+  border-top:1px solid #191919;
+  border-bottom-right-radius: 4px;
+  border-bottom-left-radius: 4px;
+}
+
+#rTip > u > i{
   display: table-row;
 }
 
-#rTip > q > i > b{
+#rTip > u > i > b{
   display: table-cell;
-  padding-right: 10px;
+  padding: 2px 10px 2px 0;
   color: #ccc;
 }
 
-#rTip > q > i > b:first-child{
+#rTip > u > i > b:first-child{
   font: bold 11px Helvetica, Arial;   
   color: #888;
 }
 
-#rTip > q > i > b:nth-child(2){
+#rTip > u > i > b:nth-child(2){
   color: #edd078;
 }
 
-#rTip > q > q{
+#rTip > u > u{
+  font: bold 11px Helvetica, Arial;     
+  display: block;  
   margin-top: 5px;
   padding: 5px 0;
-  display: block;
-  font: bold 11px Helvetica, Arial;   
 }
 
-#rTip > q > i + q{
+#rTip > u > i + u{
   border-top:1px dotted #666;
 }
 
-#rTip > q > q > b{
+#rTip > u > u > b{
+  font-weight: bold;  
   color: #ccc;
-  font-weight: bold;
 }
 
 /* source expression */
@@ -131,58 +143,51 @@
   padding: 2px 7px 3px 4px;
   display: block;
   color: #ccc;
-  border-radius: 4px 4px 0 0;
-  border-bottom: 1px solid #fff;
   background-color: #333;
   background-image: -moz-linear-gradient(top, #444, #333);
   background-image: -ms-linear-gradient(top, #444, #333);
-  background-image: -webkit-gradient(linear, 0 0, 0 100%, from(#444), to(#333));
   background-image: -webkit-linear-gradient(top, #444, #333);
-  background-image: -o-linear-gradient(top, #444, #333);
   background-image: linear-gradient(top, #444, #333);  
+  border-radius: 4px 4px 0 0;
+  border-bottom: 1px solid #fff;  
 }
 
-.ref input{
+.ref input[type="checkbox"]{
   display: none;
 }
 
 /* expand/collapse toggle link for groups */
-.ref label{
-  margin: 0;
-  padding: 0;
+.ref label{  
   width: 14px;
   height: 14px;        
   display: inline-block;              
   background: transparent url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAoAAAAOCAYAAAAWo42rAAAAYklEQVQoz2M4xWCwBIgFgJgBHwYR/4H4ARA7EqMQhP8CcTcQsxNSCMMXgViXGIUg/AOIi4CYkZBCGN4HxLLEKAThd0AcRazCSEIK9xKymijPgIJHh1CAdxEKcKKicDExiQIAaIvOXmRns2sAAAAASUVORK5CYII=) no-repeat center bottom;        
   vertical-align: -3px;
   cursor: pointer;
-          transition: all ease-in .15s;  
-       -o-transition: all ease-in .15s;          
+  -webkit-transition: all ease-in .15s;  
+     -moz-transition: all ease-in .15s;     
       -ms-transition: all ease-in .15s;          
-     -moz-transition: all ease-in .15s;   
-  -webkit-transition: all ease-in .15s;
+          transition: all ease-in .15s;    
 }
 
 /* collapse graphic */
 .ref input:checked + label{
-          transform: rotate(90deg);
-       -o-transform: rotate(90deg);
+  -webkit-transform: rotate(90deg);
+     -moz-transform: rotate(90deg);       
       -ms-transform: rotate(90deg);
-     -moz-transform: rotate(90deg);
-  -webkit-transform: rotate(90deg);   
+          transform: rotate(90deg);  
 }
 
 
 /* hide next element when checkbox is not checked */
 .ref input ~ label + div{
   display: none;
-  overflow: hidden;
+  overflow: auto;
 }
 
 /* show it when checkbox is checked */
 .ref input:checked ~ label + div{
   display: block;
-  overflow: auto;  
 }
 
 /* group sections */
@@ -202,13 +207,6 @@
 }
 
 /* emulate a table for displaying array & object members */
-.ref dl,
-.ref dt,
-.ref dd{
-  margin: 0;
-  padding: 0;
-}
-
 /* section row */
 .ref dl{
   display: table-row;
@@ -222,7 +220,7 @@
   padding: 1px 0 1px 10px;
 }
 
-/* last cell of a section */
+/* last cell of a row (forces table to adjust width like we want to) */
 .ref dd{
   width: 100%;
 }
@@ -243,8 +241,7 @@
 }
 
 /* hidden content (used to generate the tooltip */
-.ref q,
-.ref .rExp q{
+.ref q{
   display: none;  
 }
 
@@ -265,8 +262,8 @@
 .ref .rResource,
 .ref .rStrMatch{
   font: bold 11px Helvetica, Arial; 
-  color:#fff;        
-  padding:1px 3px;
+  color: #fff;        
+  padding: 1px 3px;
   text-transform: lowercase;
   text-shadow: none;
   border-radius: 2px;        
@@ -280,20 +277,20 @@
 
 /* boolean true value */
 .ref .rTrue{
-  background-color:#339900;
+  background-color: #339900;
 }
 
 /* boolean false value */
 .ref .rFalse{
-  background-color:#CC0033;
-  color:#fff;
+  background-color: #CC0033;
+  color: #fff;
 }   
 
 /* null value */
 .ref .rNull{
-  background-color:#eee;
-  color:#999;
-  text-shadow: #fff 0 1px 1px;
+  background-color: #eee;
+  color: #999;
+  text-shadow: inherit;
 }
 
 /* resources */
@@ -313,7 +310,7 @@
 
 /* integer or double values */
 .ref .rInteger,
-.rDouble{
+.ref .rDouble{
   color: #0099CC;
 }   
 
@@ -331,6 +328,10 @@
   color:#CC0033;
 }
 
+.ref .rInherited .rProperty{
+  color: #999;
+}
+
 .ref .rMethod{
   font-weight: bold;
   color: #0057ae;
@@ -342,7 +343,7 @@
 }
 
 /* optional method arguments */
-.ref .rOptional{
+.ref .rOptional > *{
   font-style: italic;
   color: #aaa;
 }
@@ -361,7 +362,8 @@
 .ref .rIterateable,
 .ref .rCloneable{
   font: bold 11px Helvetica, Arial;    
-  color:#fff;        
+  display: inline-block;  
+  margin: 0 2px;  
   width: 14px;
   height: 14px;
   text-transform: uppercase;
@@ -369,23 +371,22 @@
   text-shadow: none;
   line-height: 15px;
   border-radius: 30px;
-  margin: 0 2px;
-  display: inline-block;
-  background-color: #78bded;  
+  background: #78bded;  
+  color:#fff;          
 }
 
 .ref .rAbstract{
-  background-color: #baed78;
+  background: #baed78;
 }
 
 .ref .rProtected{
-  background-color: #edd078;
+  background: #edd078;
 }
 
 .ref .rIterateable{
-  background-color: #d5dea5;
+  background: #d5dea5;
 }
 
 .ref .rCloneable{
-  background-color: #bdd7d1;
+  background: #bdd7d1;
 }

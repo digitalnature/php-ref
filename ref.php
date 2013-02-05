@@ -3,7 +3,7 @@
 
 
 /**
- * Shortcut to ref::transform(), HTML mode
+ * Shortcut to ref, HTML mode
  *
  * @version  1.0
  * @param    mixed $args
@@ -30,7 +30,7 @@ function r(){
 
   // get the info
   foreach($args as $index => $arg)
-    $output[] = ref::transform($arg, isset($expressions[$index]) ? $expressions[$index] : null, 'html');
+    $output[] = new ref($arg, isset($expressions[$index]) ? $expressions[$index] : null, 'html');
 
   $output = implode("\n\n", $output);
 
@@ -40,19 +40,21 @@ function r(){
 
   // IE goes funky if there's no doctype
   if(!headers_sent() && !ob_get_length())
-    print '<!DOCTYPE HTML><html><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" /><body>';
+    print '<!DOCTYPE HTML><html><head><title>REF</title><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" /></head><body>';
 
   print $output;
 
   // stop the script if this function was called with the bitwise not operator
-  if(in_array('~', $options, true))
+  if(in_array('~', $options, true)){
+    print '</body></html>';
     exit(0);
+  }  
 }  
 
 
 
 /**
- * Shortcut to ref::transform(), plain text mode
+ * Shortcut to ref, plain text mode
  *
  * @version  1.0
  * @param    mixed $args
@@ -67,7 +69,7 @@ function rt(){
     $expressions = array();
 
   foreach($args as $index => $arg)
-    $output[] = ref::transform($arg, isset($expressions[$index]) ? $expressions[$index] : null, 'text');
+    $output[] = new ref($arg, isset($expressions[$index]) ? $expressions[$index] : null, 'text');
 
   $output = implode('', $output);
 
@@ -94,28 +96,32 @@ function rt(){
 class ref{
 
   protected static
-
-    // initial expand depth (for HTML mode only)
-    $expandDepth  = 1,  
-
-    // shortcut functions used to access the ::build() method below;
-    // if they are namespaced, the namespace must be present as well (methods are not supported)
-    $shortcutFunc = array('r', 'rt'),
-    
-    // default output format
-    $outputFormat = 'html',
-
-    // stylesheet path (for HTML only);
-    // 'false' means no styles
-    $stylePath    = '{:dir}/ref.css',
-
-    // javascript path (for HTML only);
-    // 'false' means no js
-    $scriptPath   = '{:dir}/ref.js',
-
+  
     // cpu time used
-    $time         = 0;
+    $time   = 0,
 
+    // configuration (and default values)
+    $config = array(
+
+                // initial expand depth (for HTML mode only)
+                'expandDepth'  => 1,
+
+                // shortcut functions used to access the ::build() method below;
+                // if they are namespaced, the namespace must be present as well (methods are not supported)                      
+                'shortcutFunc' => array('r', 'rt'),
+
+                // default output format
+                'outputFormat' => 'html',
+
+                // stylesheet path (for HTML only);
+                // 'false' means no styles
+                'stylePath'    => '{:dir}/ref.css',
+
+                // javascript path (for HTML only);
+                // 'false' means no js                      
+                'scriptPath'   => '{:dir}/ref.js',
+
+              );
 
 
   protected
@@ -129,23 +135,77 @@ class ref{
     // current nesting level
     $level        = 0,
 
+    // max. expand depth
+    $depth        = 1,
+
     // output format
-    $format       = 'html';
+    $format       = null,
+
+    // queried variable
+    $subject      = null,
+
+    // source expression
+    $expression   = null;
 
 
 
   /**
-   * Currently the constructor will only set up the output format.
-   *
-   * Other options might be added in the future
+   * Constructor
    *
    * @since   1.0
-   * @param   string $format
+   * @param   mixed $subject           Variable to query
+   * @param   string|null $expression  Source expression string
+   * @param   string|null $format      Output format, defaults to the 'outputFormat' config setting
+   * @param   int|null $depth          Maximum expand depth
    */
-  public function __construct($format = 'html'){
-    $this->format = $format;
+  public function __construct($subject, $expression = null, $format = null, $depth = null){
+
+    $this->subject    = $subject;
+    $this->format     = $format ? $format : static::config('outputFormat');
+    $this->depth      = ($depth !== null) ? $depth : static::config('expandDepth');
+    $this->expression = $expression;
+
   }
 
+
+
+  /**
+   * Creates the root structure that contains all the groups and entities
+   *   
+   * @since   1.0
+   * @return  string
+   */
+  public function __toString(){
+ 
+    // instance index (gets displayed as comment in html-mode)
+    static $counter = 1;
+
+    $startTime = microtime(true);  
+    $varOutput = $this->formatSubject($this->subject);    
+    $expOutput = $this->expression ? $this->formatExpression($this->expression) : '';
+
+    switch($this->format){
+
+      // HTML output
+      case 'html':
+        $assets   = static::getAssets();
+        $cpuUsage = round(microtime(true) - $startTime, 4);        
+        $output   = sprintf('<div class="ref">%s<div>%s</div></div>', $expOutput, $varOutput);
+        $output   = sprintf('<!-- ref #%d --><div>%s%s</div><!-- /ref (took %ss) -->', $counter++, $assets, $output, $cpuUsage);
+        static::$time += $cpuUsage;
+
+        return $output;
+
+      // text output
+      default:      
+        $output = sprintf("\n%s\n%s\n%s\n", $expOutput, str_repeat('=', static::strLen($expOutput)), $varOutput);      
+        static::$time += round(microtime(true) - $startTime, 4);
+
+        return $output;
+
+    }
+
+  }
 
 
   /**
@@ -158,24 +218,219 @@ class ref{
    */
   public static function config($key, $value = null){
 
-    $validKeys = array(
-      'shortcutFunc',
-      'expandDepth',
-      'outputFormat',
-      'stylePath',
-      'scriptPath',
-    );
-
-    if(!in_array($key, $validKeys, true))
-      throw new Exception(sprintf('Unrecognized option: "%s". Valid options are: %s', $key, implode(', ', $validKeys)));
+    if(!array_key_exists($key, static::$config))
+      throw new Exception(sprintf('Unrecognized option: "%s". Valid options are: %s', $key, implode(', ', array_keys(static::$config))));
 
     if($value === null)
-      return static::${$key};
+      return static::$config[$key];
 
-    if(is_array(static::${$key}))
-      return static::${$key} = (array)$value;
+    if(is_array(static::$config[$key]))
+      return static::$config[$key] = (array)$value;
 
-    return static::${$key} = $value;
+    return static::$config[$key] = $value;
+  }
+
+
+
+  /**
+   * Executes a function the given number of times and returns the elapsed time.
+   *
+   * Keep in mind that the returned time includes function call overhead (including
+   * microtime calls) x iteration count. This is why this is better suited for
+   * determining which of two or more functions is the fastest, rather than
+   * finding out how fast is a single function.
+   *
+   * @since   1.0
+   * @param   int $iterations      Number of times the function will be executed
+   * @param   callable $function   Function to execute
+   * @param   mixed &$output       If given, last return value will be available in this variable
+   * @return  double               Elapsed time
+   */
+  public static function timeFunc($iterations, $function, &$output = null){
+    
+    $time = 0;
+
+    for($i = 0; $i < $iterations; $i++){
+      $start  = microtime(true);
+      $output = call_user_func($function);
+      $time  += microtime(true) - $start;
+    }
+    
+    return round($time, 4);
+  }  
+
+
+
+  /**
+   * Parses a DocBlock comment into a data structure.
+   *
+   * @since   1.0
+   * @link    http://pear.php.net/manual/en/standards.sample.php
+   * @param   string $comment    DocBlock comment (must start with /**)
+   * @param   string $key        Field to return (optional)
+   * @return  array|string|null  Array containing all fields, array/string with the contents of
+   *                             the requested field, or null if the comment is empty/invalid
+   */
+  public static function parseComment($comment, $key = null){
+
+    $title       = '';
+    $description = '';
+    $tags        = array();
+    $tag         = null;
+    $pointer     = null;
+    $padding     = false;
+    $comment     = array_slice(preg_split('/\r\n|\r|\n/', $comment), 1, -1);
+
+    foreach($comment as $line){
+
+      // drop any leading spaces
+      $line = ltrim($line);
+
+      // drop "* "
+      if($line !== '')
+        $line = substr($line, 2);      
+
+      if(strpos($line, '@') === 0){
+        $padding = false;        
+        $pos     = strpos($line, ' ');
+        $tag     = substr($line, 1, $pos - 1);
+        $line    = trim(substr($line, $pos));
+
+        // tags that have two or more values;
+        // note that 'throws' may also have two values, however most people use it like "@throws ExceptioClass if whatever...",
+        // which, if broken into two values, leads to an inconsistent description sentence...
+        if(in_array($tag, array('global', 'param', 'return', 'var'))){
+          $parts = array();
+
+          if(($pos = strpos($line, ' ')) !== false){
+            $parts[] = substr($line, 0, $pos);
+            $line = ltrim(substr($line, $pos));
+
+            if(($pos = strpos($line, ' ')) !== false){
+
+              // we expect up to 3 elements in 'param' tags
+              if(($tag === 'param') && in_array($line[0], array('&', '$'), true)){
+                $parts[] = substr($line, 0, $pos);
+                $parts[] = ltrim(substr($line, $pos));
+
+              }else{
+                if($tag === 'param')
+                  $parts[] = '';
+
+                $parts[] = ltrim($line);
+              }
+
+            }else{
+              $parts[] = $line;
+            }
+          
+          }else{
+            $parts[] = $line;            
+          }
+
+          $parts += array_fill(0, ($tag !== 'param') ? 2 : 3, '');
+
+          // maybe we should leave out empty (invalid) entries?
+          if(array_filter($parts)){
+            $tags[$tag][] = $parts;
+            $pointer = &$tags[$tag][count($tags[$tag]) - 1][count($parts) - 1];
+          }  
+
+        // tags that have only one value (eg. 'link', 'license', 'author' ...)
+        }else{
+          $tags[$tag][] = trim($line);
+          $pointer = &$tags[$tag][count($tags[$tag]) - 1];
+        }
+
+        continue;
+      }
+
+      // preserve formatting of tag descriptions, because
+      // in some frameworks (like Lithium) they span across multiple lines
+      if($tag !== null){
+
+        $trimmed = trim($line);
+
+        if($padding !== false){
+          $trimmed = static::strPad($trimmed, static::strLen($line) - $padding, ' ', STR_PAD_LEFT);
+          
+        }else{
+          $padding = static::strLen($line) - static::strLen($trimmed);
+        }  
+
+        $pointer .=  "\n{$trimmed}";
+        continue;
+      }
+      
+      // tag definitions have not started yet;
+      // assume this is title / description text
+      $description .= "\n{$line}";
+    }
+    
+    $description = trim($description);
+
+    // determine the real title and description by splitting the text
+    // at the nearest encountered [dot + space] or [2x new line]
+    if($description !== ''){
+      $stop = min(array_filter(array(static::strLen($description), strpos($description, '. '), strpos($description, "\n\n"))));
+      $title = substr($description, 0, $stop + 1);
+      $description = trim(substr($description, $stop + 1));
+    }
+    
+    $data = compact('title', 'description', 'tags');
+
+    if(!array_filter($data))
+      return null;
+
+    if($key !== null)
+      return isset($data[$key]) ? $data[$key] : null;
+
+    return $data;
+  }
+
+
+
+  /**
+   * Get styles and javascript (only generated for the 1st call)
+   *
+   * @since   1.0
+   * @param   string
+   */
+  public static function getAssets(){
+
+    // tracks style/jscript inclusion state (html only)
+    static $didAssets = false;
+
+    // first call? include styles and javascript
+    if($didAssets)
+      return '';   
+
+    ob_start();
+
+    if(static::config('stylePath') !== false){
+      ?>
+      <style scoped>
+        <?php readfile(str_replace('{:dir}', __DIR__, static::config('stylePath'))); ?>
+      </style>
+      <?php
+    }
+
+    if(static::config('scriptPath') !== false){
+      ?>
+      <script>
+        <?php readfile(str_replace('{:dir}', __DIR__, static::config('scriptPath'))); ?>
+      </script>
+      <?php
+    }  
+
+    // normalize space and remove comments
+    $output = preg_replace('/\s+/', ' ', trim(ob_get_clean()));
+    $output = preg_replace('!/\*.*?\*/!s', '', $output);
+    $output = preg_replace('/\n\s*\n/', "\n", $output);
+
+    $didAssets = true;
+
+    return $output;
   }
 
 
@@ -184,11 +439,11 @@ class ref{
    * Get all parent classes of a class
    *
    * @since   1.0
-   * @param   string|object $class   Class name or object
-   * @param   bool $internalOnly     Retrieve only PHP-internal classes
+   * @param   string|Reflector $class   Class name or reflection object
+   * @param   bool $internalOnly        Retrieve only PHP-internal classes
    * @return  array
    */
-  protected function getParentClasses($class, $internalOnly = false){
+  protected static function getParentClasses($class, $internalOnly = false){
 
     $haveParent = ($class instanceof \Reflector) ? $class : new \ReflectionClass($class);
     $parents = array();
@@ -209,15 +464,15 @@ class ref{
    * Generate class info
    *
    * @since   1.0
-   * @param   string|object $class   Class name or object
+   * @param   string|Reflector $class   Class name or reflection object
    * @return  string
    */
-  protected function transformClassString($class){
+  protected function formatClassString($class){
 
     if(!($class instanceof \Reflector))
       $class = new \ReflectionClass($class);
 
-    $classes = $this->getParentClasses($class) + array($class);
+    $classes = static::getParentClasses($class) + array($class);
 
     foreach($classes as &$class){
 
@@ -248,10 +503,10 @@ class ref{
    * Generate function info
    *
    * @since   1.0
-   * @param   string|object $func   Function name or reflector object
+   * @param   string|Reflector $func   Function name or reflection object
    * @return  string
    */
-  protected function transformFunctionString($func){
+  protected function formatFunctionString($func){
 
     if(!($func instanceof \Reflector))
       $func = new \ReflectionFunction($func);
@@ -268,7 +523,7 @@ class ref{
    * @param   mixed $subject       Variable to query   
    * @return  string               Result
    */
-  protected function transformSubject(&$subject){
+  protected function formatSubject(&$subject){
   
     // null value
     if(is_null($subject))
@@ -307,9 +562,9 @@ class ref{
           );
 
         break;
-
         // gd image extension resource
         case 'gd':
+
           $meta = array(
              'size'       => sprintf('%d x %d', imagesx($subject), imagesy($subject)),
              'true_color' => imageistruecolor($subject),
@@ -373,7 +628,7 @@ class ref{
         $items[] = array(
           $this->entity('resourceInfo', $key),
           $this->entity('sep', ':'),
-          $this->transformSubject($value),
+          $this->formatSubject($value),
         );
       }  
 
@@ -387,11 +642,10 @@ class ref{
     if(is_string($subject)){
       $encoding = function_exists('mb_detect_encoding') ? mb_detect_encoding($subject) : false;
       $length   = static::strLen($subject);
-      $info     = $length;
       $alpha    = ctype_alpha($subject);
 
-      if($encoding)
-        $info = $encoding . ' (' . $info . ')';
+      $info = ($encoding !== 'ASCII') ? $length . '; ' . $encoding : $length;
+      $info = 'string(' . $info . ')';
 
       $string = $this->entity('string', $subject, $info);
       $matches = array();
@@ -450,19 +704,19 @@ class ref{
         $info[] = (($perms & 0x0002) ? 'w' : '-');
         $info[] = (($perms & 0x0001) ? (($perms & 0x0200) ? 't' : 'x' ) : (($perms & 0x0200) ? 'T' : '-'));
         
-        $matches[] = $this->entity('strMatch', 'File') . ' ' . implode('', $info) . ' ' . sprintf('%.2fK', $file->getSize() / 1024);
+        $matches[] = $this->entity('strMatch', 'file') . ' ' . implode('', $info) . ' ' . sprintf('%.2fK', $file->getSize() / 1024);
       }  
 
       // class name?
       if(class_exists($subject, false))
-        $matches[] = $this->entity('strMatch', 'Class') . ' ' . $this->transformClassString($subject);
+        $matches[] = $this->entity('strMatch', 'class') . ' ' . $this->formatClassString($subject);
 
       if(interface_exists($subject, false))
-        $matches[] = $this->entity('strMatch', 'Interface') . ' ' . $this->transformClassString($subject);
+        $matches[] = $this->entity('strMatch', 'interface') . ' ' . $this->formatClassString($subject);
 
       // class name?
       if(function_exists($subject))
-        $matches[] = $this->entity('strMatch', 'Function') . ' ' . $this->transformFunctionString($subject);      
+        $matches[] = $this->entity('strMatch', 'function') . ' ' . $this->formatFunctionString($subject);      
 
       // skip more advanced checks if the string appears to be numeric,
       // or if it's shorter than 5 characters
@@ -472,7 +726,7 @@ class ref{
         if($length > 4){
           $date = date_parse($subject);
           if(($date !== false) && empty($date['errors']))
-            $matches[] = $this->entity('strMatch', 'Date') . ' ' . static::humanTime(@strtotime($subject));
+            $matches[] = $this->entity('strMatch', 'date') . ' ' . static::humanTime(@strtotime($subject));
         }
 
         // attempt to detect if this is a serialized string     
@@ -483,7 +737,7 @@ class ref{
           if(($subject[$length - 1] === ';') || ($subject[$length - 1] === '}'))
             if((($subject[0] === 's') && ($subject[$length - 2] !== '"')) || preg_match("/^{$subject[0]}:[0-9]+:/s", $subject))
               if(($unserialized = @unserialize($subject)) !== false)
-                $matches[] = $this->entity('strMatch', 'Unserialized:') . ' ' . $this->transformSubject($unserialized);
+                $matches[] = $this->entity('strMatch', 'unserialized:') . ' ' . $this->formatSubject($unserialized);
 
           $unserializing = false;
 
@@ -498,7 +752,7 @@ class ref{
             $json = json_decode($subject);
 
             if(json_last_error() === JSON_ERROR_NONE)
-              $matches[] = $this->entity('strMatch', 'Json.Decoded') . ' ' . $this->transformSubject($json);
+              $matches[] = $this->entity('strMatch', 'json.decoded') . ' ' . $this->formatSubject($json);
 
             $decodingJson = false;
           }
@@ -516,7 +770,7 @@ class ref{
 
       // empty array?
       if(empty($subject))      
-        return $this->entity('array', 'Array') . $this->group();
+        return $this->entity('array', 'array') . $this->group();
 
       // set a marker to detect recursion
       if(!$this->arrayMarker)
@@ -524,7 +778,7 @@ class ref{
 
       // if our marker element is present in the array it means that we were here before
       if(isset($subject[$this->arrayMarker]))
-        return $this->entity('array', 'Array') . $this->group('Recursion');
+        return $this->entity('array', 'array') . $this->group('Recursion');
 
       $subject[$this->arrayMarker] = true;
 
@@ -545,19 +799,20 @@ class ref{
         if($key === $this->arrayMarker)
           continue;
 
+        $keyInfo = gettype($key);
+
         if(is_string($key)){
-          $encoding = function_exists('mb_detect_encoding') ? mb_detect_encoding($key) : 'ASCII';
-          $length   = static::strLen($key);
-          $keyInfo  = sprintf('String key (%s/%d)', $encoding, $length);
-        
-        }else{
-          $keyInfo = sprintf('Numeric key (%s)', gettype($key));
+          $encoding = function_exists('mb_detect_encoding') ? mb_detect_encoding($key) : '';
+          $length   = $encoding && ($encoding !== 'ASCII') ? static::strLen($key) . '; ' . $encoding : static::strLen($key);
+          $keyInfo  = sprintf('%s(%s)', $keyInfo, $length);        
         }
+
+        $keyInfo = sprintf('Key: %s', $keyInfo);
 
         $items[$index++] = array(
           $this->entity('key', $key, $keyInfo),
           $this->entity('sep', '=>'),
-          $this->transformSubject($value),
+          $this->formatSubject($value),
         );
       }
 
@@ -565,19 +820,19 @@ class ref{
       // not really required, because ::build() doesn't take references, but we want to be nice :P
       unset($subject[$this->arrayMarker]);
 
-      $group = $this->entity('array', 'Array') . $this->group($itemCount, $this->section($items));
+      $group = $this->entity('array', 'array') . $this->group($itemCount, $this->section($items));
       $this->level--;
 
       return $group;
     }
 
     // if we reached this point, $subject must be an object     
-    $objectName = $this->transformClassString($subject);
+    $objectName = $this->formatClassString($subject);
     $objectHash = spl_object_hash($subject);
 
     // already been here?
     if(in_array($objectHash, $this->objectHashes))
-      return $this->entity('object', "{$objectName} Object") . $this->group('Recursion');
+      return $this->entity('object', "{$objectName} object") . $this->group('Recursion');
 
     // track hash
     $this->objectHashes[] = $objectHash;
@@ -591,11 +846,11 @@ class ref{
     $interfaces = $reflector->getInterfaces();
     $traits     = (PHP_MINOR_VERSION > 3) ? $reflector->getTraits() : array();
 
-    $internalParents = $this->getParentClasses($reflector, true);
+    $internalParents = static::getParentClasses($reflector, true);
 
     // no data to display?
     if(!$props && !$methods && !$constants && !$interfaces && !$traits)
-      return $this->entity('object', "{$objectName} Object") . $this->group();
+      return $this->entity('object', "{$objectName} object") . $this->group();
 
     $output = '';
     $this->level++;
@@ -628,7 +883,7 @@ class ref{
           $this->entity('sep', '::'),
           $this->entity('constant', $name),
           $this->entity('sep', '='),
-          $this->transformSubject($value),
+          $this->formatSubject($value),
         );
         
       }
@@ -671,12 +926,20 @@ class ref{
           if($parent->hasProperty($name))
             $name = $this->anchor($name, 'property', $parent->getName(), $name);
 
+        $inherited = $reflector->getShortName() !== $prop->getDeclaringClass()->getShortName();
+        $modTip    = $inherited ? sprintf('Inherited from ::%s', $prop->getDeclaringClass()->getShortName()) : null;
+
+        $name = $this->entity('property', $name, $prop);
+
+        if($inherited)
+          $name = $this->entity('inherited', $name);
+
         $items[$index++] = array(
-          $this->entity('sep', $prop->isStatic() ? '::' : '->'),
+          $this->entity('sep', $prop->isStatic() ? '::' : '->', $modTip),
           $this->modifiers($modifiers),
-          $this->entity('property', $name, $prop),
+          $name,
           $this->entity('sep', '='),
-          $this->transformSubject($value),
+          $this->formatSubject($value),
         );
 
       }
@@ -713,16 +976,16 @@ class ref{
           $paramHint = '';
 
           if($paramClass)
-            $paramHint = $this->entity('hint', $this->anchor($paramClass->getName(), 'class'), $paramClass);
+            $paramHint = $this->entity('hint', $this->anchor($paramClass, 'class'), $paramClass);
           
           if($parameter->isArray())
-            $paramHint = $this->entity('arrayHint', 'Array');
+            $paramHint = $this->entity('arrayHint', 'array');
        
           if($parameter->isOptional()){
             $paramValue = $parameter->isDefaultValueAvailable() ? $parameter->getDefaultValue() : null;            
             $paramName  = $this->entity('param', $paramName, $parameter);
             $paramName .= $this->entity('sep', ' = ');
-            $paramName .= $this->entity('paramValue', $this->transformSubject($paramValue));
+            $paramName .= $this->entity('paramValue', $this->formatSubject($paramValue));
 
             if($paramHint)
               $paramName = $paramHint . ' ' . $paramName;
@@ -775,7 +1038,7 @@ class ref{
       $output .= $this->section($items, 'Methods');
     }
 
-    $group = $this->entity('object', "{$objectName} Object") . $this->group('', $output);
+    $group = $this->entity('object', "{$objectName} object") . $this->group('', $output);
     $this->level--;
 
     return $group;
@@ -791,7 +1054,7 @@ class ref{
    * @param   string $expression      Expression to format
    * @return  string                  Formatted output
    */
-  public function transformExpression($expression){
+  protected function formatExpression($expression){
 
     $prefix = $this->entity('sep', '> ');
 
@@ -838,7 +1101,7 @@ class ref{
 
       }else{
 
-        if(strpos($expression, '::') === false)
+        if(strpos($fn[0], '::') === false)
           return $this->entity('exp', $prefix . $expression);
 
         $cn = explode('::', $fn[0], 2);
@@ -879,163 +1142,6 @@ class ref{
    */
   public static function getTime(){
     return static::$time;
-  }
-
-
-
-  /**
-   * Creates the root structure that contains all the groups and entities
-   *   
-   * @since   1.0
-   * @param   mixed $subject           Variable to query
-   * @param   string|null $expression  Source expression string
-   * @param   string|null $format      Output format, defaults to the 'outputFormat' config setting
-   * @return  string                   Formatted information
-   */
-  public static function transform($subject, $expression = null, $format = null){
-
-    // tracks style/jscript inclusion state (html only)
-    static $didAssets = false;
- 
-    // instance index (gets displayed as comment in html-mode)
-    static $counter = 1;
-
-
-    if(!$format)
-      $format = static::$outputFormat;
-
-    //$errorReporting = error_reporting(0);
-
-    $startTime = microtime(true);  
-    $startMem  = memory_get_usage();
-    $instance  = new static($format);
-    $varOutput = $instance->transformSubject($subject);    
-    $expOutput = ($expression !== null) ? $instance->transformExpression($expression) : '';
-    $memUsage  = abs(round((memory_get_usage() - $startMem) / 1024, 2));
-    $cpuUsage  = round(microtime(true) - $startTime, 4);
-
-    static::$time += $cpuUsage;
-
-    $instance = null;
-    unset($instance);
-
-    switch($format){
-
-      // HTML output
-      case 'html':
-        $assets = '';      
-
-        // first call? include styles and javascript
-        if(!$didAssets){
-
-          ob_start();
-
-          if(static::$stylePath !== false){
-            ?>
-            <style scoped>
-              <?php readfile(str_replace('{:dir}', __DIR__, static::$stylePath)); ?>
-            </style>
-            <?php
-          }
-
-          if(static::$scriptPath !== false){
-            ?>
-            <script>
-              <?php readfile(str_replace('{:dir}', __DIR__, static::$scriptPath)); ?>
-            </script>
-            <?php
-          }  
-
-          // normalize space and remove comments
-          $assets = preg_replace('/\s+/', ' ', trim(ob_get_clean()));
-          $assets = preg_replace('!/\*.*?\*/!s', '', $assets);
-          $assets = preg_replace('/\n\s*\n/', "\n", $assets);
-
-          $didAssets = true;
-        }
-
-        $output = sprintf('<div class="ref">%s<div>%s</div></div>', $expOutput, $varOutput);
-
-        return sprintf('<!-- ref #%d -->%s%s<!-- /ref (took %ss, %sK) -->', $counter++, $assets, $output, $cpuUsage, $memUsage);        
-
-      // text output
-      default:      
-        return sprintf("\n%s\n%s\n%s\n", $expOutput, str_repeat('=', static::strLen($expOutput)), $varOutput);
-
-    }
-
-  }
-
-
-
-  /**
-   * Creates a group
-   *
-   * @since   1.0
-   * @param   string $prefix
-   * @param   string $toggledText
-   * @return  string
-   */
-  protected function group($prefix = '', $content = ''){
-
-    switch($this->format){
-
-      // HTML output
-      case 'html':
-
-        if($content !== ''){
-          $checked = (static::$expandDepth < 0) || ((static::$expandDepth > 0) && ($this->level <= static::$expandDepth)) ? 'checked="checked"' : '';
-          $content = sprintf('<input type="checkbox" id="%1$s" %2$s/><label for="%1$s"></label><div>%3$s</div>', uniqid('x', true), $checked, $content);
-        }  
-
-        if($prefix !== '')
-          $prefix = '<b>' . $prefix . '</b>';
-
-        return '<i class="rGroup">(' . $prefix . '</i>' . $content . '<i class="rGroup">)</i>';        
-
-      // text-only output
-      default:
-
-        if($content !== '')
-          $content =  $content . "\n";
-
-        return '(' . $prefix . $content . ')';
-      
-    }    
-  }
-
-
-
-  /**
-   * Calculates real string length
-   *
-   * @since   1.0
-   * @param   string $string
-   * @return  int
-   */
-  protected static function strLen($string){
-
-    if(function_exists('mb_strlen'))
-      return mb_strlen($string, mb_detect_encoding($string));      
-    
-    return strlen($string);
-  }
-
-
-
-  /**
-   * Safe str_pad alternative
-   *
-   * @since   1.0
-   * @param   string $string
-   * @param   int $padLen
-   * @param   string $padStr
-   * @param   int $padType
-   * @return  string
-   */
-  protected static function strPad($input, $padLen, $padStr = ' ', $padType = STR_PAD_RIGHT){
-    $diff = strlen($input) - static::strLen($input);
-    return str_pad($input, $padLen + $diff, $padStr, $padType);
   }
 
 
@@ -1225,13 +1331,15 @@ class ref{
       switch($class){
 
         case 'string':
-          return 'string(' . $this->tip($tip) . ') "' . $text . '"';
+          return $this->tip($tip) . ' "' . $text . '"';
 
         case 'strMatch':        
-          return '~ ' . $text . ':';
+          return '~' . $text . ':';
 
         case 'integer':
-        case 'double':        
+        case 'double':
+        case 'true':
+        case 'false':
           return $this->tip($tip) . '(' . $text . ')';
 
         case 'key':
@@ -1259,14 +1367,39 @@ class ref{
 
 
   /**
-   * Escapes variable for HTML output
+   * Creates a group
    *
    * @since   1.0
-   * @param   mixed
-   * @return  mixed
+   * @param   string $prefix
+   * @param   string $toggledText
+   * @return  string
    */
-  protected static function escape($var){
-    return is_array($var) ? array_map('static::escape', $var) : htmlspecialchars($var, ENT_QUOTES);
+  protected function group($prefix = '', $content = ''){
+
+    switch($this->format){
+
+      // HTML output
+      case 'html':
+
+        if($content !== ''){
+          $checked  = ($this->depth < 0) || (($this->depth > 0) && ($this->level <= $this->depth)) ? 'checked="checked"' : '';
+          $content  = sprintf('<input type="checkbox" id="%1$s" %2$s/><label for="%1$s"></label><div>%3$s</div>', uniqid('x', true), $checked, $content);
+        }  
+
+        if($prefix !== '')
+          $prefix = '<b>' . $prefix . '</b>';
+
+        return sprintf('<i class="rGroup">(%s</i>%s<i class="rGroup">)</i>', $prefix, $content);
+
+      // text-only output
+      default:
+
+        if($content !== '')
+          $content =  $content . "\n";
+
+        return '(' . $prefix . $content . ')';
+      
+    }    
   }
 
 
@@ -1314,7 +1447,7 @@ class ref{
 
         }
 
-        $subMeta .= sprintf('<q>Defined in <b>%s:%d</b></q>', basename($data->getFileName()), $data->getStartLine());
+        $subMeta .= sprintf('<u>Defined in <b>%s:%d</b></u>', basename($data->getFileName()), $data->getStartLine());
       }
 
     // class property
@@ -1358,7 +1491,7 @@ class ref{
     if($text && ($this->format === 'html')){
 
       if($subMeta)
-        $subMeta = sprintf('<q>%s</q>', $subMeta);
+        $subMeta = sprintf('<u>%s</u>', $subMeta);
 
       if($leftMeta)
         $leftMeta = sprintf('<b>%s</b>', static::escape($leftMeta));
@@ -1378,9 +1511,8 @@ class ref{
    * Creates modifier bubbles
    *
    * @since   1.0
-   * @param   string $class           Entity class ('r' will be prepended to it, then the entire thing gets camelized)
-   * @param   string $text            Entity text content   
-   * @return  string                  <I> tag with the provided information
+   * @param   array $modifiers
+   * @return  string
    */
   protected function modifiers(array $modifiers){
 
@@ -1426,7 +1558,7 @@ class ref{
       extract($calee);
 
       // skip, if the called function doesn't match the shortcut function name
-      if(!$function || !preg_grep("/{$function}/i" , static::$shortcutFunc))
+      if(!$function || !preg_grep("/{$function}/i" , static::config('shortcutFunc')))
         continue;
 
       if(!$line || !$file)
@@ -1517,157 +1649,48 @@ class ref{
 
 
   /**
-   * Executes a function the given number of times and returns the elapsed time.
-   *
-   * Keep in mind that the returned time includes function call
-   * overhead (including microtime calls) x iteration count.   
-   * This is why this is better suited for determining which of two ore more functions
-   * is the fastest, rather than finding out how fast is a single function.
+   * Calculates real string length
    *
    * @since   1.0
-   * @param   int $iterations
-   * @param   callable $function
-   * @param   mixed &$output
-   * @return  double
+   * @param   string $string
+   * @return  int
    */
-  public static function timeFunc($iterations, $function, &$output = null){
-    
-    $time = 0;
+  protected static function strLen($string){
 
-    for($i = 0; $i < $iterations; $i++){
-      $start = microtime(true);
-      $output = call_user_func($function);
-      $time += microtime(true) - $start;
-    }
+    if(function_exists('mb_strlen'))
+      return mb_strlen($string, mb_detect_encoding($string));      
     
-    return round($time, 4);
-  }  
+    return strlen($string);
+  }
 
 
 
   /**
-   * Parses a DocBlock comment into a data structure.
+   * Safe str_pad alternative
    *
    * @since   1.0
-   * @link    http://pear.php.net/manual/en/standards.sample.php
-   * @param   string $comment   Comment string
-   * @param   string $key       Field to return (optional)
-   * @return  array|string      Array containing all fields, or array/string with the contents of the requested field
+   * @param   string $string
+   * @param   int $padLen
+   * @param   string $padStr
+   * @param   int $padType
+   * @return  string
    */
-  public static function parseComment($comment, $key = null){
+  protected static function strPad($input, $padLen, $padStr = ' ', $padType = STR_PAD_RIGHT){
+    $diff = strlen($input) - static::strLen($input);
+    return str_pad($input, $padLen + $diff, $padStr, $padType);
+  }
 
-    $title       = '';
-    $description = '';
-    $tags        = array();
-    $tag         = null;
-    $pointer     = null;
-    $padding     = false;
 
-    foreach(array_slice(preg_split('/\r\n|\r|\n/', $comment), 1, -1) as $line){
 
-      // drop any leading spaces
-      $line = ltrim($line);
-
-      // drop "* "
-      if($line !== '')
-        $line = substr($line, 2);      
-
-      if(strpos($line, '@') === 0){
-        $padding = false;        
-        $pos     = strpos($line, ' ');
-        $tag     = substr($line, 1, $pos - 1);
-        $line    = trim(substr($line, $pos));
-
-        // tags that have two or more values;
-        // note that 'throws' may also have two values, however most people use it like "@throws ExceptioClass if whatever...",
-        // which, if broken into two values, leads to an inconsistent description sentence...
-        if(in_array($tag, array('global', 'param', 'return', 'var'))){
-          $parts = array();
-
-          if(($pos = strpos($line, ' ')) !== false){
-            $parts[] = substr($line, 0, $pos);
-            $line = ltrim(substr($line, $pos));
-
-            if(($pos = strpos($line, ' ')) !== false){
-
-              // we expect up to 3 elements in 'param' tags
-              if(($tag === 'param') && in_array($line[0], array('&', '$'), true)){
-                $parts[] = substr($line, 0, $pos);
-                $parts[] = ltrim(substr($line, $pos));
-                
-              }else{
-                if($tag === 'param')
-                  $parts[] = '';
-
-                $parts[] = ltrim($line);
-              }
-
-            }else{
-              $parts[] = $line;
-            }
-          
-          }else{
-            $parts[] = $line;            
-          }
-
-          $parts += array_fill(0, ($tag !== 'param') ? 2 : 3, '');
-
-          // maybe we should leave out empty (invalid) entries?
-          if(array_filter($parts)){
-            $tags[$tag][] = $parts;
-            $pointer = &$tags[$tag][count($tags[$tag]) - 1][count($parts) - 1];
-          }  
-
-        // tags that have only one value (eg. 'link', 'license', 'author' ...)
-        }else{
-          $tags[$tag][] = trim($line);
-          $pointer = &$tags[$tag][count($tags[$tag]) - 1];
-        }
-
-        continue;
-      }
-
-      // preserve formatting of tag descriptions, because
-      // in some frameworks (like Lithium) they span across multiple lines
-      if($tag !== null){
-
-        $trimmed = trim($line);
-
-        if($padding !== false){
-          $trimmed = static::strPad($trimmed, static::strLen($line) - $padding, ' ', STR_PAD_LEFT);
-          
-        }else{
-          $padding = static::strLen($line) - static::strLen($trimmed);
-        }  
-
-        $pointer .=  "\n{$trimmed}";
-        continue;
-      }
-      
-      // tag definitions have not started yet;
-      // assume this is title / description text
-      $description .= "\n{$line}";
-    }
-    
-    $description = trim($description);
-
-    // determine the real title and description by splitting the text
-    // at the nearest encountered [dot + space] or [2x new line]
-    if($description !== ''){
-      $stop = min(array_filter(array(static::strLen($description), strpos($description, '. '), strpos($description, "\n\n"))));
-      $title = substr($description, 0, $stop + 1);
-      $description = trim(substr($description, $stop + 1));
-    }
-    
-    $data = compact('title', 'description', 'tags');
-
-    if(!array_filter($data))
-      return null;
-
-    if($key !== null)
-      return isset($data[$key]) ? $data[$key] : null;
-
-    return $data;
+  /**
+   * Escapes variable for HTML output
+   *
+   * @since   1.0
+   * @param   mixed
+   * @return  mixed
+   */
+  protected static function escape($var){
+    return is_array($var) ? array_map('static::escape', $var) : htmlspecialchars($var, ENT_QUOTES);
   }
 
 
@@ -1680,7 +1703,7 @@ class ref{
    * @param    int $currentTime    Optional. Use a custom date instead of the current time returned by the server
    * @return   string              Human readable date string
    */
-  public static function humanTime($time, $currentTime = null){
+  protected static function humanTime($time, $currentTime = null){
 
     $prefix      = '-';
     $time        = (int)$time;
