@@ -23,8 +23,10 @@ window.addEventListener('load', function(){
   }
 
   document.onmousemove = function(evt){
-    rTip.e.style.left = evt.pageX + 'px';
-    rTip.e.style.top = evt.pageY + 'px';
+    if(rTip.e.className.indexOf('visible') < 0)
+      return;
+    rTip.e.style.top = ((document.documentElement.clientHeight - event.clientY) < rTip.e.offsetHeight + 20 ? (event.pageY - rTip.e.offsetHeight) : event.pageY) + 'px';
+    rTip.e.style.left = ((document.documentElement.clientWidth - event.clientX) < rTip.e.offsetWidth + 20 ? (event.pageX - rTip.e.offsetWidth) : event.pageX) + 'px';
   };
 
   ref.parentNode.insertBefore(this.rTip.e, ref.nextSibling);

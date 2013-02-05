@@ -245,7 +245,7 @@
   display: none;  
 }
 
-/* show help cursor when mouse is over a P with a tooltip */
+/* show help cursor when mouse is over an entity with a tooltip */
 .ref .rHasTip{
   cursor: help;
 }
@@ -269,18 +269,18 @@
   border-radius: 2px;        
   margin-right: 5px;
   background-color: #eee;  
+  background-image: -webkit-linear-gradient(top, rgba(255,255,255,0.1) 40%,rgba(0,0,0,0.1) 100%);  
   background-image: -moz-linear-gradient(top, rgba(255,255,255,0.1) 40%, rgba(0,0,0,0.1) 100%);
-  background-image: -webkit-linear-gradient(top, rgba(255,255,255,0.1) 40%,rgba(0,0,0,0.1) 100%);
   background-image: -ms-linear-gradient(top, rgba(255,255,255,0.1) 40%,rgba(0,0,0,0.1) 100%);
   background-image: linear-gradient(to bottom, rgba(255,255,255,0.1) 40%,rgba(0,0,0,0.1) 100%);
 }
 
-/* boolean true value */
+/* boolean true */
 .ref .rTrue{
   background-color: #339900;
 }
 
-/* boolean false value */
+/* boolean false */
 .ref .rFalse{
   background-color: #CC0033;
   color: #fff;
@@ -303,6 +303,7 @@
   color: #999;
 }
 
+/* string matches */
 .ref .rStrMatch{
   background-color: #d78035;
   margin-right: 0;
@@ -355,7 +356,7 @@
   color: #333;
 }
 
-/* tiny bubbles that indicate visibility info */
+/* tiny bubbles that indicate visibility info or class features */
 .ref .rFinal,
 .ref .rAbstract,
 .ref .rProtected,

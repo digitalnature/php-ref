@@ -394,7 +394,7 @@ class ref{
    * Get styles and javascript (only generated for the 1st call)
    *
    * @since   1.0
-   * @param   string
+   * @return  string
    */
   public static function getAssets(){
 
@@ -431,6 +431,119 @@ class ref{
     $didAssets = true;
 
     return $output;
+  }
+
+
+
+  /**
+   * Determines the input expression(s) passed to the shortcut function
+   *
+   * @since   1.0
+   * @param   array &$options   Optional, options to gather (from operators)
+   * @return  array             Array of string expressions
+   */
+  public static function getInputExpressions(array &$options = null){    
+
+    // used to determine the position of the current call,
+    // if more ::build() calls were made on the same line
+    static $lineInst = array();
+
+    // pull only basic info with php 5.3.6+ to save some memory
+    $trace = defined('DEBUG_BACKTRACE_IGNORE_ARGS') ? debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS) : debug_backtrace();
+    
+    while($callee = array_pop($trace)){
+
+      // extract only the information we neeed
+      $calee = array_intersect_key($callee, array_fill_keys(array('file', 'function', 'line'), false));
+      extract($calee);
+
+      // skip, if the called function doesn't match the shortcut function name
+      if(!$function || !preg_grep("/{$function}/i" , static::config('shortcutFunc')))
+        continue;
+
+      if(!$line || !$file)
+        return array();
+    
+      $code     = file($file);
+      $code     = $code[$line - 1]; // multiline expressions not supported!
+      $instIndx = 0;
+      $tokens   = token_get_all("<?php {$code}");
+
+      // locate the caller position in the line, and isolate argument tokens
+      foreach($tokens as $i => $token){
+
+        // match token with our shortcut function name
+        if(is_string($token) || ($token[0] !== T_STRING) || (strcasecmp($token[1], $function) !== 0))
+          continue;
+
+        // is this some method that happens to have the same name as the shortcut function?
+        if(isset($tokens[$i - 1]) && is_array($tokens[$i - 1]) && in_array($tokens[$i - 1][0], array(T_DOUBLE_COLON, T_OBJECT_OPERATOR), true))
+          continue;
+
+        // find argument definition start, just after '('
+        if(isset($tokens[$i + 1]) && ($tokens[$i + 1][0] === '(')){
+          $instIndx++;
+
+          if(!isset($lineInst[$line]))
+            $lineInst[$line] = 0;
+
+          if($instIndx <= $lineInst[$line])
+            continue;
+
+          $lineInst[$line]++;
+
+          // gather options
+          if($options !== null){
+            $j = $i - 1;
+            while(isset($tokens[$j]) && is_string($tokens[$j]) && in_array($tokens[$j], array('@', '+', '-', '!', '~')))
+              $options[] = $tokens[$j--];
+          }  
+         
+          $lvl = $index = $curlies = 0;
+          $expressions = array();
+
+          // get the expressions
+          foreach(array_slice($tokens, $i + 2) as $token){
+
+            if(is_array($token)){
+              $expressions[$index][] = $token[1];
+              continue;
+            }
+
+            if($token === '{')
+              $curlies++;
+
+            if($token === '}')
+              $curlies--;        
+
+            if($token === '(')
+              $lvl++;
+
+            if($token === ')')
+              $lvl--;
+
+            // assume next argument if a comma was encountered,
+            // and we're not insde a curly bracket or inner parentheses
+            if(($curlies < 1) && ($lvl === 0) && ($token === ',')){
+              $index++;
+              continue;
+            }  
+
+            // negative parentheses count means we reached the end of argument definitions
+            if($lvl < 0){         
+              foreach($expressions as &$expression)
+                $expression = trim(implode('', $expression));
+
+              return $expressions;
+            }
+
+            $expressions[$index][] = $token;      
+          }
+
+          break;
+        }    
+      }     
+    }
   }
 
 
@@ -703,8 +816,10 @@ class ref{
         $info[] = (($perms & 0x0004) ? 'r' : '-');
         $info[] = (($perms & 0x0002) ? 'w' : '-');
         $info[] = (($perms & 0x0001) ? (($perms & 0x0200) ? 't' : 'x' ) : (($perms & 0x0200) ? 'T' : '-'));
+
+        $size = is_dir($subject) ? '' : sprintf(' %.2fK', $file->getSize() / 1024);
         
-        $matches[] = $this->entity('strMatch', 'file') . ' ' . implode('', $info) . ' ' . sprintf('%.2fK', $file->getSize() / 1024);
+        $matches[] = $this->entity('strMatch', 'file') . ' ' . implode('', $info) . $size;
       }  
 
       // class name?
@@ -1531,119 +1646,6 @@ class ref{
         return implode('', $modifiers);
 
     } 
-  }
-
-
-
-  /**
-   * Determines the input expression(s) passed to the shortcut function
-   *
-   * @since   1.0
-   * @param   array &$options   Optional, options to gather (from operators)
-   * @return  array             Array of string expressions
-   */
-  public static function getInputExpressions(array &$options = null){    
-
-    // used to determine the position of the current call,
-    // if more ::build() calls were made on the same line
-    static $lineInst = array();
-
-    // pull only basic info with php 5.3.6+ to save some memory
-    $trace = defined('DEBUG_BACKTRACE_IGNORE_ARGS') ? debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS) : debug_backtrace();
-    
-    while($callee = array_pop($trace)){
-
-      // extract only the information we neeed
-      $calee = array_intersect_key($callee, array_fill_keys(array('file', 'function', 'line'), false));
-      extract($calee);
-
-      // skip, if the called function doesn't match the shortcut function name
-      if(!$function || !preg_grep("/{$function}/i" , static::config('shortcutFunc')))
-        continue;
-
-      if(!$line || !$file)
-        return array();
-    
-      $code     = file($file);
-      $code     = $code[$line - 1]; // multiline expressions not supported!
-      $instIndx = 0;
-      $tokens   = token_get_all("<?php {$code}");
-
-      // locate the caller position in the line, and isolate argument tokens
-      foreach($tokens as $i => $token){
-
-        // match token with our shortcut function name
-        if(is_string($token) || ($token[0] !== T_STRING) || (strcasecmp($token[1], $function) !== 0))
-          continue;
-
-        // is this some method that happens to have the same name as the shortcut function?
-        if(isset($tokens[$i - 1]) && is_array($tokens[$i - 1]) && in_array($tokens[$i - 1][0], array(T_DOUBLE_COLON, T_OBJECT_OPERATOR), true))
-          continue;
-
-        // find argument definition start, just after '('
-        if(isset($tokens[$i + 1]) && ($tokens[$i + 1][0] === '(')){
-          $instIndx++;
-
-          if(!isset($lineInst[$line]))
-            $lineInst[$line] = 0;
-
-          if($instIndx <= $lineInst[$line])
-            continue;
-
-          $lineInst[$line]++;
-
-          // gather options
-          if($options !== null){
-            $j = $i - 1;
-            while(isset($tokens[$j]) && is_string($tokens[$j]) && in_array($tokens[$j], array('@', '+', '-', '!', '~')))
-              $options[] = $tokens[$j--];
-          }  
-         
-          $lvl = $index = $curlies = 0;
-          $expressions = array();
-
-          // get the expressions
-          foreach(array_slice($tokens, $i + 2) as $token){
-
-            if(is_array($token)){
-              $expressions[$index][] = $token[1];
-              continue;
-            }
-
-            if($token === '{')
-              $curlies++;
-
-            if($token === '}')
-              $curlies--;        
-
-            if($token === '(')
-              $lvl++;
-
-            if($token === ')')
-              $lvl--;
-
-            // assume next argument if a comma was encountered,
-            // and we're not insde a curly bracket or inner parentheses
-            if(($curlies < 1) && ($lvl === 0) && ($token === ',')){
-              $index++;
-              continue;
-            }  
-
-            // negative parentheses count means we reached the end of argument definitions
-            if($lvl < 0){         
-              foreach($expressions as &$expression)
-                $expression = trim(implode('', $expression));
-
-              return $expressions;
-            }
-
-            $expressions[$index][] = $token;      
-          }
-
-          break;
-        }    
-      }     
-    }
   }
 
 
