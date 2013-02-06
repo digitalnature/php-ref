@@ -48,7 +48,6 @@
   display: none;  
   position: absolute;
   z-index: 101;  
-  margin: 10px 0 0 15px;  
   font-size: 11px;
   white-space: pre;  
   text-align: left;  
@@ -59,10 +58,20 @@
   border: 0;  
   border-radius: 4px;
   box-shadow:0 0 4px rgba(0,0,0, 0.25);  
+  -webkit-transition: opacity .25s, margin .25s;
+     -moz-transition: opacity .25s, margin .25s;
+      -ie-transition: opacity .25s, margin .25s;
+          transition: opacity .25s, margin .25s;
 }
 
 #rTip.visible{
   display: block;
+  margin: 10px 0 0 15px;  
+}
+
+#rTip.visible.fadingOut{
+  opacity: 0;
+  margin: 20px 0 0 25px;
 }
 
 #rTip > i{
