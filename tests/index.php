@@ -1,6 +1,5 @@
 <?php
 
-
   if(isset($_GET['mode'])){
 
   	$htmlMode = ($_GET['mode'] !== 'text');
@@ -26,7 +25,7 @@
 		}
 
 		$array = array(
-		  'hèllo world'                       => '( ͡° ͜ʖ ͡°)',		  
+		  'hèllo world'                       => '(͡°͜ʖ͡°)',		  
 		  'empty string'                      => '',
 		  'multi'                             => array(1, 2, 3, array(4, 5, 6), 'FUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUU'),  
 		  'matching class'                    => 'DateTime',

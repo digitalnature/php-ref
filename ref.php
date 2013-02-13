@@ -91,16 +91,24 @@ function rt(){
  * REF is a nicer alternative to PHP's print_r() / var_dump().
  *
  * @version  1.0
- * @author   digitalnature, http://digitalnature.eu
+ * @author   digitalnature - http://digitalnature.eu
  */
 class ref{
 
   protected static
   
-    // cpu time used
+    /**
+     * CPU time used for processing
+     *
+     * @var  array
+     */   
     $time   = 0,
 
-    // configuration (and default values)
+    /**
+     * Configuration (+ default values)
+     *
+     * @var  array
+     */     
     $config = array(
 
                 // initial expand depth (for HTML mode only)
@@ -126,26 +134,40 @@ class ref{
 
   protected
 
-    // temporary element (marker) for arrays, used to track recursions
-    $arrayMarker  = null,
+    /**
+     * Tracks current nesting level
+     *
+     * @var  int
+     */  
+    $level      = 0,
 
-    // tracks objects to detect recursion
-    $objectHashes = array(),
+    /**
+     * Max. expand depth of this instance
+     *
+     * @var  int
+     */     
+    $depth      = 1,
 
-    // current nesting level
-    $level        = 0,
+    /**
+     * Output format of this instance
+     *
+     * @var  string
+     */     
+    $format     = null,
 
-    // max. expand depth
-    $depth        = 1,
+    /**
+     * Queried variable
+     *
+     * @var  mixed
+     */     
+    $subject    = null,
 
-    // output format
-    $format       = null,
-
-    // queried variable
-    $subject      = null,
-
-    // source expression
-    $expression   = null;
+    /**
+     * Source expression
+     *
+     * @var  string|null
+     */      
+    $expression = null;
 
 
 
@@ -633,8 +655,8 @@ class ref{
    * Builds a report with information about $subject
    *
    * @since   1.0
-   * @param   mixed $subject       Variable to query   
-   * @return  string               Result
+   * @param   mixed $subject   Variable to query   
+   * @return  mixed            Result (both HTML and text modes generate strings)
    */
   protected function formatSubject(&$subject){
   
@@ -887,15 +909,18 @@ class ref{
       if(empty($subject))      
         return $this->entity('array', 'array') . $this->group();
 
+      // temporary element (marker) for arrays, used to track recursions
+      static $arrayMarker = null;
+
       // set a marker to detect recursion
-      if(!$this->arrayMarker)
-        $this->arrayMarker = uniqid('', true);
+      if(!$arrayMarker)
+        $arrayMarker = uniqid('', true);
 
       // if our marker element is present in the array it means that we were here before
-      if(isset($subject[$this->arrayMarker]))
+      if(isset($subject[$arrayMarker]))
         return $this->entity('array', 'array') . $this->group('Recursion');
 
-      $subject[$this->arrayMarker] = true;
+      $subject[$arrayMarker] = true;
 
       // note that we must substract the marker element
       $itemCount = count($subject) - 1;
@@ -911,7 +936,7 @@ class ref{
       foreach($subject as $key => &$value){
 
         // ignore our marker
-        if($key === $this->arrayMarker)
+        if($key === $arrayMarker)
           continue;
 
         $keyInfo = gettype($key);
@@ -933,7 +958,7 @@ class ref{
 
       // remove our temporary marker;
       // not really required, because ::build() doesn't take references, but we want to be nice :P
-      unset($subject[$this->arrayMarker]);
+      unset($subject[$arrayMarker]);
 
       $group = $this->entity('array', 'array') . $this->group($itemCount, $this->section($items));
       $this->level--;
@@ -942,15 +967,18 @@ class ref{
     }
 
     // if we reached this point, $subject must be an object     
-    $objectName = $this->formatClassString($subject);
+    $objectName = $this->formatClassString($subject);    
     $objectHash = spl_object_hash($subject);
 
+    // tracks objects to detect recursion
+    static $objectHashes = array();
+
     // already been here?
-    if(in_array($objectHash, $this->objectHashes))
+    if(in_array($objectHash, $objectHashes))
       return $this->entity('object', "{$objectName} object") . $this->group('Recursion');
 
     // track hash
-    $this->objectHashes[] = $objectHash;
+    $objectHashes[] = $objectHash;
 
     // again, because reflectionObjects can't be cloned apparently :)
     $reflector = new \ReflectionObject($subject);    
@@ -964,8 +992,10 @@ class ref{
     $internalParents = static::getParentClasses($reflector, true);
 
     // no data to display?
-    if(!$props && !$methods && !$constants && !$interfaces && !$traits)
+    if(!$props && !$methods && !$constants && !$interfaces && !$traits){
+      $objectHashes = array();
       return $this->entity('object', "{$objectName} object") . $this->group();
+    }
 
     $output = '';
     $this->level++;
@@ -1155,6 +1185,7 @@ class ref{
 
     $group = $this->entity('object', "{$objectName} object") . $this->group('', $output);
     $this->level--;
+    $objectHashes = array();
 
     return $group;
   }
@@ -1265,8 +1296,8 @@ class ref{
    * Creates a group section
    *
    * @since   1.0
-   * @param   array|splFixedArray $items    Array or SplFixedArray instance containing rows and columns (columns as arrays)
-   * @param   string $title                 Section title, optional
+   * @param   array|Iterator $items    Array or SplFixedArray instance containing rows and columns (columns as arrays)
+   * @param   string $title            Section title, optional
    * @return  string
    */
   protected function section($items, $title = ''){
@@ -1486,10 +1517,12 @@ class ref{
    *
    * @since   1.0
    * @param   string $prefix
-   * @param   string $toggledText
+   * @param   string $content
    * @return  string
    */
   protected function group($prefix = '', $content = ''){
+
+    static $groupId = 0;
 
     switch($this->format){
 
@@ -1498,7 +1531,7 @@ class ref{
 
         if($content !== ''){
           $checked  = ($this->depth < 0) || (($this->depth > 0) && ($this->level <= $this->depth)) ? 'checked="checked"' : '';
-          $content  = sprintf('<input type="checkbox" id="%1$s" %2$s/><label for="%1$s"></label><div>%3$s</div>', uniqid('x', true), $checked, $content);
+          $content  = sprintf('<input type="checkbox" id="refGrp%1$s" %2$s/><label for="refGrp%1$s"></label><div>%3$s</div>', $groupId++, $checked, $content);
         }  
 
         if($prefix !== '')
@@ -1688,7 +1721,7 @@ class ref{
    * Escapes variable for HTML output
    *
    * @since   1.0
-   * @param   mixed
+   * @param   mixed $var
    * @return  mixed
    */
   protected static function escape($var){
