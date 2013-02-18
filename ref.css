@@ -197,7 +197,7 @@
 /* hide next element when checkbox is not checked */
 .ref input ~ label + div{
   display: none;
-  overflow: auto;
+  overflow: auto;      
 }
 
 /* show it when checkbox is checked */

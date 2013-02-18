@@ -1,6 +1,6 @@
 window.addEventListener('load', function(){
 
-  var tip  = document.createElement('div'),      
+  var tip  = document.createElement('div'),
       refs = document.querySelectorAll('.ref'),
       nfos = document.querySelectorAll('.ref .rHasTip');
 
@@ -16,15 +16,14 @@ window.addEventListener('load', function(){
     nfos[i].onmouseover = function(){ 
       tip.className = 'ref visible';      
       tip.innerHTML = this.getElementsByTagName('q')[0].innerHTML;
-      clearTimeout(tip.fadeOut);
+      window.clearTimeout(tip.fadeOut);
     };
     nfos[i].onmouseout = function(){
       tip.className = 'ref visible fadingOut';
-      tip.fadeOut = setTimeout(function(){
+      tip.fadeOut = window.setTimeout(function(){
         tip.innerHTML = '';
         tip.className = '';
-      }, 250);
-    
+      }, 250);    
     };  
   }
 
