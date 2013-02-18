@@ -779,7 +779,7 @@ class ref{
       $length   = static::strLen($subject);
       $alpha    = ctype_alpha($subject);
 
-      $info = ($encoding !== 'ASCII') ? $length . '; ' . $encoding : $length;
+      $info = $encoding && ($encoding !== 'ASCII') ? $length . '; ' . $encoding : $length;
       $info = 'string(' . $info . ')';
 
       $string = $this->entity('string', $subject, $info);
@@ -1601,7 +1601,8 @@ class ref{
     // class property
     }elseif($data instanceof \ReflectionProperty){
 
-      $comments = static::parseComment($data->getDocComment());
+      // weird memory leak in ReflectionProperty::getDocComment() ?
+      $comments = $data->getDeclaringClass()->isInternal() ? false : static::parseComment($data->getDocComment());
 
       if($comments){
         $text = $comments['title'];
@@ -1610,7 +1611,7 @@ class ref{
         // note that we need to make the left meta area have the same height as the content
         if(isset($comments['tags']['var'][0]))
           $leftMeta = $comments['tags']['var'][0][0] . str_repeat("\n", substr_count(implode("\n", array_filter(array($text, $desc))), "\n") + 1);
-      }  
+      }
     
     // function parameter
     }elseif($data instanceof \ReflectionParameter){
