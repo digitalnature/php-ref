@@ -974,11 +974,11 @@ class ref{
     static $objectHashes = array();
 
     // already been here?
-    if(in_array($objectHash, $objectHashes))
+    if(isset($objectHashes[$objectHash]))
       return $this->entity('object', "{$objectName} object") . $this->group('Recursion');
 
     // track hash
-    $objectHashes[] = $objectHash;
+    $objectHashes[$objectHash] = 1;
 
     // again, because reflectionObjects can't be cloned apparently :)
     $reflector = new \ReflectionObject($subject);    
@@ -992,8 +992,8 @@ class ref{
     $internalParents = static::getParentClasses($reflector, true);
 
     // no data to display?
-    if(!$props && !$methods && !$constants && !$interfaces && !$traits){
-      $objectHashes = array();
+    if(!$props && !$methods && !$constants && !$interfaces && !$traits){      
+      unset($objectHashes[$objectHash]);
       return $this->entity('object', "{$objectName} object") . $this->group();
     }
 
@@ -1184,8 +1184,9 @@ class ref{
     }
 
     $group = $this->entity('object', "{$objectName} object") . $this->group('', $output);
+
     $this->level--;
-    $objectHashes = array();
+    unset($objectHashes[$objectHash]);
 
     return $group;
   }
