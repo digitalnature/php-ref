@@ -290,9 +290,9 @@
   background-image: linear-gradient(to bottom, rgba(255,255,255,0.1) 40%,rgba(0,0,0,0.1) 100%);
 }
 
-/* regular expression */
+/* regular expression (colors partially match RegexBuddy and RegexPal) */
 .ref .rStrRegex{
-  background: #ddd;
+  background: #e6e6e6;
   padding: 0 2px;
   border-radius: 2px;
 }
@@ -302,16 +302,53 @@
   text-shadow: none;
 }
 
-/* regexpal colors */
-.ref .rStrRegex b    {background: #aad1f7;} /* metasequence */
-.ref .rStrRegex i    {background: #f9ca69;} /* char class */
-.ref .rStrRegex i b  {background: #f7a700;} /* char class: metasequence */
-.ref .rStrRegex i u  {background: #efba4a;} /* char class: range-hyphen */
-.ref .rStrRegex b.g1 {background: #d2f854;} /* group: depth 1 */
-.ref .rStrRegex b.g2 {background: #9ec70c;} /* group: depth 2 */
-.ref .rStrRegex b.g3 {background: #ecc9f7;} /* group: depth 3 */
-.ref .rStrRegex b.g4 {background: #54b70b;} /* group: depth 4 */
-.ref .rStrRegex b.g5 {background: #b688cf;} /* group: depth 5 */
+
+/* char class */
+.ref .rStrRegex i{
+  background: #ffc080;
+  color: #694c07;
+}
+
+.ref .rStrRegex i i{background: #e0a060;} /* char class: metasequence */
+.ref .rStrRegex i u{background: #ffcf9b;} /* char class: range-hyphen */
+
+/* metasequence */
+.ref .rStrRegex b{
+  background: #80c0ff;
+  color: #105f8c;
+} 
+
+/* group: depth 1 */
+.ref .rStrRegex .g1{
+  background: #00c000;
+  color: #fff;
+}
+
+/* group: depth 2 */
+.ref .rStrRegex .g2{
+  background: #c3e86c;
+  color: #648c1c;
+}
+
+/* group: depth 3 */
+.ref .rStrRegex .g3{
+  background: #008000;
+  color: #fff;
+}
+
+/* group: depth 4 */
+.ref .rStrRegex .g4{
+  background: #6dcb99;
+  color: #fff;
+}
+
+/* group: depth 5 */
+.ref .rStrRegex .g5{
+  background: #00ff00;
+  color: #2c8e24;
+}
+
+
 
 /* boolean true */
 .ref .rTrue{

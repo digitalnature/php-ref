@@ -901,10 +901,10 @@ class ref{
 
         // attempt to match a regex
         try{
-          $regex = $this->colorizeRegex($subject);
+          $regexEntity = $this->colorizeRegex($subject);
 
-          if($regex)
-            $matches[] = $this->entity('strMatch', 'regex') . ' ' . $this->entity('strRegex', $regex);
+          if($regexEntity)
+            $matches[] = $this->entity('strMatch', 'regex') . ' ' . $regexEntity;
 
         }catch(\Exception $e){}
 
@@ -1882,7 +1882,7 @@ class ref{
               throw new \Exception('Incomplete regex token');
 
             if(preg_match('/^\\\\[dsw]$/i', $cm)) {
-              $output         .= sprintf('<b>%s</b>', $cm);
+              $output         .= sprintf('<i>%s</i>', $cm);
               $cLastRangeable  = ($cLastType !== 1);
               $cLastType       = 2;
 
@@ -1890,7 +1890,7 @@ class ref{
               throw new \Exception('Incomplete regex token');
               
             }else{
-              $output         .= sprintf('<b>%s</b>', htmlspecialchars($cm, ENT_QUOTES));
+              $output         .= sprintf('<i>%s</i>', static::escape($cm));
               $cLastRangeable  = $cLastType !== 1;
               $lastCC          = $getTokenCharCode($cm);
             }
@@ -1919,7 +1919,7 @@ class ref{
             }
 
           }else{
-            $output         .= htmlspecialchars($cm, ENT_QUOTES);
+            $output         .= static::escape($cm);
             $cLastRangeable  = strlen($cm) > 1 || ($cLastType !== 1);
             $lastCC          = $cm[strlen($cm) - 1];
           }
@@ -1982,13 +1982,13 @@ class ref{
             throw new \Exception('Incomplete regex token');
 
           $output      .= '<b>' . $m . '</b>';
-          $lastIsQuant  = strpos('bB', $m[1]) === false;
+          $lastIsQuant  = (strpos('bB', $m[1]) === false);
 
         }elseif($m === '\\'){
           throw new \Exception('Incomplete regex token');
             
         }else{
-          $output      .= htmlspecialchars($m, ENT_QUOTES);
+          $output      .= static::escape($m);
           $lastIsQuant  = true;
         }
 
@@ -1998,10 +1998,10 @@ class ref{
 
         preg_match('/^\{([0-9]+)(?:,([0-9]*))?/', $m, $interval);
 
-        if($interval && (+$interval[1] > 65535 || ($interval[2] && +$interval[2] > 65535)))
+        if($interval && (+$interval[1] > 65535 || (isset($interval[2]) && (+$interval[2] > 65535))))
           throw new \Exception('Interval quantifier cannot use value over 65,535');
         
-        if($interval && $interval[2] && (+$interval[1] > +$interval[2]))
+        if($interval && isset($interval[2]) && (+$interval[1] > +$interval[2]))
           throw new \Exception('Interval quantifier range is reversed');
         
         $output      .= ($lastStyle ? '<b class="' . $lastStyle . '">' : '<b>') . $m . '</b>';    
@@ -2026,7 +2026,7 @@ class ref{
         $lastIsQuant  = true;
    
       }else{
-        $output      .= htmlspecialchars($m, ENT_QUOTES);
+        $output      .= static::escape($m);
         $lastIsQuant  = true;
       }
 
@@ -2037,7 +2037,7 @@ class ref{
     if($openGroups)
       throw new \Exception('Unclosed grouping');
 
-    return $output;
+    return $this->entity('strRegex', $output, sprintf('Capturing groups: %d', $capturingGroupCount));
   }  
 
 }
