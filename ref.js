@@ -30,3 +30,17 @@ window.addEventListener('load', function(){
   tip.id = 'rTip';
   document.body.appendChild(tip);
 });
+
+window.addEventListener('keydown', function(ev){
+  if(ev.keyCode != 88)
+    return;
+
+  ev.preventDefault();
+
+  var haveChecked = !!document.querySelector('.ref input[type="checkbox"]:checked'),
+      inputs = document.querySelectorAll('.ref input[type="checkbox"]');
+
+  for(var i = 0, max = inputs.length; i < max; i++)
+    inputs[i].checked = !haveChecked;
+
+});

@@ -655,10 +655,11 @@ class ref{
    * Builds a report with information about $subject
    *
    * @since   1.0
-   * @param   mixed $subject   Variable to query   
-   * @return  mixed            Result (both HTML and text modes generate strings)
+   * @param   mixed $subject          Variable to query   
+   * @param   bool $skipStringChecks  Skip advanced string checks
+   * @return  mixed                   Result (both HTML and text modes generate strings)
    */
-  protected function formatSubject(&$subject){
+  protected function formatSubject(&$subject, $skipStringChecks = false){
   
     // null value
     if(is_null($subject))
@@ -783,121 +784,133 @@ class ref{
       $info = 'string(' . $info . ')';
 
       $string = $this->entity('string', $subject, $info);
-      $matches = array();
 
-      // file?
-      if(file_exists($subject)){
+      if(!$skipStringChecks){
+        $matches = array();
 
-        $file  = new \SplFileInfo($subject);
-        $info  = array();
-        $perms = $file->getPerms();
+        // file?
+        if(file_exists($subject)){
 
-        // socket
-        if(($perms & 0xC000) === 0xC000)
-          $info[] = 's';
+          $file  = new \SplFileInfo($subject);
+          $info  = array();
+          $perms = $file->getPerms();
 
-        // symlink        
-        elseif(($perms & 0xA000) === 0xA000)
-          $info[] = 'l';
+          // socket
+          if(($perms & 0xC000) === 0xC000)
+            $info[] = 's';
 
-        // regular
-        elseif(($perms & 0x8000) === 0x8000)
-          $info[] = '-';
+          // symlink        
+          elseif(($perms & 0xA000) === 0xA000)
+            $info[] = 'l';
 
-        // block special
-        elseif(($perms & 0x6000) === 0x6000)
-          $info[] = 'b';
+          // regular
+          elseif(($perms & 0x8000) === 0x8000)
+            $info[] = '-';
 
-        // directory
-        elseif(($perms & 0x4000) === 0x4000)
-          $info[] = 'd';
+          // block special
+          elseif(($perms & 0x6000) === 0x6000)
+            $info[] = 'b';
 
-        // character special
-        elseif(($perms & 0x2000) === 0x2000)          
-          $info[] = 'c';
+          // directory
+          elseif(($perms & 0x4000) === 0x4000)
+            $info[] = 'd';
 
-        // FIFO pipe
-        elseif(($perms & 0x1000) === 0x1000)          
-          $info[] = 'p';
+          // character special
+          elseif(($perms & 0x2000) === 0x2000)          
+            $info[] = 'c';
 
-        // unknown
-        else          
-          $info[] = 'u';        
+          // FIFO pipe
+          elseif(($perms & 0x1000) === 0x1000)          
+            $info[] = 'p';
 
-        // owner
-        $info[] = (($perms & 0x0100) ? 'r' : '-');
-        $info[] = (($perms & 0x0080) ? 'w' : '-');
-        $info[] = (($perms & 0x0040) ? (($perms & 0x0800) ? 's' : 'x' ) : (($perms & 0x0800) ? 'S' : '-'));
+          // unknown
+          else          
+            $info[] = 'u';        
 
-        // group
-        $info[] = (($perms & 0x0020) ? 'r' : '-');
-        $info[] = (($perms & 0x0010) ? 'w' : '-');
-        $info[] = (($perms & 0x0008) ? (($perms & 0x0400) ? 's' : 'x' ) : (($perms & 0x0400) ? 'S' : '-'));
+          // owner
+          $info[] = (($perms & 0x0100) ? 'r' : '-');
+          $info[] = (($perms & 0x0080) ? 'w' : '-');
+          $info[] = (($perms & 0x0040) ? (($perms & 0x0800) ? 's' : 'x' ) : (($perms & 0x0800) ? 'S' : '-'));
 
-        // world
-        $info[] = (($perms & 0x0004) ? 'r' : '-');
-        $info[] = (($perms & 0x0002) ? 'w' : '-');
-        $info[] = (($perms & 0x0001) ? (($perms & 0x0200) ? 't' : 'x' ) : (($perms & 0x0200) ? 'T' : '-'));
+          // group
+          $info[] = (($perms & 0x0020) ? 'r' : '-');
+          $info[] = (($perms & 0x0010) ? 'w' : '-');
+          $info[] = (($perms & 0x0008) ? (($perms & 0x0400) ? 's' : 'x' ) : (($perms & 0x0400) ? 'S' : '-'));
 
-        $size = is_dir($subject) ? '' : sprintf(' %.2fK', $file->getSize() / 1024);
-        
-        $matches[] = $this->entity('strMatch', 'file') . ' ' . implode('', $info) . $size;
-      }  
+          // world
+          $info[] = (($perms & 0x0004) ? 'r' : '-');
+          $info[] = (($perms & 0x0002) ? 'w' : '-');
+          $info[] = (($perms & 0x0001) ? (($perms & 0x0200) ? 't' : 'x' ) : (($perms & 0x0200) ? 'T' : '-'));
 
-      // class name?
-      if(class_exists($subject, false))
-        $matches[] = $this->entity('strMatch', 'class') . ' ' . $this->formatClassString($subject);
-
-      if(interface_exists($subject, false))
-        $matches[] = $this->entity('strMatch', 'interface') . ' ' . $this->formatClassString($subject);
-
-      // class name?
-      if(function_exists($subject))
-        $matches[] = $this->entity('strMatch', 'function') . ' ' . $this->formatFunctionString($subject);      
-
-      // skip more advanced checks if the string appears to be numeric,
-      // or if it's shorter than 5 characters
-      if(!is_numeric($subject) && ($length > 4)){
-
-        // date?
-        if($length > 4){
-          $date = date_parse($subject);
-          if(($date !== false) && empty($date['errors']))
-            $matches[] = $this->entity('strMatch', 'date') . ' ' . static::humanTime(@strtotime($subject));
+          $size = is_dir($subject) ? '' : sprintf(' %.2fK', $file->getSize() / 1024);
+          
+          $matches[] = $this->entity('strMatch', 'file') . ' ' . implode('', $info) . $size;
         }
 
-        // attempt to detect if this is a serialized string     
-        static $unserializing = false;      
+        // class name?
+        if(class_exists($subject, false))
+          $matches[] = $this->entity('strMatch', 'class') . ' ' . $this->formatClassString($subject);
 
-        if(!$unserializing && in_array($subject[0], array('s', 'a', 'O'), true)){
-          $unserializing = true;
-          if(($subject[$length - 1] === ';') || ($subject[$length - 1] === '}'))
-            if((($subject[0] === 's') && ($subject[$length - 2] !== '"')) || preg_match("/^{$subject[0]}:[0-9]+:/s", $subject))
-              if(($unserialized = @unserialize($subject)) !== false)
-                $matches[] = $this->entity('strMatch', 'unserialized:') . ' ' . $this->formatSubject($unserialized);
+        if(interface_exists($subject, false))
+          $matches[] = $this->entity('strMatch', 'interface') . ' ' . $this->formatClassString($subject);
 
-          $unserializing = false;
+        // class name?
+        if(function_exists($subject))
+          $matches[] = $this->entity('strMatch', 'function') . ' ' . $this->formatFunctionString($subject);      
 
-        }else{
+        // skip more advanced checks if the string appears to be numeric,
+        // or if it's shorter than 5 characters
+        if(!is_numeric($subject) && ($length > 4)){
 
-          // try to find out if it's a json-encoded string;
-          // only do this for json-encoded arrays or objects, because other types have too generic formats
-          static $decodingJson = false;
+          // date?
+          if($length > 4){
+            $date = date_parse($subject);
+            if(($date !== false) && empty($date['errors']))
+              $matches[] = $this->entity('strMatch', 'date') . ' ' . static::humanTime(@strtotime($subject));
+          }
 
-          if(!$decodingJson && in_array($subject[0], array('{', '['), true)){     
-            $decodingJson = true;
-            $json = json_decode($subject);
+          // attempt to detect if this is a serialized string     
+          static $unserializing = false;      
 
-            if(json_last_error() === JSON_ERROR_NONE)
-              $matches[] = $this->entity('strMatch', 'json.decoded') . ' ' . $this->formatSubject($json);
+          if(!$unserializing && in_array($subject[0], array('s', 'a', 'O'), true)){
+            $unserializing = true;
+            if(($subject[$length - 1] === ';') || ($subject[$length - 1] === '}'))
+              if((($subject[0] === 's') && ($subject[$length - 2] !== '"')) || preg_match("/^{$subject[0]}:[0-9]+:/s", $subject))
+                if(($unserialized = @unserialize($subject)) !== false)
+                  $matches[] = $this->entity('strMatch', 'unserialized:') . ' ' . $this->formatSubject($unserialized);
 
-            $decodingJson = false;
+            unset($unserializing);
+
+          }else{
+
+            // try to find out if it's a json-encoded string;
+            // only do this for json-encoded arrays or objects, because other types have too generic formats
+            static $decodingJson = false;
+
+            if(!$decodingJson && in_array($subject[0], array('{', '['), true)){     
+              $decodingJson = true;
+              $json = json_decode($subject);
+
+              if(json_last_error() === JSON_ERROR_NONE)
+                $matches[] = $this->entity('strMatch', 'json.decoded') . ' ' . $this->formatSubject($json);
+
+              unset($decodingJson);
+            }
           }
         }
-      }
 
-      if($matches)
-        $string = $string . $this->entity('sep', "\n") . implode($this->entity('sep', "\n"), $matches);
+        // attempt to match a regex
+        try{
+          $regex = $this->colorizeRegex($subject);
+
+          if($regex)
+            $matches[] = $this->entity('strMatch', 'regex') . ' ' . $this->entity('strRegex', $regex);
+
+        }catch(\Exception $e){}
+
+        if($matches)
+          $string = $string . $this->entity('sep', "\n") . implode($this->entity('sep', "\n"), $matches);
+      }
 
       return $string;
     }    
@@ -907,7 +920,7 @@ class ref{
 
       // empty array?
       if(empty($subject))      
-        return $this->entity('array', 'array') . $this->group();
+        return $this->entity('array') . $this->group();
 
       // temporary element (marker) for arrays, used to track recursions
       static $arrayMarker = null;
@@ -918,7 +931,7 @@ class ref{
 
       // if our marker element is present in the array it means that we were here before
       if(isset($subject[$arrayMarker]))
-        return $this->entity('array', 'array') . $this->group('Recursion');
+        return $this->entity('array') . $this->group('Recursion');
 
       $subject[$arrayMarker] = true;
 
@@ -960,7 +973,7 @@ class ref{
       // not really required, because ::build() doesn't take references, but we want to be nice :P
       unset($subject[$arrayMarker]);
 
-      $group = $this->entity('array', 'array') . $this->group($itemCount, $this->section($items));
+      $group = $this->entity('array') . $this->group($itemCount, $this->section($items));
       $this->level--;
 
       return $group;
@@ -1130,7 +1143,7 @@ class ref{
             $paramValue = $parameter->isDefaultValueAvailable() ? $parameter->getDefaultValue() : null;            
             $paramName  = $this->entity('param', $paramName, $parameter);
             $paramName .= $this->entity('sep', ' = ');
-            $paramName .= $this->entity('paramValue', $this->formatSubject($paramValue));
+            $paramName .= $this->entity('paramValue', $this->formatSubject($paramValue, true));
 
             if($paramHint)
               $paramName = $paramHint . ' ' . $paramName;
@@ -1472,29 +1485,19 @@ class ref{
     if($text === null)
       $text = $class;
 
-    // we can't show all tip content in text-mode
+    // format text-mode output to match var_dump()
     if($this->format !== 'html'){
+      $formatMap = array(
+        'string'   => '%1$s "%2$s"',
+        'strMatch' => '~~ %2$s',
+        'integer'  => 'int(%2$s)',
+        'double'   => 'double(%2$s)',
+        'true'     => 'bool(%2$s)',
+        'false'    => 'bool(%2$s)',
+        'key'      => '[%2$s]',
+      );
 
-      switch($class){
-
-        case 'string':
-          return $this->tip($tip) . ' "' . $text . '"';
-
-        case 'strMatch':        
-          return '~' . $text . ':';
-
-        case 'integer':
-        case 'double':
-        case 'true':
-        case 'false':
-          return $this->tip($tip) . '(' . $text . ')';
-
-        case 'key':
-          return '[' . $text . ']';
-
-      }
-
-      return $text;
+      return isset($formatMap[$class]) ? sprintf($formatMap[$class], $this->tip($tip), $text) : $text;
     }
 
     // escape text that is known to contain html entities
@@ -1543,8 +1546,10 @@ class ref{
       // text-only output
       default:
 
-        if($content !== '')
+        if($content !== ''){
           $content =  $content . "\n";
+          $prefix .= ' ▼';
+        }  
 
         return '(' . $prefix . $content . ')';
       
@@ -1771,6 +1776,268 @@ class ref{
         break;
 
     return $prefix . $count . $unit;
+  }  
+
+
+
+  /**
+   * Highlights regex syntax.
+   * 
+   * Based on "Regex Colorizer" by Steven Levithan (this is a translation from javascript)
+   *
+   * @link     https://github.com/slevithan/regex-colorizer
+   * @link     https://github.com/symfony/Finder/blob/master/Expression/Regex.php#L64-74
+   * @param    string $pattern
+   * @return   string
+   */
+  public function colorizeRegex($pattern){
+
+    if($this->format !== 'html')
+      return '';
+
+    // detection attempt code from the Symfony Finder component
+    $maybeValid = false;
+    if(preg_match('/^(.{3,}?)([imsxuADU]*)$/', $pattern, $m)) {
+      $start = substr($m[1], 0, 1);
+      $end   = substr($m[1], -1);
+
+      if(($start === $end && !preg_match('/[*?[:alnum:] \\\\]/', $start)) || ($start === '{' && $end === '}'))
+        $maybeValid = true;
+    }
+
+    if(!$maybeValid)
+      throw new \Exception('Pattern does not appear to be a valid PHP regex');
+
+    $output              = '';
+    $capturingGroupCount = 0;
+    $groupStyleDepth     = 0;
+    $openGroups          = array();
+    $lastIsQuant         = false;
+    $lastType            = 1;      // 1 = none; 2 = alternator
+    $lastStyle           = null;
+
+    preg_match_all('/\[\^?]?(?:[^\\\\\]]+|\\\\[\S\s]?)*]?|\\\\(?:0(?:[0-3][0-7]{0,2}|[4-7][0-7]?)?|[1-9][0-9]*|x[0-9A-Fa-f]{2}|u[0-9A-Fa-f]{4}|c[A-Za-z]|[\S\s]?)|\((?:\?[:=!]?)?|(?:[?*+]|\{[0-9]+(?:,[0-9]*)?\})\??|[^.?*+^${[()|\\\\]+|./', $pattern, $matches);
+
+    $matches = $matches[0];
+
+    $getTokenCharCode = function($token){
+      if(strlen($token) > 1 && $token[0] === '\\'){
+        $t1 = substr($token, 1);
+
+        if(preg_match('/^c[A-Za-z]$/', $t1))
+          return strpos("ABCDEFGHIJKLMNOPQRSTUVWXYZ", strtoupper($t1[1])) + 1;
+
+        if(preg_match('/^(?:x[0-9A-Fa-f]{2}|u[0-9A-Fa-f]{4})$/', $t1))
+          return intval(substr($t1, 1), 16);
+
+        if(preg_match('/^(?:[0-3][0-7]{0,2}|[4-7][0-7]?)$/', $t1))
+          return intval($t1, 8);
+
+        $len = strlen($t1);
+
+        if($len === 1 && strpos('cuxDdSsWw', $t1) !== false)
+          return null;
+
+        if($len === 1){
+          switch ($t1) {
+            case 'b': return 8;  
+            case 'f': return 12; 
+            case 'n': return 10; 
+            case 'r': return 13; 
+            case 't': return 9;  
+            case 'v': return 11; 
+            default: return $t1[0]; 
+          }
+        }
+      }
+
+      return ($token !== '\\') ? $token[0] : null;  
+    };   
+
+    foreach($matches as $m){
+
+      if($m[0] === '['){
+        $output        .= '<i>';
+        $lastCC         = null;  
+        $cLastRangeable = false;
+        $cLastType      = 0;  // 0 = none; 1 = range hyphen; 2 = short class
+
+        preg_match('/^(\[\^?)(]?(?:[^\\\\\]]+|\\\\[\S\s]?)*)(]?)$/', $m, $parts);
+
+        array_shift($parts);
+        list($opening, $content, $closing) = $parts;
+
+        if(!$closing)
+          throw new \Exception('Unclosed character class');
+
+        preg_match_all('/[^\\\\-]+|-|\\\\(?:[0-3][0-7]{0,2}|[4-7][0-7]?|x[0-9A-Fa-f]{2}|u[0-9A-Fa-f]{4}|c[A-Za-z]|[\S\s]?)/', $content, $ccTokens);
+        $ccTokens     = $ccTokens[0];
+        $ccTokenCount = count($ccTokens);
+        $output      .= $opening;  
+
+        foreach($ccTokens as $i => $cm) {
+
+          if($cm[0] === '\\'){
+            if(preg_match('/^\\\\[cux]$/', $cm))
+              throw new \Exception('Incomplete regex token');
+
+            if(preg_match('/^\\\\[dsw]$/i', $cm)) {
+              $output         .= sprintf('<b>%s</b>', $cm);
+              $cLastRangeable  = ($cLastType !== 1);
+              $cLastType       = 2;
+
+            }elseif($cm === '\\'){
+              throw new \Exception('Incomplete regex token');
+              
+            }else{
+              $output         .= sprintf('<b>%s</b>', htmlspecialchars($cm, ENT_QUOTES));
+              $cLastRangeable  = $cLastType !== 1;
+              $lastCC          = $getTokenCharCode($cm);
+            }
+
+          }elseif($cm === '-'){
+            if($cLastRangeable){
+              $nextToken = ($i + 1 < $ccTokenCount) ? $ccTokens[$i + 1] : false;
+
+              if($nextToken){
+                $nextTokenCharCode = $getTokenCharCode($nextToken[0]);
+
+                if((!is_null($nextTokenCharCode) && $lastCC > $nextTokenCharCode) || $cLastType === 2 || preg_match('/^\\\\[dsw]$/i', $nextToken[0]))
+                  throw new \Exception('Reversed or invalid range');
+
+                $output         .= '<u>-</u>';
+                $cLastRangeable  = false;
+                $cLastType       = 1;
+               
+              }else{
+                $output .= $closing ? '-' : '<u>-</u>';
+              }
+
+            }else{
+              $output         .= '-';
+              $cLastRangeable  = ($cLastType !== 1);
+            }
+
+          }else{
+            $output         .= htmlspecialchars($cm, ENT_QUOTES);
+            $cLastRangeable  = strlen($cm) > 1 || ($cLastType !== 1);
+            $lastCC          = $cm[strlen($cm) - 1];
+          }
+        }
+
+        $output      .= $closing . '</i>';
+        $lastIsQuant  = true;
+
+      }elseif($m[0] === '('){
+        if(strlen($m) === 2)
+          throw new \Exception('Invalid or unsupported group type');
+   
+        if(strlen($m) === 1)
+          $capturingGroupCount++;
+
+        $groupStyleDepth = ($groupStyleDepth !== 5) ? $groupStyleDepth + 1 : 1;
+        $openGroups[]    = $m; // opening
+        $lastIsQuant     = false;
+        $output         .= sprintf('<b class="g%d">%s</b>', $groupStyleDepth, $m);
+
+      }elseif($m[0] === ')'){
+        if(!count($openGroups)) 
+          throw new \Exception('No matching opening parenthesis');
+
+        $output         .= sprintf('<b class="g%d">)</b>', $groupStyleDepth);
+        $prevGroup       = $openGroups[count($openGroups) - 1];
+        $prevGroup       = isset($prevGroup[2]) ? $prevGroup[2] : '';
+        $lastIsQuant     = !preg_match('/^[=!]/', $prevGroup);
+        $lastStyle       = 'g' . $groupStyleDepth;
+        $lastType        = 0;
+        $groupStyleDepth = ($groupStyleDepth !== 1) ? $groupStyleDepth - 1 : 5;
+
+        array_pop($openGroups);
+        continue;
+      
+      }elseif($m[0] === '\\'){
+        if(isset($m[1]) && preg_match('/^[1-9]/', $m[1])){
+          $nonBackrefDigits = '';
+          $num = substr(+$m, 1);
+
+          while($num > $capturingGroupCount){
+            preg_match('/[0-9]$/', $num, $digits);
+            $nonBackrefDigits = $digits[0] . $nonBackrefDigits;
+            $num = floor($num / 10); 
+          }
+
+          if($num > 0){
+            $output .= '<b>\\' . $num . '</b>' . $nonBackrefDigits;
+
+          }else{
+            preg_match('/^\\\\([0-3][0-7]{0,2}|[4-7][0-7]?|[89])([0-9]*)/', $m, $pts);
+            $output .= '<b>\\' . $pts[1] . '</b>' . $pts[2];
+          }
+
+          $lastIsQuant = true;
+
+        }elseif(isset($m[1]) && preg_match('/^[0bBcdDfnrsStuvwWx]/', $m[1])){
+   
+          if(preg_match('/^\\\\[cux]$/', $m))
+            throw new \Exception('Incomplete regex token');
+
+          $output      .= '<b>' . $m . '</b>';
+          $lastIsQuant  = strpos('bB', $m[1]) === false;
+
+        }elseif($m === '\\'){
+          throw new \Exception('Incomplete regex token');
+            
+        }else{
+          $output      .= htmlspecialchars($m, ENT_QUOTES);
+          $lastIsQuant  = true;
+        }
+
+      }elseif(preg_match('/^(?:[?*+]|\{[0-9]+(?:,[0-9]*)?\})\??$/', $m)){
+        if(!$lastIsQuant)
+          throw new \Exception('Quantifiers must be preceded by a token that can be repeated');
+
+        preg_match('/^\{([0-9]+)(?:,([0-9]*))?/', $m, $interval);
+
+        if($interval && (+$interval[1] > 65535 || ($interval[2] && +$interval[2] > 65535)))
+          throw new \Exception('Interval quantifier cannot use value over 65,535');
+        
+        if($interval && $interval[2] && (+$interval[1] > +$interval[2]))
+          throw new \Exception('Interval quantifier range is reversed');
+        
+        $output      .= ($lastStyle ? '<b class="' . $lastStyle . '">' : '<b>') . $m . '</b>';    
+        $lastIsQuant  = false;
+
+      }elseif($m === '|'){
+        if($lastType === 1 || ($lastType === 2 && !count($openGroups)))
+          throw new \Exception('Empty alternative effectively truncates the regex here');
+
+        $output      .= count($openGroups) ? sprintf('<b class="g%d">|</b>', $groupStyleDepth) : '<b>|</b>';
+        $lastIsQuant  = false;
+        $lastType     = 2;
+        $lastStyle    = '';
+        continue;
+
+      }elseif($m === '^' || $m === '$'){
+        $output      .= '<b>' . $m . '</b>';
+        $lastIsQuant  = false;
+
+      }elseif($m === '.'){
+        $output      .= '<b>.</b>';
+        $lastIsQuant  = true;
+   
+      }else{
+        $output      .= htmlspecialchars($m, ENT_QUOTES);
+        $lastIsQuant  = true;
+      }
+
+      $lastType  = 0;
+      $lastStyle = '';    
+    }
+
+    if($openGroups)
+      throw new \Exception('Unclosed grouping');
+
+    return $output;
   }  
 
 }

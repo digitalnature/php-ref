@@ -218,7 +218,7 @@ class ClassTest extends AbstractTest implements Testable{
 	 * @since   1.0
 	 * @return  array    Indexed array containing list items
 	 */
-	public function getList(ClassTest $x = null){}
+	public function getList(ClassTest $x = null, $regexToIgnore = '/abc/'){}
 
 
 

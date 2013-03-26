@@ -34,3 +34,7 @@ Prepending the error control operator (@) will return the information:
 
     $output = @r($var);   // html
     $output = @rt($var);  // text
+
+Keyboard shortcuts  (javascript must be enabled):
+
+- `X` - collapses / expands all levels

@@ -31,8 +31,8 @@
 .ref > div{
   background: #f9f9f9;        
   border: 1px solid #eee;
-  padding: 2px 5px;
   border-radius: 0 0 4px 4px;
+  padding: 2px 5px;  
   margin: 0 0 4px;
   text-shadow: 0 1px 0 #fff;
 }
@@ -49,7 +49,7 @@
   display: none;  
   position: absolute;
   z-index: 101;  
-  font-size: 11px;
+  font-size: 12px;
   white-space: pre;  
   text-align: left;  
   text-shadow: 0 -1px 0 #191919;  
@@ -290,6 +290,29 @@
   background-image: linear-gradient(to bottom, rgba(255,255,255,0.1) 40%,rgba(0,0,0,0.1) 100%);
 }
 
+/* regular expression */
+.ref .rStrRegex{
+  background: #ddd;
+  padding: 0 2px;
+  border-radius: 2px;
+}
+
+.ref .rStrRegex i, .ref .rStrRegex u, .ref .rStrRegex b{
+  font-weight: bold;
+  text-shadow: none;
+}
+
+/* regexpal colors */
+.ref .rStrRegex b    {background: #aad1f7;} /* metasequence */
+.ref .rStrRegex i    {background: #f9ca69;} /* char class */
+.ref .rStrRegex i b  {background: #f7a700;} /* char class: metasequence */
+.ref .rStrRegex i u  {background: #efba4a;} /* char class: range-hyphen */
+.ref .rStrRegex b.g1 {background: #d2f854;} /* group: depth 1 */
+.ref .rStrRegex b.g2 {background: #9ec70c;} /* group: depth 2 */
+.ref .rStrRegex b.g3 {background: #ecc9f7;} /* group: depth 3 */
+.ref .rStrRegex b.g4 {background: #54b70b;} /* group: depth 4 */
+.ref .rStrRegex b.g5 {background: #b688cf;} /* group: depth 5 */
+
 /* boolean true */
 .ref .rTrue{
   background-color: #339900;
@@ -355,7 +378,7 @@
 
 /* inherited methods */
 .ref .rInherited .rMethod{
-  color: #80b3e6;
+  color: #6da5de;
 }
 
 /* optional method arguments */
