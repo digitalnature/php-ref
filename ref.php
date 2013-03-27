@@ -241,7 +241,7 @@ class ref{
   public static function config($key, $value = null){
 
     if(!array_key_exists($key, static::$config))
-      throw new Exception(sprintf('Unrecognized option: "%s". Valid options are: %s', $key, implode(', ', array_keys(static::$config))));
+      throw new \Exception(sprintf('Unrecognized option: "%s". Valid options are: %s', $key, implode(', ', array_keys(static::$config))));
 
     if($value === null)
       return static::$config[$key];
@@ -772,24 +772,23 @@ class ref{
       $this->level--;
 
       return $group;
-    }    
+    }
 
     // string
     if(is_string($subject)){
       $encoding = function_exists('mb_detect_encoding') ? mb_detect_encoding($subject) : false;
-      $length   = static::strLen($subject);
+      $length   = static::strLen($subject); 
       $alpha    = ctype_alpha($subject);
+      $info     = $encoding && ($encoding !== 'ASCII') ? $length . '; ' . $encoding : $length;
+      $info     = 'string(' . $info . ')';
+      $string   = $this->entity('string', $subject, $info);
 
-      $info = $encoding && ($encoding !== 'ASCII') ? $length . '; ' . $encoding : $length;
-      $info = 'string(' . $info . ')';
-
-      $string = $this->entity('string', $subject, $info);
-
-      if(!$skipStringChecks){
+      // advanced checks only if there are 3 characteres or more
+      if(!$skipStringChecks && $length > 2){
         $matches = array();
 
         // file?
-        if(file_exists($subject)){
+        if(($length < 1000) && file_exists($subject)){
 
           $file  = new \SplFileInfo($subject);
           $info  = array();
@@ -848,22 +847,22 @@ class ref{
         }
 
         // class name?
-        if(class_exists($subject, false))
+        if(($length < 100) && class_exists($subject, false))
           $matches[] = $this->entity('strMatch', 'class') . ' ' . $this->formatClassString($subject);
 
-        if(interface_exists($subject, false))
+        if(($length < 100) && interface_exists($subject, false))
           $matches[] = $this->entity('strMatch', 'interface') . ' ' . $this->formatClassString($subject);
 
         // class name?
-        if(function_exists($subject))
+        if(($length < 70) && function_exists($subject))
           $matches[] = $this->entity('strMatch', 'function') . ' ' . $this->formatFunctionString($subject);      
 
-        // skip more advanced checks if the string appears to be numeric,
+        // skip serialization/json checks if the string appears to be numeric,
         // or if it's shorter than 5 characters
         if(!is_numeric($subject) && ($length > 4)){
 
           // date?
-          if($length > 4){
+          if(($length > 4) && ($length < 100)){
             $date = date_parse($subject);
             if(($date !== false) && empty($date['errors']))
               $matches[] = $this->entity('strMatch', 'date') . ' ' . static::humanTime(@strtotime($subject));
@@ -900,13 +899,15 @@ class ref{
         }
 
         // attempt to match a regex
-        try{
-          $regexEntity = $this->colorizeRegex($subject);
+        if($length < 1000){
+          try{
+            $regexEntity = $this->colorizeRegex($subject);
 
-          if($regexEntity)
-            $matches[] = $this->entity('strMatch', 'regex') . ' ' . $regexEntity;
+            if($regexEntity)
+              $matches[] = $this->entity('strMatch', 'regex') . ' ' . $regexEntity;
 
-        }catch(\Exception $e){}
+          }catch(\Exception $e){}
+        }
 
         if($matches)
           $string = $string . $this->entity('sep', "\n") . implode($this->entity('sep', "\n"), $matches);
