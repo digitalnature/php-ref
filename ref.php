@@ -18,7 +18,9 @@ function r(){
   $options = array();
 
   // doh
-  $output = array();
+  $output = '';
+
+  $ref = new ref('html');
 
   // names of the arguments that were passed to this function
   $expressions = ref::getInputExpressions($options);
@@ -26,13 +28,10 @@ function r(){
   // something went wrong while trying to parse the source expressions?
   // if so, silently ignore this part and leave out the expression info
   if(func_num_args() !== count($expressions))
-    $expressions = array();
+    $expressions = array_fill(0, func_num_args(), null);
 
-  // get the info
   foreach($args as $index => $arg)
-    $output[] = new ref($arg, isset($expressions[$index]) ? $expressions[$index] : null, 'html');
-
-  $output = implode("\n\n", $output);
+    $output .= $ref->query($arg, $expressions[$index]);
 
   // return the results if this function was called with the error suppression operator 
   if(in_array('@', $options, true))
@@ -62,16 +61,15 @@ function r(){
 function rt(){
   $args        = func_get_args();
   $options     = array();  
-  $output      = array();  
+  $output      = '';
   $expressions = ref::getInputExpressions($options);
+  $ref         = new ref('text');
 
   if(func_num_args() !== count($expressions))
-    $expressions = array();
+    $expressions = array_fill(0, func_num_args(), null);
 
   foreach($args as $index => $arg)
-    $output[] = new ref($arg, isset($expressions[$index]) ? $expressions[$index] : null, 'text');
-
-  $output = implode('', $output);
+    $output .= $ref->query($arg, $expressions[$index]);
 
   if(in_array('@', $options, true))
     return $output;  
@@ -153,21 +151,7 @@ class ref{
      *
      * @var  string
      */     
-    $format     = null,
-
-    /**
-     * Queried variable
-     *
-     * @var  mixed
-     */     
-    $subject    = null,
-
-    /**
-     * Source expression
-     *
-     * @var  string|null
-     */      
-    $expression = null;
+    $format     = null;
 
 
 
@@ -175,18 +159,12 @@ class ref{
    * Constructor
    *
    * @since   1.0
-   * @param   mixed $subject           Variable to query
-   * @param   string|null $expression  Source expression string
    * @param   string|null $format      Output format, defaults to the 'outputFormat' config setting
    * @param   int|null $depth          Maximum expand depth
    */
-  public function __construct($subject, $expression = null, $format = null, $depth = null){
-
-    $this->subject    = $subject;
-    $this->format     = $format ? $format : static::config('outputFormat');
-    $this->depth      = ($depth !== null) ? $depth : static::config('expandDepth');
-    $this->expression = $expression;
-
+  public function __construct($format = null, $depth = null){
+    $this->format = $format ? $format : static::config('outputFormat');
+    $this->depth  = ($depth !== null) ? $depth : static::config('expandDepth');
   }
 
 
@@ -197,34 +175,29 @@ class ref{
    * @since   1.0
    * @return  string
    */
-  public function __toString(){
+  public function query($subject, $expression = null){
  
     // instance index (gets displayed as comment in html-mode)
     static $counter = 1;
 
-    $startTime = microtime(true);  
-    $varOutput = $this->formatSubject($this->subject);    
-    $expOutput = $this->expression ? $this->formatExpression($this->expression) : '';
+    $startTime  = microtime(true);         
+    $subject    = $this->formatSubject($subject);
+    $expression = $this->formatExpression($expression);    
 
     switch($this->format){
 
       // HTML output
       case 'html':
-        $assets   = static::getAssets();
-        $cpuUsage = round(microtime(true) - $startTime, 4);        
-        $output   = sprintf('<div class="ref">%s<div>%s</div></div>', $expOutput, $varOutput);
-        $output   = sprintf('<!-- ref #%d --><div>%s%s</div><!-- /ref (took %ss) -->', $counter++, $assets, $output, $cpuUsage);
+        $assets        = static::getAssets();
+        $template      = '<!-- ref #%d --><div>%s<div class="ref">%s<div>%s</div></div></div><!-- /ref (took %ss) -->';
+        $cpuUsage      = round(microtime(true) - $startTime, 4);
         static::$time += $cpuUsage;
-
-        return $output;
+        return sprintf($template, $counter++, $assets, $expression, $subject, $cpuUsage);
 
       // text output
-      default:      
-        $output = sprintf("\n%s\n%s\n%s\n", $expOutput, str_repeat('=', static::strLen($expOutput)), $varOutput);      
-        static::$time += round(microtime(true) - $startTime, 4);
-
-        return $output;
-
+      default:     
+        static::$time += round(microtime(true) - $startTime, 4);      
+        return sprintf("\n%s\n%s\n%s\n", $expression, str_repeat('=', static::strLen($expression)), $subject);
     }
 
   }
@@ -677,7 +650,6 @@ class ref{
 
     // resource
     if(is_resource($subject)){
-
       $type = get_resource_type($subject);
       $name = $this->entity('resource', $subject);        
       $meta = array();
@@ -698,6 +670,7 @@ class ref{
           );
 
         break;
+
         // gd image extension resource
         case 'gd':
 
@@ -781,7 +754,7 @@ class ref{
       $alpha    = ctype_alpha($subject);
       $info     = $encoding && ($encoding !== 'ASCII') ? $length . '; ' . $encoding : $length;
       $info     = 'string(' . $info . ')';
-      $string   = $this->entity('string', $subject, $info);
+      $extra    = '';
 
       // advanced checks only if there are 3 characteres or more
       if(!$skipStringChecks && $length > 2){
@@ -794,36 +767,21 @@ class ref{
           $info  = array();
           $perms = $file->getPerms();
 
-          // socket
-          if(($perms & 0xC000) === 0xC000)
+          if(($perms & 0xC000) === 0xC000)       // socket
             $info[] = 's';
-
-          // symlink        
-          elseif(($perms & 0xA000) === 0xA000)
+          elseif(($perms & 0xA000) === 0xA000)   // symlink        
             $info[] = 'l';
-
-          // regular
-          elseif(($perms & 0x8000) === 0x8000)
+          elseif(($perms & 0x8000) === 0x8000)   // regular
             $info[] = '-';
-
-          // block special
-          elseif(($perms & 0x6000) === 0x6000)
+          elseif(($perms & 0x6000) === 0x6000)   // block special
             $info[] = 'b';
-
-          // directory
-          elseif(($perms & 0x4000) === 0x4000)
+          elseif(($perms & 0x4000) === 0x4000)   // directory
             $info[] = 'd';
-
-          // character special
-          elseif(($perms & 0x2000) === 0x2000)          
+          elseif(($perms & 0x2000) === 0x2000)   // character special
             $info[] = 'c';
-
-          // FIFO pipe
-          elseif(($perms & 0x1000) === 0x1000)          
+          elseif(($perms & 0x1000) === 0x1000)   // FIFO pipe
             $info[] = 'p';
-
-          // unknown
-          else          
+          else                                   // unknown
             $info[] = 'u';        
 
           // owner
@@ -899,7 +857,7 @@ class ref{
         }
 
         // attempt to match a regex
-        if($length < 1000){
+        if($length < 10000){
           try{
             $regexEntity = $this->colorizeRegex($subject);
 
@@ -910,10 +868,10 @@ class ref{
         }
 
         if($matches)
-          $string = $string . $this->entity('sep', "\n") . implode($this->entity('sep', "\n"), $matches);
+          $extra = $this->entity('sep', "\n") . implode($this->entity('sep', "\n"), $matches);
       }
 
-      return $string;
+      return $this->entity('string', $subject, $info) . $extra;
     }    
 
     // arrays
@@ -1215,25 +1173,29 @@ class ref{
    * @param   string $expression      Expression to format
    * @return  string                  Formatted output
    */
-  protected function formatExpression($expression){
+  protected function formatExpression($expression = null){
+
+    if($expression === null)
+      return '';
+
+    if(static::strLen($expression) > 120)
+      $expression = substr($expression, 0, 120) . '...';
 
     $prefix = $this->entity('sep', '> ');
 
     if(strpos($expression, '(') === false)
-      return $this->entity('exp', $prefix . $expression);
+      return $this->entity('exp', $prefix . $this->entity('expTxt', $expression));
 
     $fn = explode('(', $expression, 2);
 
     // try to find out if this is a function
     try{
-      $reflector = new \ReflectionFunction($fn[0]);        
-
+      $reflector = new \ReflectionFunction($fn[0]);
       $fn[0] = $this->entity('srcFunction', $this->anchor($reflector, 'function'), $reflector);
     
     }catch(\Exception $e){
 
       if(stripos($fn[0], 'new ') === 0){
-
         $cn = explode(' ' , $fn[0], 2);
 
         // linkify 'new keyword' (as constructor)
@@ -1261,9 +1223,8 @@ class ref{
         $fn[0] = implode(' ', $cn);
 
       }else{
-
         if(strpos($fn[0], '::') === false)
-          return $this->entity('exp', $prefix . $expression);
+          return $this->entity('exp', $prefix . $this->entity('expTxt', $expression));
 
         $cn = explode('::', $fn[0], 2);
 
@@ -1502,7 +1463,7 @@ class ref{
     }
 
     // escape text that is known to contain html entities
-    if(in_array($class, array('string', 'key', 'param', 'sep', 'resourceInfo'), true))
+    if(in_array($class, array('string', 'key', 'param', 'sep', 'resourceInfo', 'expTxt'), true))
       $text = static::escape($text);
 
     $tip = $this->tip($tip);
@@ -1512,7 +1473,7 @@ class ref{
     if($tip !== '')
       $class .= ' rHasTip';
 
-    return sprintf('<i class="r%s">%s%s</i>', $class, $text, $tip);
+    return '<i class="r' . $class . '">' . $text . $tip . '</i>';
   }
 
 
@@ -1699,11 +1660,8 @@ class ref{
    * @return  int
    */
   protected static function strLen($string){
-
-    if(function_exists('mb_strlen'))
-      return mb_strlen($string, mb_detect_encoding($string));      
-    
-    return strlen($string);
+    $encoding = function_exists('mb_detect_encoding') ? mb_detect_encoding($string) : false;   
+    return $encoding ? mb_strlen($string, $encoding) : strlen($string);
   }
 
 
