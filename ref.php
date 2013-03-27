@@ -48,7 +48,7 @@ function r(){
     print '</body></html>';
     exit(0);
   }  
-}  
+}
 
 
 
@@ -173,6 +173,8 @@ class ref{
    * Creates the root structure that contains all the groups and entities
    *   
    * @since   1.0
+   * @param   mixed $subject
+   * @param   string $expression
    * @return  string
    */
   public function query($subject, $expression = null){
@@ -625,6 +627,80 @@ class ref{
 
 
   /**
+   * Generates information report for arrays
+   *
+   * It's a separate function because arrays must be passed by reference
+   * in order to detect recursion. And we do this only for subjects that are arrays
+   * because creating a references actually increases memory usage in this case.
+   *
+   * @since   1.0
+   * @param   array $subject
+   * @return  string
+   */
+  protected function formatSubjectArray(array &$subject){
+
+    // empty array?
+    if(empty($subject))      
+      return $this->entity('array') . $this->group();
+
+    // temporary element (marker) for arrays, used to track recursions
+    static $marker = null;
+
+    // set a marker to detect recursion
+    if(!$marker)
+      $marker = uniqid('', true);
+
+    // if our marker element is present in the array it means that we were here before
+    if(isset($subject[$marker]))
+      return $this->entity('array') . $this->group('Recursion');
+
+    $subject[$marker] = true;
+
+    // note that we must substract the marker element
+    $itemCount = count($subject) - 1;
+    $index = 0;
+    $this->level++;
+
+    // use splFixedArray() on PHP 5.3.4+ to save up some memory, because the subject array
+    // might contain a huge amount of entries.
+    // (note: lower versions of PHP 5.3 throw a heap corruption error after 10K entries)
+    // A more efficient way is to build the items as we go as strings,
+    // by concatenating the info foreach entry, but then we loose the flexibility that the
+    // entity/group/section methods provide us (exporting data in different formats
+    // would become harder)
+    $items = version_compare(PHP_VERSION, '5.3.4') >= 0 ? new \SplFixedArray($itemCount) : array();
+
+    foreach($subject as $key => &$value){
+
+      // ignore our marker
+      if($key === $marker)
+        continue;
+
+      $keyInfo = gettype($key);
+
+      if(is_string($key)){
+        $encoding = function_exists('mb_detect_encoding') ? mb_detect_encoding($key) : '';
+        $length   = $encoding && ($encoding !== 'ASCII') ? static::strLen($key) . '; ' . $encoding : static::strLen($key);
+        $keyInfo  = sprintf('%s(%s)', $keyInfo, $length);        
+      }
+
+      $items[$index++] = array(
+        $this->entity('key', $key, sprintf('Key: %s', $keyInfo)),
+        $this->entity('sep', '=>'),
+        is_array($value) ? $this->formatSubjectArray($value) : $this->formatSubject($value),
+      );
+
+      unset($subject[$key]);
+    }
+ 
+    $group = $this->entity('array') . $this->group($itemCount, $this->section($items));
+    $this->level--;
+
+    return $group;    
+  }
+
+
+  /**
    * Builds a report with information about $subject
    *
    * @since   1.0
@@ -632,8 +708,8 @@ class ref{
    * @param   bool $skipStringChecks  Skip advanced string checks
    * @return  mixed                   Result (both HTML and text modes generate strings)
    */
-  protected function formatSubject(&$subject, $skipStringChecks = false){
-  
+  protected function formatSubject($subject, $skipStringChecks = false){
+
     // null value
     if(is_null($subject))
       return $this->entity('null');
@@ -739,9 +815,13 @@ class ref{
           $this->entity('sep', ':'),
           $this->formatSubject($value),
         );
+
+        array_shift($meta);
       }  
 
+      $meta  = null;
       $group = $name . $this->group($type, $this->section($items));
+
       $this->level--;
 
       return $group;
@@ -751,7 +831,6 @@ class ref{
     if(is_string($subject)){
       $encoding = function_exists('mb_detect_encoding') ? mb_detect_encoding($subject) : false;
       $length   = static::strLen($subject); 
-      $alpha    = ctype_alpha($subject);
       $info     = $encoding && ($encoding !== 'ASCII') ? $length . '; ' . $encoding : $length;
       $info     = 'string(' . $info . ')';
       $extra    = '';
@@ -869,74 +948,16 @@ class ref{
 
         if($matches)
           $extra = $this->entity('sep', "\n") . implode($this->entity('sep', "\n"), $matches);
+
+        $matches = null;
       }
 
       return $this->entity('string', $subject, $info) . $extra;
     }    
 
-    // arrays
-    if(is_array($subject)){
-
-      // empty array?
-      if(empty($subject))      
-        return $this->entity('array') . $this->group();
-
-      // temporary element (marker) for arrays, used to track recursions
-      static $arrayMarker = null;
-
-      // set a marker to detect recursion
-      if(!$arrayMarker)
-        $arrayMarker = uniqid('', true);
-
-      // if our marker element is present in the array it means that we were here before
-      if(isset($subject[$arrayMarker]))
-        return $this->entity('array') . $this->group('Recursion');
-
-      $subject[$arrayMarker] = true;
-
-      // note that we must substract the marker element
-      $itemCount = count($subject) - 1;
-      $index = 0;
-      $this->level++;      
-
-      // note that we build the item list using splFixedArray() to save up some memory, because the subject array
-      // might contain a huge amount of entries. A more efficient way is to build the items as we go as strings,
-      // by concatenating the info foreach entry, but then we loose the flexibility that the
-      // entity/group/section methods provide us (exporting data in different formats would become harder)
-      $items = new \SplFixedArray($itemCount);
-
-      foreach($subject as $key => &$value){
-
-        // ignore our marker
-        if($key === $arrayMarker)
-          continue;
-
-        $keyInfo = gettype($key);
-
-        if(is_string($key)){
-          $encoding = function_exists('mb_detect_encoding') ? mb_detect_encoding($key) : '';
-          $length   = $encoding && ($encoding !== 'ASCII') ? static::strLen($key) . '; ' . $encoding : static::strLen($key);
-          $keyInfo  = sprintf('%s(%s)', $keyInfo, $length);        
-        }
-
-        $keyInfo = sprintf('Key: %s', $keyInfo);
-
-        $items[$index++] = array(
-          $this->entity('key', $key, $keyInfo),
-          $this->entity('sep', '=>'),
-          $this->formatSubject($value),
-        );
-      }
-
-      // remove our temporary marker;
-      // not really required, because ::build() doesn't take references, but we want to be nice :P
-      unset($subject[$arrayMarker]);
-
-      $group = $this->entity('array') . $this->group($itemCount, $this->section($items));
-      $this->level--;
-
-      return $group;
-    }
+    // arrays; forward to a different function that takes references
+    if(is_array($subject))
+      return $this->formatSubjectArray($subject);
 
     // if we reached this point, $subject must be an object     
     $objectName = $this->formatClassString($subject);    
@@ -955,12 +976,11 @@ class ref{
     // again, because reflectionObjects can't be cloned apparently :)
     $reflector = new \ReflectionObject($subject);    
 
-    $props      = $reflector->getProperties(\ReflectionMethod::IS_PUBLIC | \ReflectionMethod::IS_PROTECTED);    
-    $methods    = $reflector->getMethods(\ReflectionMethod::IS_PUBLIC | \ReflectionMethod::IS_PROTECTED);
-    $constants  = $reflector->getConstants();
-    $interfaces = $reflector->getInterfaces();
-    $traits     = (PHP_MINOR_VERSION > 3) ? $reflector->getTraits() : array();
-
+    $props           = $reflector->getProperties(\ReflectionMethod::IS_PUBLIC | \ReflectionMethod::IS_PROTECTED);    
+    $methods         = $reflector->getMethods(\ReflectionMethod::IS_PUBLIC | \ReflectionMethod::IS_PROTECTED);
+    $constants       = $reflector->getConstants();
+    $interfaces      = $reflector->getInterfaces();
+    $traits          = (PHP_MINOR_VERSION > 3) ? $reflector->getTraits() : array();
     $internalParents = static::getParentClasses($reflector, true);
 
     // no data to display?
@@ -974,24 +994,21 @@ class ref{
 
     // display the interfaces this objects' class implements
     if($interfaces){
-
-      // no splFixedArray here because we don't expect one zillion interfaces to be implemented by this object
-      $intfNames = array();
-
+      $items = array();
       foreach($interfaces as $name => $interface)
-        $intfNames[] = $this->entity('interface', $this->anchor($interface, 'class'), $interface);      
+        $items[] = $this->entity('interface', $this->anchor($interface, 'class'), $interface);      
 
-      $output .= $this->section(array((array)implode($this->entity('sep', ', '), $intfNames)), 'Implements');
+      $interfaces  = null;
+      $output     .= $this->section(array((array)implode($this->entity('sep', ', '), $items)), 'Implements');
     }
 
     // class constants
     if($constants){
       $itemCount = count($constants);
-      $index = 0;
-      $items = new \SplFixedArray($itemCount);
+      $index     = 0;
+      $items     = version_compare(PHP_VERSION, '5.3.4') >= 0 ? new \SplFixedArray($itemCount) : array();
 
       foreach($constants as $name => $value){
-
         foreach($internalParents as $parent)
           if($parent->hasConstant($name))
             $name = $this->anchor($name, 'constant', $parent->getName(), $name);
@@ -1002,7 +1019,8 @@ class ref{
           $this->entity('sep', '='),
           $this->formatSubject($value),
         );
-        
+
+        array_shift($constants);
       }
 
       $output .= $this->section($items, 'Constants');    
@@ -1010,18 +1028,19 @@ class ref{
 
     // traits this objects' class uses
     if($traits){  
-      $traitNames = array();
+      $items = array();
       foreach($traits as $name => $trait)
-        $traitNames[] = $this->entity('trait', $trait->getName(), $trait);
+        $items[] = $this->entity('trait', $trait->getName(), $trait);
 
-      $output .= $this->section((array)implode(', ', $traitNames), 'Uses');
+      $traits  = null;
+      $output .= $this->section((array)implode(', ', $items), 'Uses');
     }
 
     // object/class properties
     if($props){
       $itemCount = count($props);
-      $index = 0;
-      $items = new \SplFixedArray($itemCount);
+      $index     = 0;
+      $items     = version_compare(PHP_VERSION, '5.3.4') >= 0 ? new \SplFixedArray($itemCount) : array();
 
       foreach($props as $prop){
         $modifiers = array();
@@ -1059,8 +1078,10 @@ class ref{
           $this->formatSubject($value),
         );
 
+        array_shift($props);
       }
 
+      $props   = null;
       $output .= $this->section($items, 'Properties');
     }
 
@@ -1068,10 +1089,9 @@ class ref{
     if($methods){
       $index     = 0;
       $itemCount = count($methods);      
-      $items     = new \SplFixedArray($itemCount);
+      $items     = array();
 
       foreach($methods as $method){
-
         $paramStrings = $modifiers = array();
 
         // process arguments
@@ -1086,9 +1106,7 @@ class ref{
             $paramClass = $parameter->getClass();
 
           // @see https://bugs.php.net/bug.php?id=32177&edit=1
-          }catch(\Exception $e){
-
-          }
+          }catch(\Exception $e){}
 
           $paramHint = '';
 
@@ -1149,7 +1167,9 @@ class ref{
           $this->entity('sep', $method->isStatic() ? '::' : '->', $modTip),
           $this->modifiers($modifiers),
           $name . $this->entity('sep', ' (') . implode($this->entity('sep', ', '), $paramStrings) . $this->entity('sep', ')'),
-        );       
+        );
+
+        array_shift($methods);
       }
 
       $output .= $this->section($items, 'Methods');
@@ -1466,8 +1486,7 @@ class ref{
     if(in_array($class, array('string', 'key', 'param', 'sep', 'resourceInfo', 'expTxt'), true))
       $text = static::escape($text);
 
-    $tip = $this->tip($tip);
-    
+    $tip   = $this->tip($tip);
     $class = ucfirst($class);
 
     if($tip !== '')

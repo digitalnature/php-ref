@@ -44,7 +44,7 @@
       r(array(), $array, serialize(array('A', 'serialized', 'string')));
       r(fopen('php://stdin', 'r'), function($x, $d){}); 
       r(new \DateTimeZone('Pacific/Honolulu'));
-      r($obj, new ref('A ref instance')); 
+      r($obj, new ref()); 
 
     }else{
 
@@ -52,7 +52,7 @@
       rt(array(), $array, serialize(array('A', 'serialized', 'string')));     
       rt(fopen('php://stdin', 'r'), function($x, $d){}); 
       rt(new \DateTimeZone('Pacific/Honolulu'));
-      rt($obj, new ref('A ref instance'));
+      rt($obj, new ref());
 
     }   
 
