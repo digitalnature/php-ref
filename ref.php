@@ -981,14 +981,14 @@ class ref{
       $items = array();
       $pad = 0;
       foreach($subject as $idx => $obj){
-        $items[$idx] = array($this->formatSubject($obj));
+        $items[$idx] = array($this->entity('sep', ':'), $this->formatSubject($obj));
         if(($len = strlen($idx)) > $pad)
           $pad = strlen($idx);
       }
 
       foreach($items as $idx => &$item)
         array_unshift($item, $this->entity('index', str_pad($idx, $pad, ' ', STR_PAD_LEFT)));
-      
+
       $output .= $this->section($items, sprintf('Contents (%d)', count($items)));
     }
 
