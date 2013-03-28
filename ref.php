@@ -979,15 +979,19 @@ class ref{
     // show contents for iterators
     if($reflector->isIterateable()){
       $items = array();
-      $pad = 0;
-      foreach($subject as $idx => $obj){
-        $items[$idx] = array($this->entity('sep', ':'), $this->formatSubject($obj));
-        if(($len = strlen($idx)) > $pad)
-          $pad = strlen($idx);
-      }
+      foreach($subject as $idx => $obj)
+        $items[$idx] = array($this->entity('sep', '=>'), $this->formatSubject($obj));
 
-      foreach($items as $idx => &$item)
-        array_unshift($item, $this->entity('index', str_pad($idx, $pad, ' ', STR_PAD_LEFT)));
+      foreach($items as $idx => &$item){
+        $keyInfo = gettype($idx);
+        if(is_string($idx)){
+          $encoding = function_exists('mb_detect_encoding') ? mb_detect_encoding($idx) : '';
+          $length   = $encoding && ($encoding !== 'ASCII') ? static::strLen($idx) . '; ' . $encoding : static::strLen($idx);
+          $keyInfo  = sprintf('%s(%s)', $keyInfo, $length);        
+        }
+        
+        array_unshift($item, $this->entity('key', $idx, sprintf('Iterator key: %s', $keyInfo)));
+      }  
 
       $output .= $this->section($items, sprintf('Contents (%d)', count($items)));
     }
