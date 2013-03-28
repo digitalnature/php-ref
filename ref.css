@@ -217,7 +217,7 @@
   color: #bcbcbc;
   text-transform: lowercase;
   border-bottom: 1px dotted #ccc;
-  display: block; 
+  display: inline-block;
   margin: 7px 0 5px 10px;
 }
 
@@ -288,6 +288,10 @@
   background-image: -moz-linear-gradient(top, rgba(255,255,255,0.1) 40%, rgba(0,0,0,0.1) 100%);
   background-image: -ms-linear-gradient(top, rgba(255,255,255,0.1) 40%,rgba(0,0,0,0.1) 100%);
   background-image: linear-gradient(to bottom, rgba(255,255,255,0.1) 40%,rgba(0,0,0,0.1) 100%);
+}
+
+.ref .rIndex{
+  color: #ccc;  
 }
 
 /* regular expression (colors partially match RegexBuddy and RegexPal) */

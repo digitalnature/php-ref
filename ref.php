@@ -595,7 +595,7 @@ class ref{
         $modifiers[] = array('final', 'F', 'This class is final and cannot be extended');
 
       // php 5.4+ only
-      if((PHP_MINOR_VERSION > 3) && $class->isCloneable())
+      if((version_compare(PHP_VERSION, '5.4') >= 0) && $class->isCloneable())
         $modifiers[] = array('cloneable', 'C', 'Instances of this class can be cloned');
 
       if($class->isIterateable())
@@ -661,14 +661,14 @@ class ref{
     $index = 0;
     $this->level++;
 
-    // use splFixedArray() on PHP 5.3.4+ to save up some memory, because the subject array
+    // use splFixedArray() on PHP 5.4+ to save up some memory, because the subject array
     // might contain a huge amount of entries.
     // (note: lower versions of PHP 5.3 throw a heap corruption error after 10K entries)
     // A more efficient way is to build the items as we go as strings,
     // by concatenating the info foreach entry, but then we loose the flexibility that the
     // entity/group/section methods provide us (exporting data in different formats
     // would become harder)
-    $items = version_compare(PHP_VERSION, '5.3.4') >= 0 ? new \SplFixedArray($itemCount) : array();
+    $items = version_compare(PHP_VERSION, '5.4') >= 0 ? new \SplFixedArray($itemCount) : array();
 
     foreach($subject as $key => &$value){
 
@@ -816,7 +816,7 @@ class ref{
           $this->formatSubject($value),
         );
 
-        array_shift($meta);
+        unset($meta[$key]);
       }  
 
       $meta  = null;
@@ -972,25 +972,39 @@ class ref{
 
     // track hash
     $objectHashes[$objectHash] = 1;
+    $reflector                 = new \ReflectionObject($subject);
+    $output                    = '';
+    $this->level++;    
 
-    // again, because reflectionObjects can't be cloned apparently :)
-    $reflector = new \ReflectionObject($subject);    
+    // show contents for iterators
+    if($reflector->isIterateable()){
+      $items = array();
+      $pad = 0;
+      foreach($subject as $idx => $obj){
+        $items[$idx] = array($this->formatSubject($obj));
+        if(($len = strlen($idx)) > $pad)
+          $pad = strlen($idx);
+      }
 
-    $props           = $reflector->getProperties(\ReflectionMethod::IS_PUBLIC | \ReflectionMethod::IS_PROTECTED);    
+      foreach($items as $idx => &$item)
+        array_unshift($item, $this->entity('index', str_pad($idx, $pad, ' ', STR_PAD_LEFT)));
+      
+      $output .= $this->section($items, sprintf('Contents (%d)', count($items)));
+    }
+
+    $props           = $reflector->getProperties(\ReflectionProperty::IS_PUBLIC | \ReflectionProperty::IS_PROTECTED);    
     $methods         = $reflector->getMethods(\ReflectionMethod::IS_PUBLIC | \ReflectionMethod::IS_PROTECTED);
     $constants       = $reflector->getConstants();
     $interfaces      = $reflector->getInterfaces();
-    $traits          = (PHP_MINOR_VERSION > 3) ? $reflector->getTraits() : array();
+    $traits          = version_compare(PHP_VERSION, '5.4') >= 0 ? $reflector->getTraits() : array();
     $internalParents = static::getParentClasses($reflector, true);
 
     // no data to display?
     if(!$props && !$methods && !$constants && !$interfaces && !$traits){      
       unset($objectHashes[$objectHash]);
+      $this->level--;
       return $this->entity('object', "{$objectName} object") . $this->group();
     }
-
-    $output = '';
-    $this->level++;
 
     // display the interfaces this objects' class implements
     if($interfaces){
@@ -1006,7 +1020,7 @@ class ref{
     if($constants){
       $itemCount = count($constants);
       $index     = 0;
-      $items     = version_compare(PHP_VERSION, '5.3.4') >= 0 ? new \SplFixedArray($itemCount) : array();
+      $items     = version_compare(PHP_VERSION, '5.4') >= 0 ? new \SplFixedArray($itemCount) : array();
 
       foreach($constants as $name => $value){
         foreach($internalParents as $parent)
@@ -1020,7 +1034,7 @@ class ref{
           $this->formatSubject($value),
         );
 
-        array_shift($constants);
+        unset($constants[$name]);
       }
 
       $output .= $this->section($items, 'Constants');    
@@ -1038,11 +1052,21 @@ class ref{
 
     // object/class properties
     if($props){
-      $itemCount = count($props);
-      $index     = 0;
-      $items     = version_compare(PHP_VERSION, '5.3.4') >= 0 ? new \SplFixedArray($itemCount) : array();
+      if(version_compare(PHP_VERSION, '5.4') >= 0){
+        $items = array();
 
-      foreach($props as $prop){
+      // work-around for https://bugs.php.net/bug.php?id=49154
+      // (see http://stackoverflow.com/questions/15672287/strange-behavior-of-reflectiongetproperties-with-numeric-keys)
+      }else{
+        $props = array_values(array_filter($props, function($prop) use($subject){
+          return !$prop->isPublic() || property_exists($subject, $prop->name);
+        }));
+
+        $itemCount = count($props);
+        $items = new \SplFixedArray($itemCount);
+      }
+     
+      foreach($props as $idx => $prop){
         $modifiers = array();
 
         if($prop->isProtected())        
@@ -1070,7 +1094,7 @@ class ref{
         if($inherited)
           $name = $this->entity('inherited', $name);
 
-        $items[$index++] = array(
+        $items[$idx] = array(
           $this->entity('sep', $prop->isStatic() ? '::' : '->', $modTip),
           $this->modifiers($modifiers),
           $name,
@@ -1078,7 +1102,7 @@ class ref{
           $this->formatSubject($value),
         );
 
-        array_shift($props);
+        unset($props[$idx]);
       }
 
       $props   = null;
@@ -1087,11 +1111,10 @@ class ref{
 
     // class methods
     if($methods){
-      $index     = 0;
       $itemCount = count($methods);      
       $items     = array();
 
-      foreach($methods as $method){
+      foreach($methods as $idx => $method){
         $paramStrings = $modifiers = array();
 
         // process arguments
@@ -1163,13 +1186,13 @@ class ref{
         if($inherited)
           $name = $this->entity('inherited', $name);
 
-        $items[$index++] = array(
+        $items[$idx] = array(
           $this->entity('sep', $method->isStatic() ? '::' : '->', $modTip),
           $this->modifiers($modifiers),
           $name . $this->entity('sep', ' (') . implode($this->entity('sep', ', '), $paramStrings) . $this->entity('sep', ')'),
         );
 
-        array_shift($methods);
+        unset($methods[$idx]);
       }
 
       $output .= $this->section($items, 'Methods');
@@ -1368,6 +1391,48 @@ class ref{
 
 
   /**
+   * Creates a group
+   *
+   * @since   1.0
+   * @param   string $prefix
+   * @param   string $content
+   * @return  string
+   */
+  protected function group($prefix = '', $content = '', $container = '(%s)'){
+
+    static $groupId = 0;
+
+    switch($this->format){
+
+      // HTML output
+      case 'html':
+        if($content !== ''){
+          $checked  = ($this->depth < 0) || (($this->depth > 0) && ($this->level <= $this->depth)) ? 'checked="checked"' : '';
+          $content  = sprintf('<input type="checkbox" id="refGrp%1$s" %2$s/><label for="refGrp%1$s"></label><div>%3$s</div>', $groupId++, $checked, $content);
+        }  
+
+        if($prefix !== '')
+          $prefix = '<b>' . $prefix . '</b>';
+
+        return '<i class="rGroup">' . sprintf($container, sprintf('%s</i>%s<i class="rGroup">', $prefix, $content)) . '</i>';
+
+        return sprintf('<i class="rGroup">(%s</i>%s<i class="rGroup">)</i>', $prefix, $content);
+
+      // text-only output
+      default:
+
+        if($content !== ''){
+          $content =  $content . "\n";
+          $prefix .= ' ▼';
+        }
+
+        return sprintf($container, $prefix . $content);      
+    }    
+  }
+
+
+
+  /**
    * Generates an anchor that links to the documentation page relevant for the requested context
    *
    * For internal functions and classes, the URI will point to the local PHP manual
@@ -1493,48 +1558,6 @@ class ref{
       $class .= ' rHasTip';
 
     return '<i class="r' . $class . '">' . $text . $tip . '</i>';
-  }
-
-
-
-  /**
-   * Creates a group
-   *
-   * @since   1.0
-   * @param   string $prefix
-   * @param   string $content
-   * @return  string
-   */
-  protected function group($prefix = '', $content = ''){
-
-    static $groupId = 0;
-
-    switch($this->format){
-
-      // HTML output
-      case 'html':
-
-        if($content !== ''){
-          $checked  = ($this->depth < 0) || (($this->depth > 0) && ($this->level <= $this->depth)) ? 'checked="checked"' : '';
-          $content  = sprintf('<input type="checkbox" id="refGrp%1$s" %2$s/><label for="refGrp%1$s"></label><div>%3$s</div>', $groupId++, $checked, $content);
-        }  
-
-        if($prefix !== '')
-          $prefix = '<b>' . $prefix . '</b>';
-
-        return sprintf('<i class="rGroup">(%s</i>%s<i class="rGroup">)</i>', $prefix, $content);
-
-      // text-only output
-      default:
-
-        if($content !== ''){
-          $content =  $content . "\n";
-          $prefix .= ' ▼';
-        }  
-
-        return '(' . $prefix . $content . ')';
-      
-    }    
   }
 
 

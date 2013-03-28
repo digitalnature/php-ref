@@ -26,7 +26,7 @@ interface Testable{}
  * @since   1.0
  * @author  One Trick Pony
  */
-abstract class AbstractTest implements \Iterator{
+abstract class AbstractTest extends \ArrayObject{
 
   protected
 
@@ -149,7 +149,7 @@ class ClassTest extends AbstractTest implements Testable{
      *
      * @var array
      */
-    $list = null;
+    $stuff = null;
 
 
 
@@ -163,8 +163,9 @@ class ClassTest extends AbstractTest implements Testable{
    * @param   Iterator $classHintTest   An iterateable instance
    *                                    Two line comment test
    */
-  public function __construct(array $list, &$refTest = null, \Iterator $classHintTest = null){
-    $this->list = $list;
+  public function __construct(array $list, $stuff, &$refTest = null, \Iterator $classHintTest = null){
+    parent::__construct($list);
+    $this->stuff = $list;
     $this->pubVarB = $this;
     $this->currentDate = \DateTime::createFromFormat('U', time(), new \DateTimeZone('Europe/London'));
 

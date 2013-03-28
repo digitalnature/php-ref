@@ -36,7 +36,7 @@
 
     $array['reference to self'] = &$array;
 
-    $obj = new \Tests\ClassTest($array);    
+    $obj = new \Tests\ClassTest(array('foo', 'bar'), $array);    
 
     if($htmlMode){
     
