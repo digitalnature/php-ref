@@ -168,12 +168,15 @@
 }
 
 /* expand/collapse toggle link for groups */
-.ref label{  
-  width: 14px;
-  height: 14px;        
-  display: inline-block;              
-  background: transparent url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAoAAAAOCAYAAAAWo42rAAAAYklEQVQoz2M4xWCwBIgFgJgBHwYR/4H4ARA7EqMQhP8CcTcQsxNSCMMXgViXGIUg/AOIi4CYkZBCGN4HxLLEKAThd0AcRazCSEIK9xKymijPgIJHh1CAdxEKcKKicDExiQIAaIvOXmRns2sAAAAASUVORK5CYII=) no-repeat center bottom;        
+.ref label{
+  display: inline-block;
   vertical-align: -3px;
+  margin-left: 2px;
+  width: 0px;
+  height: 0px;
+  border-style: solid;
+  border-width: 7px 0 7px 10px;
+  border-color: transparent transparent transparent #CC0033;
   cursor: pointer;
   -webkit-transition: all ease-in .15s;  
      -moz-transition: all ease-in .15s;     

@@ -137,21 +137,29 @@ class ref{
      *
      * @var  int
      */  
-    $level      = 0,
+    $level  = 0,
 
     /**
      * Max. expand depth of this instance
      *
      * @var  int
      */     
-    $depth      = 1,
+    $depth  = 1,
 
     /**
      * Output format of this instance
      *
      * @var  string
      */     
-    $format     = null;
+    $format = null,
+
+
+    /**
+     * Running on PHP 5.4+
+     *
+     * @var  bool
+     */ 
+    $is54   = false;
 
 
 
@@ -163,6 +171,7 @@ class ref{
    * @param   int|null $depth          Maximum expand depth
    */
   public function __construct($format = null, $depth = null){
+    $this->is54   = (version_compare(PHP_VERSION, '5.4') >= 0);    
     $this->format = $format ? $format : static::config('outputFormat');
     $this->depth  = ($depth !== null) ? $depth : static::config('expandDepth');
   }
@@ -595,7 +604,7 @@ class ref{
         $modifiers[] = array('final', 'F', 'This class is final and cannot be extended');
 
       // php 5.4+ only
-      if((version_compare(PHP_VERSION, '5.4') >= 0) && $class->isCloneable())
+      if($this->is54 && $class->isCloneable())
         $modifiers[] = array('cloneable', 'C', 'Instances of this class can be cloned');
 
       if($class->isIterateable())
@@ -668,7 +677,7 @@ class ref{
     // by concatenating the info foreach entry, but then we loose the flexibility that the
     // entity/group/section methods provide us (exporting data in different formats
     // would become harder)
-    $items = version_compare(PHP_VERSION, '5.4') >= 0 ? new \SplFixedArray($itemCount) : array();
+    $items = $this->is54 ? new \SplFixedArray($itemCount) : array();
 
     foreach($subject as $key => &$value){
 
@@ -817,7 +826,7 @@ class ref{
         );
 
         unset($meta[$key]);
-      }  
+      }
 
       $meta  = null;
       $group = $name . $this->group($type, $this->section($items));
@@ -829,11 +838,8 @@ class ref{
 
     // string
     if(is_string($subject)){
-      $encoding = function_exists('mb_detect_encoding') ? mb_detect_encoding($subject) : false;
-      $length   = static::strLen($subject); 
-      $info     = $encoding && ($encoding !== 'ASCII') ? $length . '; ' . $encoding : $length;
-      $info     = 'string(' . $info . ')';
-      $extra    = '';
+      $length = static::strLen($subject);       
+      $extra  = '';
 
       // advanced checks only if there are 3 characteres or more
       if(!$skipStringChecks && $length > 2){
@@ -843,44 +849,44 @@ class ref{
         if(($length < 1000) && file_exists($subject)){
 
           $file  = new \SplFileInfo($subject);
-          $info  = array();
+          $flags = array();
           $perms = $file->getPerms();
 
           if(($perms & 0xC000) === 0xC000)       // socket
-            $info[] = 's';
+            $flags[] = 's';
           elseif(($perms & 0xA000) === 0xA000)   // symlink        
-            $info[] = 'l';
+            $flags[] = 'l';
           elseif(($perms & 0x8000) === 0x8000)   // regular
-            $info[] = '-';
+            $flags[] = '-';
           elseif(($perms & 0x6000) === 0x6000)   // block special
-            $info[] = 'b';
+            $flags[] = 'b';
           elseif(($perms & 0x4000) === 0x4000)   // directory
-            $info[] = 'd';
+            $flags[] = 'd';
           elseif(($perms & 0x2000) === 0x2000)   // character special
-            $info[] = 'c';
+            $flags[] = 'c';
           elseif(($perms & 0x1000) === 0x1000)   // FIFO pipe
-            $info[] = 'p';
+            $flags[] = 'p';
           else                                   // unknown
-            $info[] = 'u';        
+            $flags[] = 'u';        
 
           // owner
-          $info[] = (($perms & 0x0100) ? 'r' : '-');
-          $info[] = (($perms & 0x0080) ? 'w' : '-');
-          $info[] = (($perms & 0x0040) ? (($perms & 0x0800) ? 's' : 'x' ) : (($perms & 0x0800) ? 'S' : '-'));
+          $flags[] = (($perms & 0x0100) ? 'r' : '-');
+          $flags[] = (($perms & 0x0080) ? 'w' : '-');
+          $flags[] = (($perms & 0x0040) ? (($perms & 0x0800) ? 's' : 'x' ) : (($perms & 0x0800) ? 'S' : '-'));
 
           // group
-          $info[] = (($perms & 0x0020) ? 'r' : '-');
-          $info[] = (($perms & 0x0010) ? 'w' : '-');
-          $info[] = (($perms & 0x0008) ? (($perms & 0x0400) ? 's' : 'x' ) : (($perms & 0x0400) ? 'S' : '-'));
+          $flags[] = (($perms & 0x0020) ? 'r' : '-');
+          $flags[] = (($perms & 0x0010) ? 'w' : '-');
+          $flags[] = (($perms & 0x0008) ? (($perms & 0x0400) ? 's' : 'x' ) : (($perms & 0x0400) ? 'S' : '-'));
 
           // world
-          $info[] = (($perms & 0x0004) ? 'r' : '-');
-          $info[] = (($perms & 0x0002) ? 'w' : '-');
-          $info[] = (($perms & 0x0001) ? (($perms & 0x0200) ? 't' : 'x' ) : (($perms & 0x0200) ? 'T' : '-'));
+          $flags[] = (($perms & 0x0004) ? 'r' : '-');
+          $flags[] = (($perms & 0x0002) ? 'w' : '-');
+          $flags[] = (($perms & 0x0001) ? (($perms & 0x0200) ? 't' : 'x' ) : (($perms & 0x0200) ? 'T' : '-'));
 
           $size = is_dir($subject) ? '' : sprintf(' %.2fK', $file->getSize() / 1024);
           
-          $matches[] = $this->entity('strMatch', 'file') . ' ' . implode('', $info) . $size;
+          $matches[] = $this->entity('strMatch', 'file') . ' ' . implode('', $flags) . $size;
         }
 
         // class name?
@@ -894,7 +900,7 @@ class ref{
         if(($length < 70) && function_exists($subject))
           $matches[] = $this->entity('strMatch', 'function') . ' ' . $this->formatFunctionString($subject);      
 
-        // skip serialization/json checks if the string appears to be numeric,
+        // skip serialization/json/date checks if the string appears to be numeric,
         // or if it's shorter than 5 characters
         if(!is_numeric($subject) && ($length > 4)){
 
@@ -906,31 +912,31 @@ class ref{
           }
 
           // attempt to detect if this is a serialized string     
-          static $unserializing = false;      
+          static $unserializing = 0;      
 
-          if(!$unserializing && in_array($subject[0], array('s', 'a', 'O'), true)){
-            $unserializing = true;
+          if(($unserializing < 5) && in_array($subject[0], array('s', 'a', 'O'), true)){
+            $unserializing++;
             if(($subject[$length - 1] === ';') || ($subject[$length - 1] === '}'))
               if((($subject[0] === 's') && ($subject[$length - 2] !== '"')) || preg_match("/^{$subject[0]}:[0-9]+:/s", $subject))
                 if(($unserialized = @unserialize($subject)) !== false)
                   $matches[] = $this->entity('strMatch', 'unserialized:') . ' ' . $this->formatSubject($unserialized);
 
-            unset($unserializing);
+            $unserializing--;
 
           }else{
 
             // try to find out if it's a json-encoded string;
             // only do this for json-encoded arrays or objects, because other types have too generic formats
-            static $decodingJson = false;
+            static $decodingJson = 0;
 
-            if(!$decodingJson && in_array($subject[0], array('{', '['), true)){     
-              $decodingJson = true;
+            if(($decodingJson < 5) && in_array($subject[0], array('{', '['), true)){     
+              $decodingJson++;
               $json = json_decode($subject);
 
               if(json_last_error() === JSON_ERROR_NONE)
                 $matches[] = $this->entity('strMatch', 'json.decoded') . ' ' . $this->formatSubject($json);
 
-              unset($decodingJson);
+              $decodingJson--;
             }
           }
         }
@@ -952,6 +958,10 @@ class ref{
         $matches = null;
       }
 
+      $encoding = function_exists('mb_detect_encoding') ? mb_detect_encoding($subject) : false;      
+      $info     = $encoding && ($encoding !== 'ASCII') ? $length . '; ' . $encoding : $length;
+      $info     = 'string(' . $info . ')';
+
       return $this->entity('string', $subject, $info) . $extra;
     }    
 
@@ -961,19 +971,24 @@ class ref{
 
     // if we reached this point, $subject must be an object     
     $objectName = $this->formatClassString($subject);    
-    $objectHash = spl_object_hash($subject);
+    $hash = spl_object_hash($subject);
 
     // tracks objects to detect recursion
-    static $objectHashes = array();
+    static $hashes = array();
 
     // already been here?
-    if(isset($objectHashes[$objectHash]))
+    if(isset($hashes[$hash]))
       return $this->entity('object', "{$objectName} object") . $this->group('Recursion');
 
+    // sometimes incomplete objects may be created from string unserialization,
+    // if the class to which the object belongs wasn't included until the unserialization stage...
+    if($subject instanceof \__PHP_Incomplete_Class)
+      return $this->entity('object') . $this->group('Incomplete');      
+
     // track hash
-    $objectHashes[$objectHash] = 1;
-    $reflector                 = new \ReflectionObject($subject);
-    $output                    = '';
+    $hashes[$hash] = 1;
+    $reflector           = new \ReflectionObject($subject);
+    $output              = '';
     $this->level++;    
 
     // show contents for iterators
@@ -989,7 +1004,7 @@ class ref{
           $length   = $encoding && ($encoding !== 'ASCII') ? static::strLen($idx) . '; ' . $encoding : static::strLen($idx);
           $keyInfo  = sprintf('%s(%s)', $keyInfo, $length);        
         }
-        
+
         array_unshift($item, $this->entity('key', $idx, sprintf('Iterator key: %s', $keyInfo)));
       }  
 
@@ -1000,12 +1015,20 @@ class ref{
     $methods         = $reflector->getMethods(\ReflectionMethod::IS_PUBLIC | \ReflectionMethod::IS_PROTECTED);
     $constants       = $reflector->getConstants();
     $interfaces      = $reflector->getInterfaces();
-    $traits          = version_compare(PHP_VERSION, '5.4') >= 0 ? $reflector->getTraits() : array();
+    $traits          = $this->is54 ? $reflector->getTraits() : array();
     $internalParents = static::getParentClasses($reflector, true);
+
+    // work-around for https://bugs.php.net/bug.php?id=49154
+    // @see http://stackoverflow.com/questions/15672287/strange-behavior-of-reflectiongetproperties-with-numeric-keys
+    if(!$this->is54){      
+      $props = array_values(array_filter($props, function($prop) use($subject){
+        return !$prop->isPublic() || property_exists($subject, $prop->name);
+      }));
+    }
 
     // no data to display?
     if(!$props && !$methods && !$constants && !$interfaces && !$traits){      
-      unset($objectHashes[$objectHash]);
+      unset($hashes[$hash]);
       $this->level--;
       return $this->entity('object', "{$objectName} object") . $this->group();
     }
@@ -1022,9 +1045,8 @@ class ref{
 
     // class constants
     if($constants){
-      $itemCount = count($constants);
-      $index     = 0;
-      $items     = version_compare(PHP_VERSION, '5.4') >= 0 ? new \SplFixedArray($itemCount) : array();
+      $index = 0;
+      $items = $this->is54 ? new \SplFixedArray(count($constants)) : array();
 
       foreach($constants as $name => $value){
         foreach($internalParents as $parent)
@@ -1055,20 +1077,8 @@ class ref{
     }
 
     // object/class properties
-    if($props){
-      if(version_compare(PHP_VERSION, '5.4') >= 0){
-        $items = array();
-
-      // work-around for https://bugs.php.net/bug.php?id=49154
-      // (see http://stackoverflow.com/questions/15672287/strange-behavior-of-reflectiongetproperties-with-numeric-keys)
-      }else{
-        $props = array_values(array_filter($props, function($prop) use($subject){
-          return !$prop->isPublic() || property_exists($subject, $prop->name);
-        }));
-
-        $itemCount = count($props);
-        $items = new \SplFixedArray($itemCount);
-      }
+    if($props){ 
+      $items = $this->is54 ? new \SplFixedArray(count($props)) : array();
      
       foreach($props as $idx => $prop){
         $modifiers = array();
@@ -1115,15 +1125,13 @@ class ref{
 
     // class methods
     if($methods){
-      $itemCount = count($methods);      
-      $items     = array();
+      $items = array();
 
       foreach($methods as $idx => $method){
         $paramStrings = $modifiers = array();
 
         // process arguments
         foreach($method->getParameters() as $parameter){
-
           $paramName = sprintf('$%s', $parameter->getName());
 
           if($parameter->isPassedByReference())
@@ -1205,7 +1213,7 @@ class ref{
     $group = $this->entity('object', "{$objectName} object") . $this->group('', $output);
 
     $this->level--;
-    unset($objectHashes[$objectHash]);
+    unset($hashes[$hash]);
 
     return $group;
   }
@@ -1588,21 +1596,18 @@ class ref{
 
       // user-defined; attempt to get doc comments
       }else{
-
         if($comments = static::parseComment($data->getDocComment())){
           $text = $comments['title'];
           $desc = $comments['description'];
 
           foreach($comments['tags'] as $tag => $values){
             foreach($values as $value){
-
               if($tag === 'param'){
                 $value[0] = $value[0] . ' ' . $value[1];
                 unset($value[1]);
               }
 
-              $value = is_array($value) ? implode('</b><b>', static::escape($value)) : static::escape($value);
-
+              $value    = is_array($value) ? implode('</b><b>', static::escape($value)) : static::escape($value);
               $subMeta .= sprintf('<i><b>@%s</b><b>%s</b></i>', $tag, $value);
             }  
           }
@@ -1629,11 +1634,9 @@ class ref{
     
     // function parameter
     }elseif($data instanceof \ReflectionParameter){
-
       $function = $data->getDeclaringFunction();
-
-      $tags = static::parseComment($function->getDocComment(), 'tags');
-      $params = empty($tags['param']) ? array() : $tags['param'];
+      $tags     = static::parseComment($function->getDocComment(), 'tags');
+      $params   = empty($tags['param']) ? array() : $tags['param'];
     
       foreach($params as $tag){
         list($types, $name, $description) = $tag;
@@ -1652,7 +1655,6 @@ class ref{
     }
 
     if($text && ($this->format === 'html')){
-
       if($subMeta)
         $subMeta = sprintf('<u>%s</u>', $subMeta);
 
