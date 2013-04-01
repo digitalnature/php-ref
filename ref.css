@@ -9,16 +9,22 @@
 .ref q,
 .ref u,
 .ref a,
+.ref s,
 .ref label,
+.ref kbd,
+.ref ins,
 .ref dl,
 .ref dt,
 .ref dd
 .ref h4{
-  font-style: normal;  
-  font-weight: normal;
+  font-style: inherit;  
+  font-weight: inherit;
   margin: 0;
   padding: 0;
-  text-decoration: none;
+  text-align: left;
+  display: inline;
+  text-decoration: inherit;
+  white-space: normal;
 }
 
 /* no quotes on Q */
@@ -148,8 +154,8 @@
   color: #ccc;
 }
 
-/* source expression */
-.ref .rExp{
+/* source expression (input) */
+.ref > kbd{
   margin: 2px 0 0;
   padding: 2px 7px 3px 4px;
   display: block;
@@ -190,11 +196,6 @@
      -moz-transform: rotate(90deg);       
       -ms-transform: rotate(90deg);
           transform: rotate(90deg);  
-}
-
-
-.ref > div{
-  position: relative;
 }
 
 /* hide next element when checkbox is not checked */
@@ -246,42 +247,44 @@
   width: 100%;
 }
 
-/* zebra */
-.ref dl:nth-child(odd){
-  background: #f4f4f4;
-}
+/* zebra-like rows */
+.ref dl:nth-child(odd){background: #f4f4f4;}
+.ref dl:nth-child(even){background: #f9f9f9;}
 
-.ref section dl:nth-child(even){
-  background: #f9f9f9;
-}
-
-/* base entity */
-.ref i{
+/* base entity - can be nested */
+.ref b{
   white-space: pre;
   display: inline;
 }
 
-/* hidden content (used to generate the tooltip */
-.ref q{
+/* meta content (used to generate the tooltip */
+.ref b > q{
   display: none;  
 }
 
 /* show help cursor when mouse is over an entity with a tooltip */
-.ref .rHasTip{
+/* note that this attribute is added with javascript */
+.ref b[data-has-tip]{
   cursor: help;
 }
 
+/* pointer if inside a link */
+.ref a > b[data-has-tip]{
+  cursor: pointer;
+}
+
 /* key-value dividers, property & method modifiers etc. */
-.ref .rSep{
+.ref i{
+  white-space: pre;  
   color: #bbb;
 }
 
 /* tag-like appearance for boolean, null and resource types */
-.ref .rTrue,
-.ref .rFalse,
-.ref .rNull,
-.ref .rResource,
-.ref .rStrMatch{
+.ref b[data-true],
+.ref b[data-false],
+.ref b[data-null],
+.ref b[data-resource],
+.ref s{
   font: bold 11px Helvetica, Arial; 
   color: #fff;        
   padding: 1px 3px;
@@ -296,154 +299,99 @@
   background-image: linear-gradient(to bottom, rgba(255,255,255,0.1) 40%,rgba(0,0,0,0.1) 100%);
 }
 
-/* regular expression (colors partially match RegexBuddy and RegexPal) */
-.ref .rStrRegex{
-  background: #e6e6e6;
-  padding: 0 2px;
-  border-radius: 2px;
-  word-wrap: break-word;
+/* string matches */
+.ref s{
+  background-color: #d78035;
 }
-
-.ref .rStrRegex i, .ref .rStrRegex u, .ref .rStrRegex b{
-  font-weight: bold;
-  text-shadow: none;
-}
-
-
-/* char class */
-.ref .rStrRegex i{
-  background: #ffc080;
-  color: #694c07;
-}
-
-.ref .rStrRegex i i{background: #e0a060;} /* char class: metasequence */
-.ref .rStrRegex i u{background: #ffcf9b;} /* char class: range-hyphen */
-
-/* metasequence */
-.ref .rStrRegex b{
-  background: #80c0ff;
-  color: #105f8c;
-} 
-
-/* group: depth 1 */
-.ref .rStrRegex .g1{
-  background: #00c000;
-  color: #fff;
-}
-
-/* group: depth 2 */
-.ref .rStrRegex .g2{
-  background: #c3e86c;
-  color: #648c1c;
-}
-
-/* group: depth 3 */
-.ref .rStrRegex .g3{
-  background: #008000;
-  color: #fff;
-}
-
-/* group: depth 4 */
-.ref .rStrRegex .g4{
-  background: #6dcb99;
-  color: #fff;
-}
-
-/* group: depth 5 */
-.ref .rStrRegex .g5{
-  background: #00ff00;
-  color: #2c8e24;
-}
-
-
 
 /* boolean true */
-.ref .rTrue{
+.ref b[data-true]{
   background-color: #339900;
 }
 
 /* boolean false */
-.ref .rFalse{
+.ref b[data-false]{
   background-color: #CC0033;
   color: #fff;
 }   
 
 /* null value */
-.ref .rNull{
+.ref b[data-null]{
   background-color: #eee;
   color: #999;
   text-shadow: inherit;
 }
 
 /* resources */
-.ref .rResource{
+.ref b[data-resource]{
   background-color: #0057ae;
 }   
 
-.ref .rResourceInfo{  
+.ref b[data-resourceInfo]{
   font: bold 11px Helvetica, Arial;   
   color: #999;
 }
 
-/* string matches */
-.ref .rStrMatch{
-  background-color: #d78035;
-  margin-right: 0;
-}
-
 /* integer or double values */
-.ref .rInteger,
-.ref .rDouble{
+.ref b[data-integer],
+.ref b[data-double]{
   color: #0099CC;
 }   
 
 /* string values */
-.ref .rString{
+.ref b[data-string]{
   color: #669933;  
 }
 
 /* arrays & objects */
-.ref .rGroup,
-.ref .rArray,
-.ref .rObject,
-.ref .rInterface,
-.ref .rTrait{
+.ref b[data-array],
+.ref b[data-array] ~ i,
+.ref b[data-object],
+.ref b[data-object] ~ i,
+.ref b[data-resource] ~ i{
   color:#CC0033;
 }
 
-.ref .rInherited .rProperty{
+.ref b[data-property-inherited]{
   color: #999;
 }
 
-.ref .rMethod{
+.ref b[data-method]{
   font-weight: bold;
   color: #0057ae;
 }
 
 /* inherited methods */
-.ref .rInherited .rMethod{
+.ref b[data-method-inherited]{
   color: #6da5de;
 }
 
+/* method arguments */
+.ref b[data-parameter]{
+  font-weight: normal;  
+  color: #333;
+}
+
 /* optional method arguments */
-.ref .rOptional > *{
+.ref b[data-parameter-optional]{
   font-style: italic;
+  font-weight: normal;    
   color: #aaa;
 }
 
 /* group info prefix */
-.ref .rGroup > b{
+.ref i + ins{
   font: bold 11px Helvetica, Arial;  
   padding: 0 3px;
   color: #333;
 }
 
 /* tiny bubbles that indicate visibility info or class features */
-.ref .rFinal,
-.ref .rAbstract,
-.ref .rProtected,
-.ref .rIterateable,
-.ref .rCloneable{
+.ref b[data-mod-final],
+.ref b[data-mod-abstract],
+.ref b[data-mod-protected],
+.ref b[data-mod-iterateable],
+.ref b[data-mod-cloneable]{
   font: bold 11px Helvetica, Arial;    
   display: inline-block;  
   margin: 0 2px;  
@@ -458,18 +406,72 @@
   color:#fff;          
 }
 
-.ref .rAbstract{
+.ref b[data-mod-abstract]{
   background: #baed78;
 }
 
-.ref .rProtected{
+.ref b[data-mod-protected]{
   background: #edd078;
 }
 
-.ref .rIterateable{
+.ref b[data-mod-iterateable]{
   background: #d5dea5;
 }
 
-.ref .rCloneable{
+.ref b[data-mod-cloneable]{
   background: #bdd7d1;
+}
+
+/* regular expression (colors partially match RegexBuddy and RegexPal) */
+.ref b[data-regex]{
+  font-weight: bold;
+  text-shadow: none;
+  padding: 1px 0;
+  background: #e6e6e6;  
+  word-wrap: break-word;
+}
+
+/* char class */
+.ref b[data-regex-chr]{
+  background: #ffc080;
+  color: #694c07;
+}
+
+.ref b[data-regex-chr-meta]{background: #e0a060;} /* char class: metasequence */
+.ref b[data-regex-chr-range]{background: #ffcf9b;} /* char class: range-hyphen */
+
+/* metasequence */
+.ref b[data-regex-meta]{
+  background: #80c0ff;
+  color: #105f8c;
+} 
+
+/* group: depth 1 */
+.ref b[data-regex-g1]{
+  background: #00c000;
+  color: #fff;
+}
+
+/* group: depth 2 */
+.ref b[data-regex-g2]{
+  background: #c3e86c;
+  color: #648c1c;
+}
+
+/* group: depth 3 */
+.ref b[data-regex-g3]{
+  background: #008000;
+  color: #fff;
+}
+
+/* group: depth 4 */
+.ref b[data-regex-g4]{
+  background: #6dcb99;
+  color: #fff;
+}
+
+/* group: depth 5 */
+.ref b[data-regex-g5]{
+  background: #00ff00;
+  color: #2c8e24;
 }

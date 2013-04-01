@@ -2,7 +2,7 @@ window.addEventListener('load', function(){
 
   var tip  = document.createElement('div'),
       refs = document.querySelectorAll('.ref'),
-      nfos = document.querySelectorAll('.ref .rHasTip');
+      nfos = document.querySelectorAll('.ref b > q');
 
   for(var i = 0, max = refs.length; i < max; i++)
     refs[i].onmousemove = function(e){
@@ -13,12 +13,13 @@ window.addEventListener('load', function(){
     };
 
   for(var i = 0, max = nfos.length; i < max; i++){
-    nfos[i].onmouseover = function(){ 
+    nfos[i].parentNode.setAttribute('data-has-tip', true);
+    nfos[i].parentNode.onmouseover = function(){ 
       tip.className = 'ref visible';      
       tip.innerHTML = this.getElementsByTagName('q')[0].innerHTML;
       window.clearTimeout(tip.fadeOut);
     };
-    nfos[i].onmouseout = function(){
+    nfos[i].parentNode.onmouseout = function(){
       tip.className = 'ref visible fadingOut';
       tip.fadeOut = window.setTimeout(function(){
         tip.innerHTML = '';
@@ -35,12 +36,10 @@ window.addEventListener('keydown', function(ev){
   if(ev.keyCode != 88)
     return;
 
-  ev.preventDefault();
-
-  var haveChecked = !!document.querySelector('.ref input[type="checkbox"]:checked'),
+  var haveCollapsed = !!document.querySelector('.ref input[type="checkbox"]:not(:checked)'),
       inputs = document.querySelectorAll('.ref input[type="checkbox"]');
 
+  ev.preventDefault();
   for(var i = 0, max = inputs.length; i < max; i++)
-    inputs[i].checked = !haveChecked;
-
+    inputs[i].checked = !!haveCollapsed;
 });

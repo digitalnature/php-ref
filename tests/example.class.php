@@ -28,6 +28,11 @@ interface Testable{}
  */
 abstract class AbstractTest extends \ArrayObject{
 
+  const
+  
+    FOO  = 'this constant will be inherited';
+
+
   protected
 
     /**
@@ -90,6 +95,11 @@ abstract class AbstractTest extends \ArrayObject{
  * @author  One Trick Pony
  */
 class ClassTest extends AbstractTest implements Testable{
+
+  const
+  
+    BAR  = 420;
+    
   
   public
 

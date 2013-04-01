@@ -31,7 +31,9 @@
       'multi'                             => array(1, 2, 3, array(4, 5, 6), 'FUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUU'),  
       'matching class'                    => 'DateTime',
       'matching file'                     => 'file.txt',
-      'matching date/file/function/class' => 'today',
+      'incomplete object'                 => unserialize('O:3:"Foo":1:{s:3:"bar";i:5;}'),
+      'empty object'                      => new \StdClass(),
+      'matching date/file/function/class' => 'today',      
     );
 
     $array['reference to self'] = &$array;
@@ -40,7 +42,7 @@
 
     if($htmlMode){
     
-      r(true, false, 'I can haz a 강남스타일 string', '2012-12-26 04:20:00', null, 17, 4.20);      
+      r(true, false, 'I can haz a 강남스타일 string', '2012-12-26 04:20:00', null, 4.20);      
       r(array(), $array, serialize(array('A', 'serialized', 'string')));
       r(fopen('php://stdin', 'r'), function($x, $d){}); 
       r(new \DateTimeZone('Pacific/Honolulu'));
@@ -48,7 +50,7 @@
 
     }else{
 
-      rt(true, false, 'I can haz a 강남스타일 string', '2012-12-26 04:20:00', null, 17, 4.20);
+      rt(true, false, 'I can haz a 강남스타일 string', '2012-12-26 04:20:00', null, 4.20);
       rt(array(), $array, serialize(array('A', 'serialized', 'string')));     
       rt(fopen('php://stdin', 'r'), function($x, $d){}); 
       rt(new \DateTimeZone('Pacific/Honolulu'));

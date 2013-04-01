@@ -113,11 +113,18 @@ class ref{
                 'expandDepth'  => 1,
 
                 // shortcut functions used to access the ::build() method below;
-                // if they are namespaced, the namespace must be present as well (methods are not supported)                      
+                // if they are namespaced, the namespace must be present as well (methods are not supported)
                 'shortcutFunc' => array('r', 'rt'),
 
-                // default output format
-                'outputFormat' => 'html',
+                // callbacks for custom/external formatters (as associative array: format => callback)
+                'formatter'    => array(),
+
+                // when this option is set to TRUE, additional information is
+                // returned (note that this seriously affects performance):
+                // - string matches (date, file, functions, classes, json, serialized data, regex etc.)
+                // - extra information for some resource types                
+                // - contents of iterator objects
+                'extendedInfo' => true,
 
                 // stylesheet path (for HTML only);
                 // 'false' means no styles
@@ -137,21 +144,21 @@ class ref{
      *
      * @var  int
      */  
-    $level  = 0,
+    $level    = 0,
 
     /**
      * Max. expand depth of this instance
      *
      * @var  int
      */     
-    $depth  = 1,
+    $expDepth = 1,
 
     /**
      * Output format of this instance
      *
      * @var  string
      */     
-    $format = null,
+    $format   = null,
 
 
     /**
@@ -159,29 +166,75 @@ class ref{
      *
      * @var  bool
      */ 
-    $is54   = false;
+    $is54     = false,
+
+
+    /**
+     * mb_string installed?
+     *
+     * @var  bool
+     */ 
+    $mbStr    = false;
 
 
 
   /**
    * Constructor
    *
-   * @since   1.0
-   * @param   string|null $format      Output format, defaults to the 'outputFormat' config setting
-   * @param   int|null $depth          Maximum expand depth
+   * @param   string|null $format   Output format, defaults to 'html'
+   * @param   int|null $expDepth    Maximum expand depth (relevant to the HTML format)
    */
-  public function __construct($format = null, $depth = null){
-    $this->is54   = (version_compare(PHP_VERSION, '5.4') >= 0);    
-    $this->format = $format ? $format : static::config('outputFormat');
-    $this->depth  = ($depth !== null) ? $depth : static::config('expandDepth');
+  public function __construct($format = 'html', $expDepth = null){
+    $this->is54     = (version_compare(PHP_VERSION, '5.4') >= 0);    
+    $this->mbStr    = function_exists('mb_detect_encoding');
+    $this->format   = $format;
+    $this->expDepth = ($expDepth !== null) ? $expDepth : static::$config['expandDepth'];
   }
 
 
 
   /**
-   * Creates the root structure that contains all the groups and entities
+   * Enforce proper use of this class
+   *
+   * @param   string $name
+   */
+  public function __get($name){
+    throw new \Exception('No such property');
+  }
+
+
+  /**
+   * Enforce proper use of this class
+   *
+   * @param   string $name
+   * @param   mixed $value
+   */
+  public function __set($name, $value){
+    throw new \Exception('Not allowed');
+  }  
+
+
+
+  /**
+   * Used to dispatch output to a custom formatter
    *   
-   * @since   1.0
+   * @param   string $name
+   * @param   array $args
+   * @return  string
+   */
+  public function __call($name, array $args = array()){
+
+    if(isset(static::$config['formatters'][$name]))
+      return call_user_func_array(static::$config['formatters'][$name], $args);
+
+    throw new \Exception('Method not defined');
+  }
+
+
+
+  /**
+   * Generate structured information about a variable/value/expression (subject)
+   *   
    * @param   mixed $subject
    * @param   string $expression
    * @return  string
@@ -189,52 +242,16 @@ class ref{
   public function query($subject, $expression = null){
  
     // instance index (gets displayed as comment in html-mode)
-    static $counter = 1;
+    static $counter = 1;  
 
-    $startTime  = microtime(true);         
-    $subject    = $this->formatSubject($subject);
-    $expression = $this->formatExpression($expression);    
+    $startTime = microtime(true);         
+    $output    = $this->format('root', $this->evaluate($subject), $this->evaluateExp($expression));
+    $endTime   = round(microtime(true) - $startTime, 4);
 
-    switch($this->format){
-
-      // HTML output
-      case 'html':
-        $assets        = static::getAssets();
-        $template      = '<!-- ref #%d --><div>%s<div class="ref">%s<div>%s</div></div></div><!-- /ref (took %ss) -->';
-        $cpuUsage      = round(microtime(true) - $startTime, 4);
-        static::$time += $cpuUsage;
-        return sprintf($template, $counter++, $assets, $expression, $subject, $cpuUsage);
-
-      // text output
-      default:     
-        static::$time += round(microtime(true) - $startTime, 4);      
-        return sprintf("\n%s\n%s\n%s\n", $expression, str_repeat('=', static::strLen($expression)), $subject);
-    }
-
+    static::$time += $endTime; 
+    return $output;
   }
 
-
-  /**
-   * Set or get configuration options
-   *
-   * @since   1.0
-   * @param   string $key
-   * @param   mixed|null $value
-   * @return  mixed
-   */
-  public static function config($key, $value = null){
-
-    if(!array_key_exists($key, static::$config))
-      throw new \Exception(sprintf('Unrecognized option: "%s". Valid options are: %s', $key, implode(', ', array_keys(static::$config))));
-
-    if($value === null)
-      return static::$config[$key];
-
-    if(is_array(static::$config[$key]))
-      return static::$config[$key] = (array)$value;
-
-    return static::$config[$key] = $value;
-  }
 
 
 
@@ -246,7 +263,6 @@ class ref{
    * determining which of two or more functions is the fastest, rather than
    * finding out how fast is a single function.
    *
-   * @since   1.0
    * @param   int $iterations      Number of times the function will be executed
    * @param   callable $function   Function to execute
    * @param   mixed &$output       If given, last return value will be available in this variable
@@ -270,7 +286,6 @@ class ref{
   /**
    * Parses a DocBlock comment into a data structure.
    *
-   * @since   1.0
    * @link    http://pear.php.net/manual/en/standards.sample.php
    * @param   string $comment    DocBlock comment (must start with /**)
    * @param   string $key        Field to return (optional)
@@ -397,9 +412,289 @@ class ref{
 
 
   /**
+   * Split a regex into its components
+   * 
+   * Based on "Regex Colorizer" by Steven Levithan (this is a translation from javascript)
+   *
+   * @link     https://github.com/slevithan/regex-colorizer
+   * @link     https://github.com/symfony/Finder/blob/master/Expression/Regex.php#L64-74
+   * @param    string $pattern
+   * @return   array
+   */
+  public static function splitRegex($pattern){
+
+    // detection attempt code from the Symfony Finder component
+    $maybeValid = false;
+    if(preg_match('/^(.{3,}?)([imsxuADU]*)$/', $pattern, $m)) {
+      $start = substr($m[1], 0, 1);
+      $end   = substr($m[1], -1);
+
+      if(($start === $end && !preg_match('/[*?[:alnum:] \\\\]/', $start)) || ($start === '{' && $end === '}'))
+        $maybeValid = true;
+    }
+
+    if(!$maybeValid)
+      throw new \Exception('Pattern does not appear to be a valid PHP regex');
+
+    $output              = array();
+    $capturingGroupCount = 0;
+    $groupStyleDepth     = 0;
+    $openGroups          = array();
+    $lastIsQuant         = false;
+    $lastType            = 1;      // 1 = none; 2 = alternator
+    $lastStyle           = null;
+
+    preg_match_all('/\[\^?]?(?:[^\\\\\]]+|\\\\[\S\s]?)*]?|\\\\(?:0(?:[0-3][0-7]{0,2}|[4-7][0-7]?)?|[1-9][0-9]*|x[0-9A-Fa-f]{2}|u[0-9A-Fa-f]{4}|c[A-Za-z]|[\S\s]?)|\((?:\?[:=!]?)?|(?:[?*+]|\{[0-9]+(?:,[0-9]*)?\})\??|[^.?*+^${[()|\\\\]+|./', $pattern, $matches);
+
+    $matches = $matches[0];
+
+    $getTokenCharCode = function($token){
+      if(strlen($token) > 1 && $token[0] === '\\'){
+        $t1 = substr($token, 1);
+
+        if(preg_match('/^c[A-Za-z]$/', $t1))
+          return strpos("ABCDEFGHIJKLMNOPQRSTUVWXYZ", strtoupper($t1[1])) + 1;
+
+        if(preg_match('/^(?:x[0-9A-Fa-f]{2}|u[0-9A-Fa-f]{4})$/', $t1))
+          return intval(substr($t1, 1), 16);
+
+        if(preg_match('/^(?:[0-3][0-7]{0,2}|[4-7][0-7]?)$/', $t1))
+          return intval($t1, 8);
+
+        $len = strlen($t1);
+
+        if($len === 1 && strpos('cuxDdSsWw', $t1) !== false)
+          return null;
+
+        if($len === 1){
+          switch ($t1) {
+            case 'b': return 8;  
+            case 'f': return 12; 
+            case 'n': return 10; 
+            case 'r': return 13; 
+            case 't': return 9;  
+            case 'v': return 11; 
+            default: return $t1[0]; 
+          }
+        }
+      }
+
+      return ($token !== '\\') ? $token[0] : null;  
+    };   
+
+    foreach($matches as $m){
+
+      if($m[0] === '['){
+        $lastCC         = null;  
+        $cLastRangeable = false;
+        $cLastType      = 0;  // 0 = none; 1 = range hyphen; 2 = short class
+
+        preg_match('/^(\[\^?)(]?(?:[^\\\\\]]+|\\\\[\S\s]?)*)(]?)$/', $m, $parts);
+
+        array_shift($parts);
+        list($opening, $content, $closing) = $parts;
+
+        if(!$closing)
+          throw new \Exception('Unclosed character class');
+
+        preg_match_all('/[^\\\\-]+|-|\\\\(?:[0-3][0-7]{0,2}|[4-7][0-7]?|x[0-9A-Fa-f]{2}|u[0-9A-Fa-f]{4}|c[A-Za-z]|[\S\s]?)/', $content, $ccTokens);
+        $ccTokens     = $ccTokens[0];
+        $ccTokenCount = count($ccTokens);
+        $output[]     = array('chr' => $opening);
+
+        foreach($ccTokens as $i => $cm) {
+
+          if($cm[0] === '\\'){
+            if(preg_match('/^\\\\[cux]$/', $cm))
+              throw new \Exception('Incomplete regex token');
+
+            if(preg_match('/^\\\\[dsw]$/i', $cm)) {
+              $output[]     = array('chr-meta' => $cm);
+              $cLastRangeable  = ($cLastType !== 1);
+              $cLastType       = 2;
+
+            }elseif($cm === '\\'){
+              throw new \Exception('Incomplete regex token');
+              
+            }else{
+              $output[]       = array('chr-meta' => $cm);
+              $cLastRangeable = $cLastType !== 1;
+              $lastCC         = $getTokenCharCode($cm);
+            }
+
+          }elseif($cm === '-'){
+            if($cLastRangeable){
+              $nextToken = ($i + 1 < $ccTokenCount) ? $ccTokens[$i + 1] : false;
+
+              if($nextToken){
+                $nextTokenCharCode = $getTokenCharCode($nextToken[0]);
+
+                if((!is_null($nextTokenCharCode) && $lastCC > $nextTokenCharCode) || $cLastType === 2 || preg_match('/^\\\\[dsw]$/i', $nextToken[0]))
+                  throw new \Exception('Reversed or invalid range');
+
+                $output[]       = array('chr-range' => '-');
+                $cLastRangeable = false;
+                $cLastType      = 1;
+               
+              }else{
+                $output[] = $closing ? array('chr' => '-') : array('chr-range' => '-');
+              }
+
+            }else{
+              $output[]        = array('chr' => '-');
+              $cLastRangeable  = ($cLastType !== 1);
+            }
+
+          }else{
+            $output[]       = array('chr' => $cm);
+            $cLastRangeable = strlen($cm) > 1 || ($cLastType !== 1);
+            $lastCC         = $cm[strlen($cm) - 1];
+          }
+        }
+
+        $output[] = array('chr' => $closing);
+        $lastIsQuant  = true;
+
+      }elseif($m[0] === '('){
+        if(strlen($m) === 2)
+          throw new \Exception('Invalid or unsupported group type');
+   
+        if(strlen($m) === 1)
+          $capturingGroupCount++;
+
+        $groupStyleDepth = ($groupStyleDepth !== 5) ? $groupStyleDepth + 1 : 1;
+        $openGroups[]    = $m; // opening
+        $lastIsQuant     = false;
+        $output[]        = array("g{$groupStyleDepth}" => $m);
+
+      }elseif($m[0] === ')'){
+        if(!count($openGroups)) 
+          throw new \Exception('No matching opening parenthesis');
+
+        $output[]        = array('g' . $groupStyleDepth => ')');
+        $prevGroup       = $openGroups[count($openGroups) - 1];
+        $prevGroup       = isset($prevGroup[2]) ? $prevGroup[2] : '';
+        $lastIsQuant     = !preg_match('/^[=!]/', $prevGroup);
+        $lastStyle       = "g{$groupStyleDepth}";
+        $lastType        = 0;
+        $groupStyleDepth = ($groupStyleDepth !== 1) ? $groupStyleDepth - 1 : 5;
+
+        array_pop($openGroups);
+        continue;
+      
+      }elseif($m[0] === '\\'){
+        if(isset($m[1]) && preg_match('/^[1-9]/', $m[1])){
+          $nonBackrefDigits = '';
+          $num = substr(+$m, 1);
+
+          while($num > $capturingGroupCount){
+            preg_match('/[0-9]$/', $num, $digits);
+            $nonBackrefDigits = $digits[0] . $nonBackrefDigits;
+            $num = floor($num / 10); 
+          }
+
+          if($num > 0){
+            $output[] = array('meta' =>  "\\{$num}", 'text' => $nonBackrefDigits);
+
+          }else{
+            preg_match('/^\\\\([0-3][0-7]{0,2}|[4-7][0-7]?|[89])([0-9]*)/', $m, $pts);
+            $output[] = array('meta' => '\\' . $pts[1], 'text' => $pts[2]);
+          }
+
+          $lastIsQuant = true;
+
+        }elseif(isset($m[1]) && preg_match('/^[0bBcdDfnrsStuvwWx]/', $m[1])){
+   
+          if(preg_match('/^\\\\[cux]$/', $m))
+            throw new \Exception('Incomplete regex token');
+
+          $output[]    = array('meta' => $m);
+          $lastIsQuant = (strpos('bB', $m[1]) === false);
+
+        }elseif($m === '\\'){
+          throw new \Exception('Incomplete regex token');
+            
+        }else{
+          $output[]    = array('text' => $m);
+          $lastIsQuant = true;
+        }
+
+      }elseif(preg_match('/^(?:[?*+]|\{[0-9]+(?:,[0-9]*)?\})\??$/', $m)){
+        if(!$lastIsQuant)
+          throw new \Exception('Quantifiers must be preceded by a token that can be repeated');
+
+        preg_match('/^\{([0-9]+)(?:,([0-9]*))?/', $m, $interval);
+
+        if($interval && (+$interval[1] > 65535 || (isset($interval[2]) && (+$interval[2] > 65535))))
+          throw new \Exception('Interval quantifier cannot use value over 65,535');
+        
+        if($interval && isset($interval[2]) && (+$interval[1] > +$interval[2]))
+          throw new \Exception('Interval quantifier range is reversed');
+        
+        $output[]     = array($lastStyle ? $lastStyle : 'meta' => $m);
+        $lastIsQuant  = false;
+
+      }elseif($m === '|'){
+        if($lastType === 1 || ($lastType === 2 && !count($openGroups)))
+          throw new \Exception('Empty alternative effectively truncates the regex here');
+
+        $output[]    = count($openGroups) ? array("g{$groupStyleDepth}" => '|') : array('meta' => '|');
+        $lastIsQuant = false;
+        $lastType    = 2;
+        $lastStyle   = '';
+        continue;
+
+      }elseif($m === '^' || $m === '$'){
+        $output[]    = array('meta' => $m);
+        $lastIsQuant = false;
+
+      }elseif($m === '.'){
+        $output[]    = array('meta' => '.');
+        $lastIsQuant = true;
+   
+      }else{
+        $output[]    = array('text' => $m);
+        $lastIsQuant = true;
+      }
+
+      $lastType  = 0;
+      $lastStyle = '';    
+    }
+
+    if($openGroups)
+      throw new \Exception('Unclosed grouping');
+
+    return $output;
+  }
+
+
+
+  /**
+   * Set or get configuration options
+   *
+   * @param   string $key
+   * @param   mixed|null $value
+   * @return  mixed
+   */
+  public static function config($key, $value = null){
+
+    if(!array_key_exists($key, static::$config))
+      throw new \Exception(sprintf('Unrecognized option: "%s". Valid options are: %s', $key, implode(', ', array_keys(static::$config))));
+
+    if($value === null)
+      return static::$config[$key];
+
+    if(is_array(static::$config[$key]))
+      return static::$config[$key] = (array)$value;
+
+    return static::$config[$key] = $value;
+  }
+
+
+
+  /**
    * Get styles and javascript (only generated for the 1st call)
    *
-   * @since   1.0
    * @return  string
    */
   public static function getAssets(){
@@ -413,18 +708,18 @@ class ref{
 
     ob_start();
 
-    if(static::config('stylePath') !== false){
+    if(static::$config['stylePath'] !== false){
       ?>
       <style scoped>
-        <?php readfile(str_replace('{:dir}', __DIR__, static::config('stylePath'))); ?>
+        <?php readfile(str_replace('{:dir}', __DIR__, static::$config['stylePath'])); ?>
       </style>
       <?php
     }
 
-    if(static::config('scriptPath') !== false){
+    if(static::$config['scriptPath'] !== false){
       ?>
       <script>
-        <?php readfile(str_replace('{:dir}', __DIR__, static::config('scriptPath'))); ?>
+        <?php readfile(str_replace('{:dir}', __DIR__, static::$config['scriptPath'])); ?>
       </script>
       <?php
     }  
@@ -442,9 +737,19 @@ class ref{
 
 
   /**
+   * Total CPU time used by the class
+   *   
+   * @return  double
+   */
+  public static function getTime(){
+    return static::$time;
+  }
+
+
+
+  /**
    * Determines the input expression(s) passed to the shortcut function
    *
-   * @since   1.0
    * @param   array &$options   Optional, options to gather (from operators)
    * @return  array             Array of string expressions
    */
@@ -464,7 +769,7 @@ class ref{
       extract($calee);
 
       // skip, if the called function doesn't match the shortcut function name
-      if(!$function || !preg_grep("/{$function}/i" , static::config('shortcutFunc')))
+      if(!$function || !preg_grep("/{$function}/i" , static::$config['shortcutFunc']))
         continue;
 
       if(!$line || !$file)
@@ -555,9 +860,235 @@ class ref{
 
 
   /**
+   * Generates the output in plain text format
+   *   
+   * @param   string $element
+   * @param   string|null $arg1
+   * @param   string|null $arg2
+   * @param   string|array|null $meta
+   * @return  string
+   */
+  protected function toText($element, $arg1 = null, $arg2 = null, $meta = null){
+
+    switch($element){
+      case 'sep':
+        return $arg1;
+
+      case 'text':
+        if($arg2 === null)
+          $arg2 = $arg1;
+
+        $formatMap = array(
+          'string'   => '%3$s "%2$s"',
+          'integer'  => 'int(%2$s)',
+          'double'   => 'double(%2$s)',
+          'true'     => 'bool(%2$s)',
+          'false'    => 'bool(%2$s)',
+          'key'      => '[%2$s]',
+        );
+
+        if(!is_string($meta))
+          $meta = '';
+
+        return isset($formatMap[$arg1]) ? sprintf($formatMap[$arg1], $arg1, $arg2, $meta) : $arg2;
+
+      case 'match':
+        return ($arg1 !== 'regex') ? "\n~~ {$arg1}: {$arg2}" : '';
+
+      case 'contain':
+        if($arg1 === 'regex')
+          return '';
+
+        return $arg2;        
+
+      case 'link':
+        return $arg1;
+
+      case 'group':
+        $prefix = ($arg2 !== null) ? $arg2 : '';
+        if($arg1){
+          $arg1 =  $arg1 . "\n";
+          $prefix .= ' ▼';
+        }
+
+        return "({$prefix}{$arg1})";
+
+      case 'section':        
+        $output = '';
+
+        if($arg2 !== null)
+          $output .= "\n\n " . $arg2 . "\n " . str_repeat('-', static::strLen($arg2));
+
+        $lengths = array();
+
+        // determine maximum column width
+        foreach($arg1 as $item)
+          foreach($item as $colIdx => $c)
+            if(!isset($lengths[$colIdx]) || $lengths[$colIdx] < static::strLen($c))
+              $lengths[$colIdx] = static::strLen($c);
+
+        foreach($arg1 as $item){
+          $lastColIdx = count($item) - 1;
+          $padLen     = 0;
+          $output    .= "\n  ";
+
+          foreach($item as $colIdx => $c){
+
+            // skip empty columns
+            if($lengths[$colIdx] < 1)
+              continue;
+
+            if($colIdx < $lastColIdx){
+              $output .= static::strPad($c, $lengths[$colIdx]) . ' ';
+              $padLen += $lengths[$colIdx] + 1;
+              continue;
+            }
+       
+            $output .= str_replace("\n", "\n" . str_repeat(' ', $padLen + 2), $c);
+          }         
+        }
+
+        return $output;
+
+      case 'bubbles':
+        return $arg1 ? '[' . implode('', $arg1) . '] ' : '';
+
+      case 'root':
+        return sprintf("\n%s\n%s\n%s\n", $arg2, str_repeat('=', static::strLen($arg2)), $arg1);        
+        
+      default:
+        return '';
+
+    }
+  }
+
+
+
+  /**
+   * Generates the output in HTML5 format
+   *   
+   * @param   string $element
+   * @param   string|null $arg1
+   * @param   string|null $arg2
+   * @param   string|array|null $meta
+   * @return  string
+   */
+  protected function toHtml($element, $arg1 = null, $arg2 = null, $meta = null){
+
+    switch($element){
+      case 'sep':
+        return sprintf('<i>%s</i>', static::escape($arg1));
+
+      case 'text':
+        $tip  = '';
+        $arg2 = ($arg2 !== null) ? static::escape($arg2) : static::escape($arg1);
+
+        // generate tooltip
+        if($meta !== null){
+          if(!is_array($meta))
+            $meta = array('title' => $meta);
+
+          $meta += array(
+            'title'       => '',
+            'left'        => '',
+            'description' => '',
+            'tags'        => array(),
+            'sub'         => array(),            
+          );
+
+          $meta = static::escape($meta);
+
+          $tip = $meta['title'] ? "<i>{$meta['title']}</i>" : '';
+
+          if($meta['description'])
+            $tip .= "<i>{$meta['description']}</i>";
+
+          $tip = "<i>{$tip}</i>";
+
+          if($meta['left'])
+            $tip = "<b>{$meta['left']}</b>{$tip}";
+
+          $tags = '';
+          foreach($meta['tags'] as $tag => $values){
+            foreach($values as $value){
+              if($tag === 'param'){
+                $value[0] = "{$value[0]} {$value[1]}";
+                unset($value[1]);
+              }
+
+              $value  = is_array($value) ? implode('</b><b>', $value) : $value;
+              $tags  .= "<i><b>@{$tag}</b><b>{$value}</b></i>";
+            }
+          }
+
+          if($tags)
+            $tip .= "<u>{$tags}</u>";
+       
+          foreach($meta['sub'] as $line)
+            $tip .= sprintf('<u>%s</u>', sprintf('<b>%s</b>', implode('</b> <b>', $line)));
+       
+      
+          $tip = "<q>{$tip}</q>";
+        }
+
+        return ($arg1 !== 'name') ? "<b data-{$arg1}>{$arg2}{$tip}</b>" : "<b>{$arg2}{$tip}</b>";
+
+      case 'match':
+        return "<br><s>{$arg1}</s><b data-$arg1>{$arg2}</b>";
+
+      case 'contain':
+        return "<b data-{$arg1}>{$arg2}</b>";
+
+      case 'link':
+        return "<a href=\"{$arg2}\" target=\"_blank\">{$arg1}</a>";
+
+      case 'group':
+        static $groupIdx = 0;
+
+        if($arg1){
+          $checked = ($this->expDepth < 0) || (($this->expDepth > 0) && ($this->level <= $this->expDepth)) ? 'checked' : '';
+          $arg1 = sprintf('<input type="checkbox" id="refGrp%1$d" %3$s /><label for="refGrp%1$d"></label><div>%2$s</div>', ++$groupIdx, $arg1, $checked);
+        }
+
+        $prefix = ($arg2 !== null) ? sprintf('<ins>%s</ins>', static::escape($arg2)) : '';
+        return "<i>(</i>{$prefix}{$arg1}<i>)</i>";
+
+      case 'section':
+        $title = ($arg2 !== null) ? "<h4>{$arg2}</h4>" : '';
+
+        foreach($arg1 as &$row){
+          $last = array_pop($row);
+          $row  = implode('</dt><dt>', $row);
+          $row  = "<dl><dt>{$row}</dt><dd>{$last}</dd></dl>";
+        }
+
+        return $title . '<section>' . implode('', $arg1) . '</section>';
+
+      case 'bubbles':
+        return '<b>' . implode('', $arg1) . '</b>';
+
+      case 'root':
+        static $counter = 0;
+
+        if($arg2 !== null)
+          $arg2 = "<kbd>{$arg2}</kbd>";
+
+        $assets = static::getAssets();
+        $counter++;
+
+        return "<!-- ref #{$counter} --><div>{$assets}<div class=\"ref\">{$arg2}<div>{$arg1}</div></div></div><!-- /ref -->";
+
+      default:
+        return '';
+
+    }
+  }
+
+
+
+  /**
    * Get all parent classes of a class
    *
-   * @since   1.0
    * @param   string|Reflector $class   Class name or reflection object
    * @param   bool $internalOnly        Retrieve only PHP-internal classes
    * @return  array
@@ -580,163 +1111,270 @@ class ref{
 
 
   /**
-   * Generate class info
+   * Generate class / function info
    *
-   * @since   1.0
    * @param   string|Reflector $class   Class name or reflection object
+   * @param   string $single            Skip parent classes
+   * @param   mixed $context            Object context
    * @return  string
    */
-  protected function formatClassString($class){
+  protected function fromReflector(\Reflector $reflector, $single = '', \Reflector $context = null){
 
-    if(!($class instanceof \Reflector))
-      $class = new \ReflectionClass($class);
+    $items = ($single !== '') || !($reflector instanceof \ReflectionClass) ? array($reflector) : array_reverse(static::getParentClasses($reflector));
 
-    $classes = static::getParentClasses($class) + array($class);
+    foreach($items as &$item){
 
-    foreach($classes as &$class){
+      $name     = ($single !== '') ? $single : $item->getName();
+      $comments = $item->isInternal() ? array() : static::parseComment($item->getDocComment());
+      $meta     = array('sub' => array());
 
-      $modifiers = array();
+      if($item->isInternal()){
+        $extension = $item->getExtension();
+        $meta['title'] = ($extension instanceof \ReflectionExtension) ? sprintf('Internal - part of %s (%s)', $extension->getName(), $extension->getVersion()) : 'Internal';
+      
+      }else{
+        $comments = static::parseComment($item->getDocComment()); 
 
-      if($class->isAbstract())
-        $modifiers[] = array('abstract', 'A', 'This class is abstract');
+        if($comments)
+          $meta += $comments;
 
-      if($class->isFinal())
-        $modifiers[] = array('final', 'F', 'This class is final and cannot be extended');
-
-      // php 5.4+ only
-      if($this->is54 && $class->isCloneable())
-        $modifiers[] = array('cloneable', 'C', 'Instances of this class can be cloned');
-
-      if($class->isIterateable())
-        $modifiers[] = array('iterateable', 'X', 'Instances of this class are iterateable');            
-     
-      $class = $this->modifiers($modifiers) . $this->entity('class', $this->anchor($class, 'class'), $class);
-    }   
-
-    return implode($this->entity('sep', ' :: '), array_reverse($classes));
-  }
-
-
-
-  /**
-   * Generate function info
-   *
-   * @since   1.0
-   * @param   string|Reflector $func   Function name or reflection object
-   * @return  string
-   */
-  protected function formatFunctionString($func){
-
-    if(!($func instanceof \Reflector))
-      $func = new \ReflectionFunction($func);
-
-    return $this->entity('function', $this->anchor($func, 'function'), $func);
-  }
-
-
-
-  /**
-   * Generates information report for arrays
-   *
-   * It's a separate function because arrays must be passed by reference
-   * in order to detect recursion. And we do this only for subjects that are arrays
-   * because creating a references actually increases memory usage in this case.
-   *
-   * @since   1.0
-   * @param   array $subject
-   * @return  string
-   */
-  protected function formatSubjectArray(array &$subject){
-
-    // empty array?
-    if(empty($subject))      
-      return $this->entity('array') . $this->group();
-
-    // temporary element (marker) for arrays, used to track recursions
-    static $marker = null;
-
-    // set a marker to detect recursion
-    if(!$marker)
-      $marker = uniqid('', true);
-
-    // if our marker element is present in the array it means that we were here before
-    if(isset($subject[$marker]))
-      return $this->entity('array') . $this->group('Recursion');
-
-    $subject[$marker] = true;
-
-    // note that we must substract the marker element
-    $itemCount = count($subject) - 1;
-    $index = 0;
-    $this->level++;
-
-    // use splFixedArray() on PHP 5.4+ to save up some memory, because the subject array
-    // might contain a huge amount of entries.
-    // (note: lower versions of PHP 5.3 throw a heap corruption error after 10K entries)
-    // A more efficient way is to build the items as we go as strings,
-    // by concatenating the info foreach entry, but then we loose the flexibility that the
-    // entity/group/section methods provide us (exporting data in different formats
-    // would become harder)
-    $items = $this->is54 ? new \SplFixedArray($itemCount) : array();
-
-    foreach($subject as $key => &$value){
-
-      // ignore our marker
-      if($key === $marker)
-        continue;
-
-      $keyInfo = gettype($key);
-
-      if(is_string($key)){
-        $encoding = function_exists('mb_detect_encoding') ? mb_detect_encoding($key) : '';
-        $length   = $encoding && ($encoding !== 'ASCII') ? static::strLen($key) . '; ' . $encoding : static::strLen($key);
-        $keyInfo  = sprintf('%s(%s)', $keyInfo, $length);        
+        $meta['sub'][] = array('Defined in', basename($item->getFileName()) . ':' . $item->getStartLine());        
       }
 
-      $items[$index++] = array(
-        $this->entity('key', $key, sprintf('Key: %s', $keyInfo)),
-        $this->entity('sep', '=>'),
-        is_array($value) ? $this->formatSubjectArray($value) : $this->formatSubject($value),
-      );
+      if(($item instanceof \ReflectionFunction) || ($item instanceof \ReflectionMethod)){
+        if(($context !== null) && ($context->getShortName() !== $item->getDeclaringClass()->getShortName()))
+          $meta['sub'][] = array('Inherited from', sprintf('::%s', $context->getShortName()));
 
-      unset($subject[$key]);
+        $item = $this->linkify($this->format('text', 'name', $name, $meta), $item);
+        continue;
+      }
+
+      $bubbles = array();
+
+      if($item->isAbstract())
+        $bubbles[] = $this->format('text', 'mod-abstract', 'A', 'This class is abstract');
+
+      if($item->isFinal())
+        $bubbles[] = $this->format('text', 'mod-final', 'F', 'This class is final and cannot be extended');
+
+      // php 5.4+ only
+      if($this->is54 && $item->isCloneable())
+        $bubbles[] = $this->format('text', 'mod-cloneable', 'C', 'Instances of this class can be cloned');
+
+      if($item->isIterateable())
+        $bubbles[] = $this->format('text', 'mod-iterateable', 'X', 'Instances of this class are iterateable');            
+
+      $item = $this->format('bubbles', $bubbles) . $this->linkify($this->format('text', 'name', $name, $meta), $item);
     }
- 
-    $group = $this->entity('array') . $this->group($itemCount, $this->section($items));
-    $this->level--;
 
-    return $group;    
+    return count($items) > 1 ? implode($this->format('sep', ' :: '), $items) : $items[0];
   }
+
+
+
+  /**
+   * Generates an URL that points to the documentation page relevant for the requested context
+   *
+   * For internal functions and classes, the URI will point to the local PHP manual
+   * if installed and configured, otherwise to php.net/manual (the english one)
+   *
+   * @param   string $node            Text to linkify
+   * @param   Reflector $reflector    Reflector object (used to determine the URL scheme for internal stuff)
+   * @param   string|null $constant   Constant name, if this is a request to linkify a constant
+   * @return  string                  Updated text
+   */
+  protected function linkify($node, \Reflector $reflector, $constant = null){
+
+    static $docRefRoot = null, $docRefExt = null;
+
+    // most people don't have this set
+    if(!$docRefRoot)
+      $docRefRoot = rtrim(ini_get('docref_root'), '/');
+
+    if(!$docRefRoot)
+      $docRefRoot = 'http://php.net/manual/en';
+
+    if(!$docRefExt)
+      $docRefExt = ini_get('docref_ext');
+
+    if(!$docRefExt)
+      $docRefExt = '.php';
+
+    $phpNetSchemes = array(
+      'class'     => $docRefRoot . '/class.%s'    . $docRefExt,
+      'function'  => $docRefRoot . '/function.%s' . $docRefExt,
+      'method'    => $docRefRoot . '/%2$s.%1$s'   . $docRefExt,
+      'property'  => $docRefRoot . '/class.%2$s'  . $docRefExt . '#%2$s.props.%1$s',
+      'constant'  => $docRefRoot . '/class.%2$s'  . $docRefExt . '#%2$s.constants.%1$s',      
+    );
+
+    $url = '';    
+    $args = array();
+
+    // determine scheme
+    if($constant !== null){
+      $type = 'constant';
+      $args[] = $constant;
+    
+    }else{
+      $type = get_class($reflector);
+      $type = explode('\\', $type); 
+      $type = strtolower(ltrim(end($type), 'Reflection'));
+
+      if($type === 'object')
+        $type = 'class';
+    }
+
+    // properties don't have the internal flag
+    $parent = ($type !== 'property') ? $reflector : $reflector->getDeclaringClass();
+
+    // internal function/method/class/property/constant
+    if($parent->isInternal()){
+      $args[] = $reflector->getName();
+
+      if(in_array($type, array('method', 'property'), true))
+        $args[] = $reflector->getDeclaringClass()->getName();
+
+      $args = array_map(function($text){
+        return str_replace('_', '-', ltrim(strtolower($text), '\\_'));
+      }, $args);
+
+      // check for some special cases that have no links
+      $valid = ($type !== 'class') || (strcasecmp($reflector->getName(), 'stdClass') !== 0);
+      $valid = $valid && (($type !== 'method') || (strcasecmp($reflector->getName(), '__invoke') !== 0));
+
+      if($valid)
+        $url = vsprintf($phpNetSchemes[$type], $args);
+    
+    // custom
+    }else{
+      $sourceFile = $reflector->getFileName();   
+      switch(true){      
+
+        // WordPress function;
+        // like pretty much everything else in WordPress, API links are inconsistent as well;
+        // so we're using queryposts.com as doc source for API
+        case ($type === 'function') && class_exists('WP') && defined('ABSPATH') && defined('WPINC'):
+          if(strpos($sourceFile, realpath(ABSPATH . WPINC)) === 0){
+            $uri = sprintf('http://queryposts.com/function/%s', urlencode(strtolower($reflector->getName())));
+            break;
+          }
+
+        // @todo: handle more apps
+      }      
+
+    }
+
+    if($url !== '')
+      return $this->format('link', $node, $url);
+
+    return $node;
+  }
+
+
+
+  /**
+   * Internal shortcut for to(Format) methods
+   *
+   * @return  string
+   */
+  protected function format($element, $arg1 = null, $arg2 = null, $meta = null){
+    return $this->{'to' . ucfirst($this->format)}($element, $arg1, $arg2, $meta);
+  }
+
 
 
   /**
    * Builds a report with information about $subject
    *
-   * @since   1.0
    * @param   mixed $subject          Variable to query   
    * @param   bool $skipStringChecks  Skip advanced string checks
    * @return  mixed                   Result (both HTML and text modes generate strings)
    */
-  protected function formatSubject($subject, $skipStringChecks = false){
+  protected function evaluate(&$subject, $skipStringChecks = false){
 
     // null value
     if(is_null($subject))
-      return $this->entity('null');
+      return $this->format('text', 'null');
 
     // integer or double
-    if(is_int($subject) || is_float($subject))
-      return $this->entity(gettype($subject), $subject, gettype($subject));    
+    if(is_int($subject) || is_float($subject)){
+      $type = gettype($subject);
+      return $this->format('text', $type, $subject, $type);
+    }  
 
     // boolean
     if(is_bool($subject)){
       $text = $subject ? 'true' : 'false';
-      return $this->entity($text, $text, gettype($subject));        
+      return $this->format('text', $text, $text, gettype($subject));    
+    }
+
+    // arrays
+    if(is_array($subject)){
+
+      // empty array?
+      if(empty($subject))
+        return $this->format('text', 'array') . $this->format('group');
+
+      // temporary element (marker) for arrays, used to track recursions
+      static $marker = null;
+
+      // set a marker to detect recursion
+      if(!$marker)
+        $marker = uniqid('', true);
+
+      // if our marker element is present in the array it means that we were here before
+      if(isset($subject[$marker]))
+        return $this->format('text', 'array') . $this->format('group', null, 'recursion');
+
+      $this->level++;
+      $subject[$marker] = true;
+
+      // note that we must substract the marker element
+      $count   = count($subject) - 1;
+
+      // use splFixedArray() on PHP 5.4+ to save up some memory, because the subject array
+      // might contain a huge amount of entries.
+      // (note: lower versions of PHP 5.3 throw a heap corruption error after 10K entries)
+      // A more efficient way is to build the items as we go as strings,
+      // by concatenating the info foreach entry, but then we loose the flexibility that the
+      // entity/group/section methods provide us (exporting data in different formats
+      // and indenting in text mode would become harder)
+      $section = $this->is54 ? new \SplFixedArray($count) : array();
+      $idx     = 0;
+
+      foreach($subject as $key => &$value){
+
+        // ignore our marker
+        if($key === $marker)
+          continue;
+
+        $keyInfo = gettype($key);
+
+        if(is_string($key)){
+          $encoding  = $this->mbStr ? mb_detect_encoding($key) : '';
+          $keyLength = $encoding && ($encoding !== 'ASCII') ? static::strLen($key) . '; ' . $encoding : static::strLen($key);
+          $keyInfo   = "{$keyInfo}({$keyLength})";
+        }
+
+        $section[$idx++] = array(
+          $this->format('text', 'key', $key, "Key: {$keyInfo}"),
+          $this->format('sep', '=>'),
+          $this->evaluate($value),
+        );
+
+        // free some memory
+        unset($subject[$key]);
+      }
+
+      $output = $this->format('text', 'array') . $this->format('group', $this->format('section', $section), $count);
+      $this->level--;
+      return $output;
     }  
 
     // resource
     if(is_resource($subject)){
       $type = get_resource_type($subject);
-      $name = $this->entity('resource', $subject);        
       $meta = array();
 
       // @see: http://php.net/manual/en/resource.php
@@ -759,6 +1397,9 @@ class ref{
         // gd image extension resource
         case 'gd':
 
+          if(!static::$config['extendedInfo'])
+            break;
+
           $meta = array(
              'size'       => sprintf('%d x %d', imagesx($subject), imagesy($subject)),
              'true_color' => imageistruecolor($subject),
@@ -767,6 +1408,10 @@ class ref{
         break;  
 
         case 'ldap link':
+
+          if(!static::$config['extendedInfo'])
+            break;
+
           $constants = get_defined_constants();
 
           array_walk($constants, function($value, $key) use(&$constants){
@@ -786,6 +1431,10 @@ class ref{
         // mysql connection (mysql extension is deprecated from php 5.4/5.5)
         case 'mysql link':
         case 'mysql link persistent':
+
+          if(!static::$config['extendedInfo'])
+            break;
+
           $dbs = array();
           $query = @mysql_list_dbs($subject);
           while($row = @mysql_fetch_array($query))
@@ -802,6 +1451,10 @@ class ref{
 
         // mysql result
         case 'mysql result':
+
+          if(!static::$config['extendedInfo'])
+            break;
+
           while($row = @mysql_fetch_object($subject))
             $meta[] = (array)$row;
 
@@ -814,36 +1467,31 @@ class ref{
 
       }
 
-      $items = array();
-      $this->level++;      
-
+      $section = array();
+      $this->level++;
       foreach($meta as $key => $value){
-        $key = ucwords(str_replace('_', ' ', $key));
-        $items[] = array(
-          $this->entity('resourceInfo', $key),
-          $this->entity('sep', ':'),
-          $this->formatSubject($value),
+        $section[] = array(
+          $this->format('text', 'resourceInfo', ucwords(str_replace('_', ' ', $key))),
+          $this->format('sep', ':'),
+          $this->evaluate($value),
         );
-
-        unset($meta[$key]);
       }
 
-      $meta  = null;
-      $group = $name . $this->group($type, $this->section($items));
-
+      $output = $this->format('text', 'resource', strval($subject)) . $this->format('group', $this->format('section', $section), $type);
       $this->level--;
-
-      return $group;
+      return $output;
     }
+ 
 
     // string
     if(is_string($subject)){
-      $length = static::strLen($subject);       
-      $extra  = '';
+      $length   = static::strLen($subject);       
+      $encoding = $this->mbStr ? mb_detect_encoding($subject) : false;      
+      $info     = $encoding && ($encoding !== 'ASCII') ? $length . '; ' . $encoding : $length;
+      $add      = '';
 
       // advanced checks only if there are 3 characteres or more
-      if(!$skipStringChecks && $length > 2){
-        $matches = array();
+      if(static::$config['extendedInfo'] && !$skipStringChecks && $length > 2){
 
         // file?
         if(($length < 1000) && file_exists($subject)){
@@ -886,19 +1534,19 @@ class ref{
 
           $size = is_dir($subject) ? '' : sprintf(' %.2fK', $file->getSize() / 1024);
           
-          $matches[] = $this->entity('strMatch', 'file') . ' ' . implode('', $flags) . $size;
+          $add .= $this->format('match', 'file', $this->format('text', 'file', implode('', $flags) . $size));
         }
 
         // class name?
         if(($length < 100) && class_exists($subject, false))
-          $matches[] = $this->entity('strMatch', 'class') . ' ' . $this->formatClassString($subject);
+          $add .= $this->format('match', 'class', $this->fromReflector(new \ReflectionClass($subject)));
 
         if(($length < 100) && interface_exists($subject, false))
-          $matches[] = $this->entity('strMatch', 'interface') . ' ' . $this->formatClassString($subject);
+          $add .= $this->format('match', 'interface', $this->fromReflector(new \ReflectionClass($subject)));
 
         // class name?
         if(($length < 70) && function_exists($subject))
-          $matches[] = $this->entity('strMatch', 'function') . ' ' . $this->formatFunctionString($subject);      
+          $add .= $this->format('match', 'function', $this->fromReflector(new \ReflectionFunction($subject)));
 
         // skip serialization/json/date checks if the string appears to be numeric,
         // or if it's shorter than 5 characters
@@ -908,8 +1556,9 @@ class ref{
           if(($length > 4) && ($length < 100)){
             $date = date_parse($subject);
             if(($date !== false) && empty($date['errors']))
-              $matches[] = $this->entity('strMatch', 'date') . ' ' . static::humanTime(@strtotime($subject));
+              $add .= $this->format('match', 'date', $this->format('text', 'date', static::humanTime(@strtotime($subject))));
           }
+
 
           // attempt to detect if this is a serialized string     
           static $unserializing = 0;      
@@ -919,7 +1568,7 @@ class ref{
             if(($subject[$length - 1] === ';') || ($subject[$length - 1] === '}'))
               if((($subject[0] === 's') && ($subject[$length - 2] !== '"')) || preg_match("/^{$subject[0]}:[0-9]+:/s", $subject))
                 if(($unserialized = @unserialize($subject)) !== false)
-                  $matches[] = $this->entity('strMatch', 'unserialized:') . ' ' . $this->formatSubject($unserialized);
+                  $add .= $this->format('match', 'serialized', $this->evaluate($unserialized));
 
             $unserializing--;
 
@@ -934,89 +1583,98 @@ class ref{
               $json = json_decode($subject);
 
               if(json_last_error() === JSON_ERROR_NONE)
-                $matches[] = $this->entity('strMatch', 'json.decoded') . ' ' . $this->formatSubject($json);
+                $add .= $this->format('match', 'json', $this->evaluate($json));
 
               $decodingJson--;
             }
           }
+
         }
 
         // attempt to match a regex
         if($length < 10000){
           try{
-            $regexEntity = $this->colorizeRegex($subject);
+            $components = $this->splitRegex($subject);
 
-            if($regexEntity)
-              $matches[] = $this->entity('strMatch', 'regex') . ' ' . $regexEntity;
+            if($components){
+              $regex = '';
+              foreach($components as $component)
+                $regex .= $this->format('text', 'regex-' . key($component), reset($component));
+
+              $add .= $this->format('match', 'regex', $regex);
+            }  
 
           }catch(\Exception $e){}
+
         }
 
-        if($matches)
-          $extra = $this->entity('sep', "\n") . implode($this->entity('sep', "\n"), $matches);
-
-        $matches = null;
       }
 
-      $encoding = function_exists('mb_detect_encoding') ? mb_detect_encoding($subject) : false;      
-      $info     = $encoding && ($encoding !== 'ASCII') ? $length . '; ' . $encoding : $length;
-      $info     = 'string(' . $info . ')';
+      return $this->format('text', 'string', $subject, "string({$info})") . $add;
+    }
+ 
+    // if we reached this point, $subject must be an object
 
-      return $this->entity('string', $subject, $info) . $extra;
-    }    
-
-    // arrays; forward to a different function that takes references
-    if(is_array($subject))
-      return $this->formatSubjectArray($subject);
-
-    // if we reached this point, $subject must be an object     
-    $objectName = $this->formatClassString($subject);    
-    $hash = spl_object_hash($subject);
+    // sometimes incomplete objects may be created from string unserialization,
+    // if the class to which the object belongs wasn't included until the unserialization stage...
+    if($subject instanceof \__PHP_Incomplete_Class)
+      return $this->format('text', 'object') . $this->format('group', null, 'Incomplete');
+  
+    $reflector  = new \ReflectionObject($subject);
+    $objectName = $this->fromReflector($reflector) . ' ' . $this->format('text', 'object');
+    $hash       = spl_object_hash($subject);
 
     // tracks objects to detect recursion
     static $hashes = array();
 
     // already been here?
     if(isset($hashes[$hash]))
-      return $this->entity('object', "{$objectName} object") . $this->group('Recursion');
+      return $objectName . $this->format('group', null, 'Recursion');
 
     // sometimes incomplete objects may be created from string unserialization,
     // if the class to which the object belongs wasn't included until the unserialization stage...
-    if($subject instanceof \__PHP_Incomplete_Class)
-      return $this->entity('object') . $this->group('Incomplete');      
-
-    // track hash
+    if($subject instanceof \__PHP_Incomplete_Class){
+      unset($hashes[$hash]);
+      return $this->format('text', 'object') . $this->format('group', null, 'Incomplete');
+    }  
+    
     $hashes[$hash] = 1;
-    $reflector           = new \ReflectionObject($subject);
-    $output              = '';
-    $this->level++;    
+    $group = '';
+    $this->level++;
 
     // show contents for iterators
-    if($reflector->isIterateable()){
-      $items = array();
-      foreach($subject as $idx => $obj)
-        $items[$idx] = array($this->entity('sep', '=>'), $this->formatSubject($obj));
+    if(static::$config['extendedInfo'] && $reflector->isIterateable()){
+      
+      $count = 0;
+      foreach($subject as $value)
+        $count++;
 
-      foreach($items as $idx => &$item){
-        $keyInfo = gettype($idx);
-        if(is_string($idx)){
-          $encoding = function_exists('mb_detect_encoding') ? mb_detect_encoding($idx) : '';
-          $length   = $encoding && ($encoding !== 'ASCII') ? static::strLen($idx) . '; ' . $encoding : static::strLen($idx);
+      $idx = 0;
+      $section = $this->is54 ? new \SplFixedArray($count) : array();
+      foreach($subject as $key => $value){
+        $keyInfo = gettype($key);
+        if(is_string($key)){
+          $encoding = $this->mbStr ? mb_detect_encoding($key) : '';
+          $length   = $encoding && ($encoding !== 'ASCII') ? static::strLen($key) . '; ' . $encoding : static::strLen($key);
           $keyInfo  = sprintf('%s(%s)', $keyInfo, $length);        
-        }
+        }            
 
-        array_unshift($item, $this->entity('key', $idx, sprintf('Iterator key: %s', $keyInfo)));
-      }  
+        $section[$idx++] = array(
+          $this->format('text', 'key', $key, sprintf('Iterator key: %s', $keyInfo)),
+          $this->format('sep', '=>'),
+          $this->evaluate($value),
+        );
+      }
 
-      $output .= $this->section($items, sprintf('Contents (%d)', count($items)));
+      $group .= $this->format('section', $section, sprintf('Contents (%d)', $count));
     }
 
     $props           = $reflector->getProperties(\ReflectionProperty::IS_PUBLIC | \ReflectionProperty::IS_PROTECTED);    
-    $methods         = $reflector->getMethods(\ReflectionMethod::IS_PUBLIC | \ReflectionMethod::IS_PROTECTED);
+    $methods         = static::$config['extendedInfo'] ? $reflector->getMethods(\ReflectionMethod::IS_PUBLIC | \ReflectionMethod::IS_PROTECTED) : array();
     $constants       = $reflector->getConstants();
     $interfaces      = $reflector->getInterfaces();
     $traits          = $this->is54 ? $reflector->getTraits() : array();
-    $internalParents = static::getParentClasses($reflector, true);
+    $internalParents = static::getParentClasses($reflector, true);        
 
     // work-around for https://bugs.php.net/bug.php?id=49154
     // @see http://stackoverflow.com/questions/15672287/strange-behavior-of-reflectiongetproperties-with-numeric-keys
@@ -1024,211 +1682,214 @@ class ref{
       $props = array_values(array_filter($props, function($prop) use($subject){
         return !$prop->isPublic() || property_exists($subject, $prop->name);
       }));
-    }
-
-    // no data to display?
-    if(!$props && !$methods && !$constants && !$interfaces && !$traits){      
+    } 
+    
+    // no data to display?        
+    if(!$props && !$methods && !$constants && !$interfaces && !$traits){
       unset($hashes[$hash]);
       $this->level--;
-      return $this->entity('object', "{$objectName} object") . $this->group();
-    }
+      return $objectName . $this->format('group');
+    }  
 
     // display the interfaces this objects' class implements
     if($interfaces){
-      $items = array();
+      $items = array();            
       foreach($interfaces as $name => $interface)
-        $items[] = $this->entity('interface', $this->anchor($interface, 'class'), $interface);      
+        $items[] = $this->fromReflector($interface, $name);
 
-      $interfaces  = null;
-      $output     .= $this->section(array((array)implode($this->entity('sep', ', '), $items)), 'Implements');
-    }
-
-    // class constants
-    if($constants){
-      $index = 0;
-      $items = $this->is54 ? new \SplFixedArray(count($constants)) : array();
-
-      foreach($constants as $name => $value){
-        foreach($internalParents as $parent)
-          if($parent->hasConstant($name))
-            $name = $this->anchor($name, 'constant', $parent->getName(), $name);
-
-        $items[$index++] = array(
-          $this->entity('sep', '::'),
-          $this->entity('constant', $name),
-          $this->entity('sep', '='),
-          $this->formatSubject($value),
-        );
-
-        unset($constants[$name]);
-      }
-
-      $output .= $this->section($items, 'Constants');    
-    }
+      $row    = array($this->format('contain', 'interfaces', implode($this->format('sep', ', '), $items)));
+      $group .= $this->format('section', array($row), 'Implements');      
+    } 
 
     // traits this objects' class uses
-    if($traits){  
-      $items = array();
+    if($traits){       
+      $items = array();      
       foreach($traits as $name => $trait)
-        $items[] = $this->entity('trait', $trait->getName(), $trait);
+        $items[] = $this->fromReflector($trait, $name);
 
-      $traits  = null;
-      $output .= $this->section((array)implode(', ', $items), 'Uses');
+      $row    = array($this->format('contain', 'traits', implode($this->format('sep', ', '), $items)));
+      $group .= $this->format('section', array($row), 'Uses');            
+    }          
+
+    // class constants
+    $section = array();
+    foreach($constants as $name => $value){
+      $key = $this->format('contain', 'constant', $this->format('text', 'name', $name));
+
+      foreach($internalParents as $parent){
+        if($parent->hasConstant($name)){
+          $key = $this->linkify($key, $parent, $name);
+          break;
+        }
+      }   
+
+      $section[] = array(
+        $this->format('sep', '::'),          
+        $key,
+        $this->format('sep', '='),
+        $this->evaluate($value),
+      );
     }
+
+    if($section)
+      $group .= $this->format('section', $section, 'Constants');                  
+          
 
     // object/class properties
-    if($props){ 
-      $items = $this->is54 ? new \SplFixedArray(count($props)) : array();
-     
-      foreach($props as $idx => $prop){
-        $modifiers = array();
+    $section = array();
+    foreach($props as $idx => $prop){
+      $bubbles     = array();
+      $sourceClass = $prop->getDeclaringClass();
+      $inherited   = $reflector->getShortName() !== $sourceClass->getShortName();
 
-        if($prop->isProtected())        
-          $prop->setAccessible(true);
+      // weird memory leak in ReflectionProperty::getDocComment() ?
+      $meta        = $sourceClass->isInternal() ? null : static::parseComment($prop->getDocComment());
 
-        $value = $prop->getValue($subject);
-
-        if($prop->isProtected())        
-          $prop->setAccessible(false);        
-
-        if($prop->isProtected())
-          $modifiers[] = array('protected', 'P', 'This property is protected');
-
-        $name = $prop->name;
-
-        foreach($internalParents as $parent)
-          if($parent->hasProperty($name))
-            $name = $this->anchor($name, 'property', $parent->getName(), $name);
-
-        $inherited = $reflector->getShortName() !== $prop->getDeclaringClass()->getShortName();
-        $modTip    = $inherited ? sprintf('Inherited from ::%s', $prop->getDeclaringClass()->getShortName()) : null;
-
-        $name = $this->entity('property', $name, $prop);
-
+      if($meta){
         if($inherited)
-          $name = $this->entity('inherited', $name);
+          $meta['sub'] = array(array('Inherited from', sprintf('::%s', $sourceClass->getShortName())));
 
-        $items[$idx] = array(
-          $this->entity('sep', $prop->isStatic() ? '::' : '->', $modTip),
-          $this->modifiers($modifiers),
-          $name,
-          $this->entity('sep', '='),
-          $this->formatSubject($value),
-        );
+        // note that we need to make the left meta area have the same height as the content
+        if(isset($meta['tags']['var'][0]))
+          $meta['left'] = $meta['tags']['var'][0][0] . str_repeat("\n", substr_count(implode("\n", array_filter(array($meta['title'], $meta['description']))), "\n") + 1);
 
-        unset($props[$idx]);
+        unset($meta['tags']);        
       }
 
-      $props   = null;
-      $output .= $this->section($items, 'Properties');
+      if($prop->isProtected())        
+        $prop->setAccessible(true);
+
+      $value = $prop->getValue($subject);
+
+      if($prop->isProtected()){
+        $prop->setAccessible(false);        
+        $bubbles[] = $this->format('text', 'mod-protected', 'P', 'This property is protected');        
+      }  
+
+      $type = $inherited ? 'property-inherited' : 'property';
+      $name = $this->format('text', 'name', $prop->name, $meta);
+
+      foreach($internalParents as $parent){
+        if($parent->hasProperty($prop->name)){
+          $name = $this->linkify($name, $prop);
+          break;
+        }
+      }              
+
+      $section[] = array(
+        $this->format('sep', $prop->isStatic() ? '::' : '->'),
+        $this->format('bubbles', $bubbles),
+        $this->format('contain', $type, $name),
+        $this->format('sep', '='),
+        $this->evaluate($value),
+      );
     }
+
+    if($section)
+      $group .= $this->format('section', $section, 'Properties');      
 
     // class methods
-    if($methods){
-      $items = array();
+    $section = array();      
+    foreach($methods as $idx => $method){
+      $bubbles  = array();
+      $args     = array();
+      $paramCom = $method->isInternal() ? array() : static::parseComment($method->getDocComment(), 'tags');
+      $paramCom = empty($paramCom['param']) ? array() : $paramCom['param'];      
 
-      foreach($methods as $idx => $method){
-        $paramStrings = $modifiers = array();
+      // process arguments
+      foreach($method->getParameters() as $idx => $parameter){
+        $meta      = null;
+        $paramName = "\${$parameter->name}";
+        $optional  = $parameter->isOptional() ? '-optional' : '';        
 
-        // process arguments
-        foreach($method->getParameters() as $parameter){
-          $paramName = sprintf('$%s', $parameter->getName());
+        $parts     = array();
 
-          if($parameter->isPassedByReference())
-            $paramName = sprintf('&%s', $paramName);
+        if($parameter->isPassedByReference())
+          $paramName = "&{$paramName}";
+        
+        // attempt to build meta
+        foreach($paramCom as $tag){
+          list($pcTypes, $pcName, $pcDescription) = $tag;
+          if($pcName !== $paramName)
+            continue;
 
-          try{
-            $paramClass = $parameter->getClass();
+          $meta = array('title' => $pcDescription);
 
+          if($pcTypes)
+            $meta['left'] = $pcTypes . str_repeat("\n", substr_count($pcDescription, "\n") + 1);
+
+          break;
+        }
+     
+        try{
+          $paramClass = $parameter->getClass();
+        }catch(\Exception $e){
           // @see https://bugs.php.net/bug.php?id=32177&edit=1
-          }catch(\Exception $e){}
-
-          $paramHint = '';
-
-          if($paramClass)
-            $paramHint = $this->entity('hint', $this->anchor($paramClass, 'class'), $paramClass);
-          
-          if($parameter->isArray())
-            $paramHint = $this->entity('arrayHint', 'array');
-       
-          if($parameter->isOptional()){
-            $paramValue = $parameter->isDefaultValueAvailable() ? $parameter->getDefaultValue() : null;            
-            $paramName  = $this->entity('param', $paramName, $parameter);
-            $paramName .= $this->entity('sep', ' = ');
-            $paramName .= $this->entity('paramValue', $this->formatSubject($paramValue, true));
-
-            if($paramHint)
-              $paramName = $paramHint . ' ' . $paramName;
-
-            $paramName  = $this->entity('optional', $paramName);
-
-          }else{            
-            $paramName = $this->entity('param', $paramName, $parameter);
-
-            if($paramHint)
-              $paramName = $paramHint . ' ' . $paramName;            
-          }
-
-          $paramStrings[] = $paramName;
         }
 
-        // is this method inherited?
-        $inherited = $reflector->getShortName() !== $method->getDeclaringClass()->getShortName();
-        $modTip    = $inherited ? sprintf('Inherited from ::%s', $method->getDeclaringClass()->getShortName()) : null;
+        if($paramClass) 
+          $parts[] = $this->fromReflector($paramClass, $paramClass->getName());
+        
+        if($parameter->isArray())
+          $parts[] = $this->format('text', 'name', 'array');
 
-        if($method->isAbstract())
-          $modifiers[] = array('abstract', 'A', 'This method is abstract');
+        $parts[] = $this->format('text', 'name', $paramName, $meta);
 
-        if($method->isFinal())
-          $modifiers[] = array('final', 'F', 'This method is final and cannot be overridden');
+        if($optional){
+          $paramValue = $parameter->isDefaultValueAvailable() ? $parameter->getDefaultValue() : null;            
+          $parts[] = $this->format('sep', '=');
+          $parts[] = $this->evaluate($paramValue, true);
+        }
 
-        if($method->isProtected())
-          $modifiers[] = array('protected', 'P', 'This method is protected');        
-
-        $name = $method->name;
-
-        if($method->returnsReference())
-          $name = '&' . $name;
-
-        if($method->isInternal() && !(($method->class === 'Closure') && ($method->name === '__invoke')))
-          $name = $this->anchor($name, 'method', $method->getDeclaringClass()->getName(), $name);          
-
-        $name = $this->entity('method', $name, $method);
-
-        if($inherited)
-          $name = $this->entity('inherited', $name);
-
-        $items[$idx] = array(
-          $this->entity('sep', $method->isStatic() ? '::' : '->', $modTip),
-          $this->modifiers($modifiers),
-          $name . $this->entity('sep', ' (') . implode($this->entity('sep', ', '), $paramStrings) . $this->entity('sep', ')'),
-        );
-
-        unset($methods[$idx]);
+        $args[] = $this->format('contain', "parameter{$optional}", implode(' ', $parts));
       }
+  
+      if($method->isAbstract())
+        $bubbles[] = $this->format('text', 'mod-abstract', 'A', 'This method is abstract');                
 
-      $output .= $this->section($items, 'Methods');
+      if($method->isFinal())
+        $bubbles[] = $this->format('text', 'mod-final', 'F', 'This method is final and cannot be overridden');
+
+      if($method->isProtected())
+        $bubbles[] = $this->format('text', 'mod-protected', 'P', 'This method is protected');
+
+      $name = $method->name;
+
+      if($method->returnsReference())
+        $name = '&' . $name;
+
+      // is this method inherited?
+      $inherited = $reflector->getShortName() !== $method->getDeclaringClass()->getShortName();
+      $type      = $inherited ? 'method-inherited' : 'method';
+      $name      = $this->fromReflector($method, $name, $reflector);    
+      $name      = $this->format('contain', $type, $name. $this->format('sep', '(') . implode($this->format('sep', ', '), $args) . $this->format('sep', ')'));
+
+      $section[] = array(
+        $this->format('sep', $method->isStatic() ? '::' : '->'),
+        $this->format('bubbles', $bubbles),
+        $name,
+      );
     }
 
-    $group = $this->entity('object', "{$objectName} object") . $this->group('', $output);
+    if($section)
+      $group .= $this->format('section', $section, 'Methods');        
 
-    $this->level--;
     unset($hashes[$hash]);
-
-    return $group;
+    $objectName .= $this->format('group', $group);
+    $this->level--;
+    return $objectName;
   }
 
 
 
   /**
    * Scans for known classes and functions inside the provided expression,
-   * and formats them when possible
+   * and linkifies them when possible
    *
-   * @since   1.0
    * @param   string $expression      Expression to format
    * @return  string                  Formatted output
    */
-  protected function formatExpression($expression = null){
+  protected function evaluateExp($expression = null){
 
     if($expression === null)
       return '';
@@ -1236,17 +1897,18 @@ class ref{
     if(static::strLen($expression) > 120)
       $expression = substr($expression, 0, 120) . '...';
 
-    $prefix = $this->entity('sep', '> ');
+    $prefix = $this->format('sep', '> ');
 
     if(strpos($expression, '(') === false)
-      return $this->entity('exp', $prefix . $this->entity('expTxt', $expression));
+      return $prefix . $this->format('text', 'expTxt', $expression);
 
-    $fn = explode('(', $expression, 2);
+    $fn    = explode('(', $expression, 2);
+    $fn[1] = $this->format('text', 'expTxt', $fn[1]); // @todo, maybe: parse $fn[1] too (content within brackets)
 
     // try to find out if this is a function
     try{
       $reflector = new \ReflectionFunction($fn[0]);
-      $fn[0] = $this->entity('srcFunction', $this->anchor($reflector, 'function'), $reflector);
+      $fn[0] = $this->fromReflector($reflector, $fn[0]);
     
     }catch(\Exception $e){
 
@@ -1257,48 +1919,52 @@ class ref{
         try{          
           $reflector = new \ReflectionMethod($cn[1], '__construct');
 
-          if($reflector->isInternal()){
-            $cn[0] = $this->anchor($cn[0], 'method', $cn[1], '__construct');
-            $cn[0] = $this->entity('srcClass', $cn[0], $reflector);
-          }
+          if($reflector->isInternal())            
+            $cn[0] = $this->fromReflector($reflector, $cn[0]);
 
         }catch(\Exception $e){
           $reflector = null;
+          $cn[0] = $this->format('text', 'expTxt', $cn[0]);
         }            
 
         // class name...
         try{          
           $reflector = new \ReflectionClass($cn[1]);
-          $cn[1] = $this->entity('srcClass', $this->anchor($reflector, 'class'), $reflector);
+          $cn[1] = $this->fromReflector($reflector, $cn[1]);
 
         }catch(\Exception $e){
           $reflector = null;
+          $cn[1] = $this->format('text', 'expTxt', $cn[1]);
         }      
 
         $fn[0] = implode(' ', $cn);
 
       }else{
+
+        // we can only linkify methods called statically
         if(strpos($fn[0], '::') === false)
-          return $this->entity('exp', $prefix . $this->entity('expTxt', $expression));
+          return $prefix . $this->format('text', 'expTxt', $expression);
 
         $cn = explode('::', $fn[0], 2);
 
         // perhaps it's a static class method; try to linkify method first
         try{
           $reflector = new \ReflectionMethod($cn[0], $cn[1]);
-          $cn[1] = $this->entity('srcMethod', $this->anchor($reflector, 'method', $cn[0], $cn[1]), $reflector);    
+          $cn[1] = $this->fromReflector($reflector, $cn[1]);    
 
         }catch(\Exception $e){
           $reflector = null;
+          $cn[1] = $this->format('text', 'expTxt', $cn[1]);
         }        
 
         // attempt to linkify the class name as well
         try{
           $reflector = new \ReflectionClass($cn[0]);
-          $cn[0] = $this->entity('srcClass', $this->anchor($reflector, 'class'), $reflector);          
+          $cn[0] = $this->fromReflector($reflector, $cn[0]);
 
         }catch(\Exception $e){
           $reflector = null;
+          $cn[0] = $this->format('text', 'expTxt', $cn[0]);
         }
 
         // apply changes
@@ -1306,396 +1972,7 @@ class ref{
       }
     }
 
-    return $this->entity('exp', $prefix . implode('(', $fn));
-  }
-
-
-
-  /**
-   * Total CPU time used by the class
-   *   
-   * @since   1.0
-   * @return  double
-   */
-  public static function getTime(){
-    return static::$time;
-  }
-
-
-
-  /**
-   * Creates a group section
-   *
-   * @since   1.0
-   * @param   array|Iterator $items    Array or SplFixedArray instance containing rows and columns (columns as arrays)
-   * @param   string $title            Section title, optional
-   * @return  string
-   */
-  protected function section($items, $title = ''){
-
-    switch($this->format){
-      
-      // HTML output
-      case 'html':
-
-        if($title !== '')
-          $title = '<h4>' . $title .'</h4>';
-
-        $content = '';
-
-        foreach($items as $item){
-          $last = array_pop($item);
-          $defs = $item ? '<dt>' . implode('</dt><dt>', $item) . '</dt>' : '';
-          $content .= '<dl>' . $defs . '<dd>' . $last . '</dd></dl>';
-        }
-
-        return $title . '<section>' . $content . '</section>';
-
-      // text-only output
-      default:
-
-        $output = '';
-
-        if($title !== '')
-          $output .= "\n\n " . $title . "\n " . str_repeat('-', static::strLen($title));
-
-        $lengths = array();
-
-        // determine maximum column width
-        foreach($items as $item)
-          foreach($item as $colIdx => $c)
-            if(!isset($lengths[$colIdx]) || $lengths[$colIdx] < static::strLen($c))
-              $lengths[$colIdx] = static::strLen($c);
-
-        foreach($items as $item){
-
-          $lastColIdx = count($item) - 1;
-          $padLen     = 0;
-          $output    .= "\n  ";
-
-          foreach($item as $colIdx => $c){
-
-            // skip empty columns
-            if($lengths[$colIdx] < 1)
-              continue;
-
-            if($colIdx < $lastColIdx){
-              $output .= static::strPad($c, $lengths[$colIdx]) . ' ';
-              $padLen += $lengths[$colIdx] + 1;
-              continue;
-            }
-        
-            $lines   = explode("\n", $c);
-            $output .= array_shift($lines);
-
-            // we must indent the entire block
-            foreach($lines as &$line)
-              $line = str_repeat(' ', $padLen) . $line;
-
-            $output .= $lines ? "\n  " . implode("\n  ", $lines) : '';
-          }         
-        }
-
-        return $output;
-    }
-  }
-
-
-
-  /**
-   * Creates a group
-   *
-   * @since   1.0
-   * @param   string $prefix
-   * @param   string $content
-   * @return  string
-   */
-  protected function group($prefix = '', $content = '', $container = '(%s)'){
-
-    static $groupId = 0;
-
-    switch($this->format){
-
-      // HTML output
-      case 'html':
-        if($content !== ''){
-          $checked  = ($this->depth < 0) || (($this->depth > 0) && ($this->level <= $this->depth)) ? 'checked="checked"' : '';
-          $content  = sprintf('<input type="checkbox" id="refGrp%1$s" %2$s/><label for="refGrp%1$s"></label><div>%3$s</div>', $groupId++, $checked, $content);
-        }  
-
-        if($prefix !== '')
-          $prefix = '<b>' . $prefix . '</b>';
-
-        return '<i class="rGroup">' . sprintf($container, sprintf('%s</i>%s<i class="rGroup">', $prefix, $content)) . '</i>';
-
-        return sprintf('<i class="rGroup">(%s</i>%s<i class="rGroup">)</i>', $prefix, $content);
-
-      // text-only output
-      default:
-
-        if($content !== ''){
-          $content =  $content . "\n";
-          $prefix .= ' ▼';
-        }
-
-        return sprintf($container, $prefix . $content);      
-    }    
-  }
-
-
-
-  /**
-   * Generates an anchor that links to the documentation page relevant for the requested context
-   *
-   * For internal functions and classes, the URI will point to the local PHP manual
-   * if installed and configured, otherwise to php.net/manual (the english one)
-   *
-   * @since   1.0   
-   * @param   string|Reflector $text  Text to linky of reflector object to extract text from (name)
-   * @param   string $scheme          Scheme to use; valid schemes are 'class', 'function', 'method', 'constant' (class only) and 'property'
-   * @param   string $id1             Class or function name
-   * @param   string|null $id2        Method name (required only for the 'method' scheme)
-   * @return  string                  HTML link
-   */
-  protected function anchor($text, $scheme, $id1 = null, $id2 = null){
-
-    static $docRefRoot = null, $docRefExt = null;
-
-    $linkText = ($text instanceof \Reflector) ? $text->getName() : $text;
-
-    if($id1 === null)
-      $id1 = $linkText;
-
-    // no links in text-mode, or if the class is a 'stdClass'
-    if(($this->format !== 'html') || (($scheme !== 'function') && ($id1 === 'stdClass')))
-      return $linkText;
-
-    $args = array_filter(array($id1, $id2));
-
-     // most people don't have this set
-    if(!$docRefRoot)
-      $docRefRoot = rtrim(ini_get('docref_root'), '/');
-
-    if(!$docRefRoot)
-      $docRefRoot = 'http://php.net/manual/en';
-
-    if(!$docRefExt)
-      $docRefExt = ini_get('docref_ext');
-
-    if(!$docRefExt)
-      $docRefExt = '.php';    
-
-    if(($text instanceof \Reflector) && !$text->isInternal()){
-
-      $uri = false;
-      $sourceFile = $text->getFileName();      
-
-      switch(true){      
-
-        // WordPress function;
-        // like pretty much everything else in WordPress, API links are inconsistent as well;
-        // so we're using queryposts.com as doc source for API
-        case ($scheme === 'function') && class_exists('WP') && defined('ABSPATH') && defined('WPINC'):
-
-          if(strpos($sourceFile, realpath(ABSPATH . WPINC)) === 0){
-            $uri = sprintf('http://queryposts.com/function/%s', urlencode(strtolower($text->getName())));
-            break;
-          }
-
-        // @todo: handle more apps
-      }
-
-      if($uri)
-        return sprintf('<a href="%s" target="_blank">%s</a>', $uri, static::escape($linkText));
-
-      return $linkText;
-    }
-
-    // PHP-internal function or class
-    foreach($args as &$arg)
-      $arg = str_replace('_', '-', ltrim(strtolower($arg), '\\_'));
-
-    $phpNetSchemes = array(
-      'class'     => $docRefRoot . '/class.%s'    . $docRefExt,
-      'function'  => $docRefRoot . '/function.%s' . $docRefExt,
-      'method'    => $docRefRoot . '/%1$s.%2$s'   . $docRefExt,
-      'constant'  => $docRefRoot . '/class.%1$s'  . $docRefExt . '#%1$s.constants.%2$s',
-      'property'  => $docRefRoot . '/class.%1$s'  . $docRefExt . '#%1$s.props.%2$s',
-    );
-
-    $uri = vsprintf($phpNetSchemes[$scheme], $args);    
-
-    return sprintf('<a href="%s" target="_blank">%s</a>', $uri, static::escape($linkText));
-  }
-
-
-
-  /**
-   * Creates a single entity with the provided class, text and tooltip content
-   *
-   * @since   1.0
-   * @param   string $class           Entity class ('r' will be prepended to it, then the entire thing gets camelized)
-   * @param   string $text            Entity text content
-   * @param   string|Reflector $tip   Tooltip content, or Reflector object from which to generate this content
-   * @return  string                  <I> tag with the provided information
-   */
-  protected function entity($class, $text = null, $tip = null){
-
-    if($text === null)
-      $text = $class;
-
-    // format text-mode output to match var_dump()
-    if($this->format !== 'html'){
-      $formatMap = array(
-        'string'   => '%1$s "%2$s"',
-        'strMatch' => '~~ %2$s',
-        'integer'  => 'int(%2$s)',
-        'double'   => 'double(%2$s)',
-        'true'     => 'bool(%2$s)',
-        'false'    => 'bool(%2$s)',
-        'key'      => '[%2$s]',
-      );
-
-      return isset($formatMap[$class]) ? sprintf($formatMap[$class], $this->tip($tip), $text) : $text;
-    }
-
-    // escape text that is known to contain html entities
-    if(in_array($class, array('string', 'key', 'param', 'sep', 'resourceInfo', 'expTxt'), true))
-      $text = static::escape($text);
-
-    $tip   = $this->tip($tip);
-    $class = ucfirst($class);
-
-    if($tip !== '')
-      $class .= ' rHasTip';
-
-    return '<i class="r' . $class . '">' . $text . $tip . '</i>';
-  }
-
-
-
-  /**
-   * Creates a tooltip
-   *
-   * @todo    refactor
-   * @since   1.0
-   * @param   string|reflector $data     Tooltip content, or reflector object from where to extract DocBlock comments
-   * @return  string
-   */
-  protected function tip($data){
-
-    $text = $desc = $subMeta = $def = $leftMeta = '';
-
-    // class or function
-    if(($data instanceof \ReflectionClass) || ($data instanceof \ReflectionFunction) || ($data instanceof \ReflectionMethod)){
-
-      // function/class/method is part of the core
-      if($data->isInternal()){
-        $extension = $data->getExtension();
-        $text = ($extension instanceof \ReflectionExtension) ? sprintf('Internal - part of %s (%s)', $extension->getName(), $extension->getVersion()) : 'Internal';
-
-      // user-defined; attempt to get doc comments
-      }else{
-        if($comments = static::parseComment($data->getDocComment())){
-          $text = $comments['title'];
-          $desc = $comments['description'];
-
-          foreach($comments['tags'] as $tag => $values){
-            foreach($values as $value){
-              if($tag === 'param'){
-                $value[0] = $value[0] . ' ' . $value[1];
-                unset($value[1]);
-              }
-
-              $value    = is_array($value) ? implode('</b><b>', static::escape($value)) : static::escape($value);
-              $subMeta .= sprintf('<i><b>@%s</b><b>%s</b></i>', $tag, $value);
-            }  
-          }
-
-        }
-
-        $subMeta .= sprintf('<u>Defined in <b>%s:%d</b></u>', basename($data->getFileName()), $data->getStartLine());
-      }
-
-    // class property
-    }elseif($data instanceof \ReflectionProperty){
-
-      // weird memory leak in ReflectionProperty::getDocComment() ?
-      $comments = $data->getDeclaringClass()->isInternal() ? false : static::parseComment($data->getDocComment());
-
-      if($comments){
-        $text = $comments['title'];
-        $desc = $comments['description'];
-
-        // note that we need to make the left meta area have the same height as the content
-        if(isset($comments['tags']['var'][0]))
-          $leftMeta = $comments['tags']['var'][0][0] . str_repeat("\n", substr_count(implode("\n", array_filter(array($text, $desc))), "\n") + 1);
-      }
-    
-    // function parameter
-    }elseif($data instanceof \ReflectionParameter){
-      $function = $data->getDeclaringFunction();
-      $tags     = static::parseComment($function->getDocComment(), 'tags');
-      $params   = empty($tags['param']) ? array() : $tags['param'];
-    
-      foreach($params as $tag){
-        list($types, $name, $description) = $tag;
-        if(ltrim($name, '&$') === $data->getName()){
-          $text = $description;
-
-          if($types)
-            $leftMeta = $types . str_repeat("\n", substr_count($text, "\n") + 1);
-
-          break;
-        }  
-      }      
-    
-    }else{
-      $text = (string)$data;
-    }
-
-    if($text && ($this->format === 'html')){
-      if($subMeta)
-        $subMeta = sprintf('<u>%s</u>', $subMeta);
-
-      if($leftMeta)
-        $leftMeta = sprintf('<b>%s</b>', static::escape($leftMeta));
-
-      if($desc)
-        $desc = sprintf('<i>%s</i>', static::escape($desc));
-
-      $text = sprintf('<q>%s<i><i>%s</i>%s</i>%s</q>', $leftMeta, static::escape($text), $desc, $subMeta);
-    }  
-
-    return $text ? $text : '';
-  }
-
-
-
-  /**
-   * Creates modifier bubbles
-   *
-   * @since   1.0
-   * @param   array $modifiers
-   * @return  string
-   */
-  protected function modifiers(array $modifiers){
-
-    switch($this->format){
-      case 'html':
-
-        foreach($modifiers as &$modifier)
-          $modifier = $this->entity($modifier[0], $modifier[1], $modifier[2]);
-        
-        return '<i class="rModifiers">' . implode('', $modifiers) . '</i>';
-
-      default:
-        foreach($modifiers as &$modifier)
-          $modifier = '[' . $modifier[1] . '] ';
-
-        return implode('', $modifiers);
-
-    } 
+    return $prefix . implode('(', $fn);
   }
 
 
@@ -1703,7 +1980,6 @@ class ref{
   /**
    * Calculates real string length
    *
-   * @since   1.0
    * @param   string $string
    * @return  int
    */
@@ -1717,7 +1993,6 @@ class ref{
   /**
    * Safe str_pad alternative
    *
-   * @since   1.0
    * @param   string $string
    * @param   int $padLen
    * @param   string $padStr
@@ -1734,7 +2009,6 @@ class ref{
   /**
    * Escapes variable for HTML output
    *
-   * @since   1.0
    * @param   mixed $var
    * @return  mixed
    */
@@ -1747,7 +2021,6 @@ class ref{
   /**
    * Generates a human readable date string from a given timestamp
    *
-   * @since    1.0
    * @param    int $timestamp      Date in UNIX time format
    * @param    int $currentTime    Optional. Use a custom date instead of the current time returned by the server
    * @return   string              Human readable date string
@@ -1783,268 +2056,6 @@ class ref{
         break;
 
     return $prefix . $count . $unit;
-  }  
-
-
-
-  /**
-   * Highlights regex syntax.
-   * 
-   * Based on "Regex Colorizer" by Steven Levithan (this is a translation from javascript)
-   *
-   * @link     https://github.com/slevithan/regex-colorizer
-   * @link     https://github.com/symfony/Finder/blob/master/Expression/Regex.php#L64-74
-   * @param    string $pattern
-   * @return   string
-   */
-  public function colorizeRegex($pattern){
-
-    if($this->format !== 'html')
-      return '';
-
-    // detection attempt code from the Symfony Finder component
-    $maybeValid = false;
-    if(preg_match('/^(.{3,}?)([imsxuADU]*)$/', $pattern, $m)) {
-      $start = substr($m[1], 0, 1);
-      $end   = substr($m[1], -1);
-
-      if(($start === $end && !preg_match('/[*?[:alnum:] \\\\]/', $start)) || ($start === '{' && $end === '}'))
-        $maybeValid = true;
-    }
-
-    if(!$maybeValid)
-      throw new \Exception('Pattern does not appear to be a valid PHP regex');
-
-    $output              = '';
-    $capturingGroupCount = 0;
-    $groupStyleDepth     = 0;
-    $openGroups          = array();
-    $lastIsQuant         = false;
-    $lastType            = 1;      // 1 = none; 2 = alternator
-    $lastStyle           = null;
-
-    preg_match_all('/\[\^?]?(?:[^\\\\\]]+|\\\\[\S\s]?)*]?|\\\\(?:0(?:[0-3][0-7]{0,2}|[4-7][0-7]?)?|[1-9][0-9]*|x[0-9A-Fa-f]{2}|u[0-9A-Fa-f]{4}|c[A-Za-z]|[\S\s]?)|\((?:\?[:=!]?)?|(?:[?*+]|\{[0-9]+(?:,[0-9]*)?\})\??|[^.?*+^${[()|\\\\]+|./', $pattern, $matches);
-
-    $matches = $matches[0];
-
-    $getTokenCharCode = function($token){
-      if(strlen($token) > 1 && $token[0] === '\\'){
-        $t1 = substr($token, 1);
-
-        if(preg_match('/^c[A-Za-z]$/', $t1))
-          return strpos("ABCDEFGHIJKLMNOPQRSTUVWXYZ", strtoupper($t1[1])) + 1;
-
-        if(preg_match('/^(?:x[0-9A-Fa-f]{2}|u[0-9A-Fa-f]{4})$/', $t1))
-          return intval(substr($t1, 1), 16);
-
-        if(preg_match('/^(?:[0-3][0-7]{0,2}|[4-7][0-7]?)$/', $t1))
-          return intval($t1, 8);
-
-        $len = strlen($t1);
-
-        if($len === 1 && strpos('cuxDdSsWw', $t1) !== false)
-          return null;
-
-        if($len === 1){
-          switch ($t1) {
-            case 'b': return 8;  
-            case 'f': return 12; 
-            case 'n': return 10; 
-            case 'r': return 13; 
-            case 't': return 9;  
-            case 'v': return 11; 
-            default: return $t1[0]; 
-          }
-        }
-      }
-
-      return ($token !== '\\') ? $token[0] : null;  
-    };   
-
-    foreach($matches as $m){
-
-      if($m[0] === '['){
-        $output        .= '<i>';
-        $lastCC         = null;  
-        $cLastRangeable = false;
-        $cLastType      = 0;  // 0 = none; 1 = range hyphen; 2 = short class
-
-        preg_match('/^(\[\^?)(]?(?:[^\\\\\]]+|\\\\[\S\s]?)*)(]?)$/', $m, $parts);
-
-        array_shift($parts);
-        list($opening, $content, $closing) = $parts;
-
-        if(!$closing)
-          throw new \Exception('Unclosed character class');
-
-        preg_match_all('/[^\\\\-]+|-|\\\\(?:[0-3][0-7]{0,2}|[4-7][0-7]?|x[0-9A-Fa-f]{2}|u[0-9A-Fa-f]{4}|c[A-Za-z]|[\S\s]?)/', $content, $ccTokens);
-        $ccTokens     = $ccTokens[0];
-        $ccTokenCount = count($ccTokens);
-        $output      .= $opening;  
-
-        foreach($ccTokens as $i => $cm) {
-
-          if($cm[0] === '\\'){
-            if(preg_match('/^\\\\[cux]$/', $cm))
-              throw new \Exception('Incomplete regex token');
-
-            if(preg_match('/^\\\\[dsw]$/i', $cm)) {
-              $output         .= sprintf('<i>%s</i>', $cm);
-              $cLastRangeable  = ($cLastType !== 1);
-              $cLastType       = 2;
-
-            }elseif($cm === '\\'){
-              throw new \Exception('Incomplete regex token');
-              
-            }else{
-              $output         .= sprintf('<i>%s</i>', static::escape($cm));
-              $cLastRangeable  = $cLastType !== 1;
-              $lastCC          = $getTokenCharCode($cm);
-            }
-
-          }elseif($cm === '-'){
-            if($cLastRangeable){
-              $nextToken = ($i + 1 < $ccTokenCount) ? $ccTokens[$i + 1] : false;
-
-              if($nextToken){
-                $nextTokenCharCode = $getTokenCharCode($nextToken[0]);
-
-                if((!is_null($nextTokenCharCode) && $lastCC > $nextTokenCharCode) || $cLastType === 2 || preg_match('/^\\\\[dsw]$/i', $nextToken[0]))
-                  throw new \Exception('Reversed or invalid range');
-
-                $output         .= '<u>-</u>';
-                $cLastRangeable  = false;
-                $cLastType       = 1;
-               
-              }else{
-                $output .= $closing ? '-' : '<u>-</u>';
-              }
-
-            }else{
-              $output         .= '-';
-              $cLastRangeable  = ($cLastType !== 1);
-            }
-
-          }else{
-            $output         .= static::escape($cm);
-            $cLastRangeable  = strlen($cm) > 1 || ($cLastType !== 1);
-            $lastCC          = $cm[strlen($cm) - 1];
-          }
-        }
-
-        $output      .= $closing . '</i>';
-        $lastIsQuant  = true;
-
-      }elseif($m[0] === '('){
-        if(strlen($m) === 2)
-          throw new \Exception('Invalid or unsupported group type');
-   
-        if(strlen($m) === 1)
-          $capturingGroupCount++;
-
-        $groupStyleDepth = ($groupStyleDepth !== 5) ? $groupStyleDepth + 1 : 1;
-        $openGroups[]    = $m; // opening
-        $lastIsQuant     = false;
-        $output         .= sprintf('<b class="g%d">%s</b>', $groupStyleDepth, $m);
-
-      }elseif($m[0] === ')'){
-        if(!count($openGroups)) 
-          throw new \Exception('No matching opening parenthesis');
-
-        $output         .= sprintf('<b class="g%d">)</b>', $groupStyleDepth);
-        $prevGroup       = $openGroups[count($openGroups) - 1];
-        $prevGroup       = isset($prevGroup[2]) ? $prevGroup[2] : '';
-        $lastIsQuant     = !preg_match('/^[=!]/', $prevGroup);
-        $lastStyle       = 'g' . $groupStyleDepth;
-        $lastType        = 0;
-        $groupStyleDepth = ($groupStyleDepth !== 1) ? $groupStyleDepth - 1 : 5;
-
-        array_pop($openGroups);
-        continue;
-      
-      }elseif($m[0] === '\\'){
-        if(isset($m[1]) && preg_match('/^[1-9]/', $m[1])){
-          $nonBackrefDigits = '';
-          $num = substr(+$m, 1);
-
-          while($num > $capturingGroupCount){
-            preg_match('/[0-9]$/', $num, $digits);
-            $nonBackrefDigits = $digits[0] . $nonBackrefDigits;
-            $num = floor($num / 10); 
-          }
-
-          if($num > 0){
-            $output .= '<b>\\' . $num . '</b>' . $nonBackrefDigits;
-
-          }else{
-            preg_match('/^\\\\([0-3][0-7]{0,2}|[4-7][0-7]?|[89])([0-9]*)/', $m, $pts);
-            $output .= '<b>\\' . $pts[1] . '</b>' . $pts[2];
-          }
-
-          $lastIsQuant = true;
-
-        }elseif(isset($m[1]) && preg_match('/^[0bBcdDfnrsStuvwWx]/', $m[1])){
-   
-          if(preg_match('/^\\\\[cux]$/', $m))
-            throw new \Exception('Incomplete regex token');
-
-          $output      .= '<b>' . $m . '</b>';
-          $lastIsQuant  = (strpos('bB', $m[1]) === false);
-
-        }elseif($m === '\\'){
-          throw new \Exception('Incomplete regex token');
-            
-        }else{
-          $output      .= static::escape($m);
-          $lastIsQuant  = true;
-        }
-
-      }elseif(preg_match('/^(?:[?*+]|\{[0-9]+(?:,[0-9]*)?\})\??$/', $m)){
-        if(!$lastIsQuant)
-          throw new \Exception('Quantifiers must be preceded by a token that can be repeated');
-
-        preg_match('/^\{([0-9]+)(?:,([0-9]*))?/', $m, $interval);
-
-        if($interval && (+$interval[1] > 65535 || (isset($interval[2]) && (+$interval[2] > 65535))))
-          throw new \Exception('Interval quantifier cannot use value over 65,535');
-        
-        if($interval && isset($interval[2]) && (+$interval[1] > +$interval[2]))
-          throw new \Exception('Interval quantifier range is reversed');
-        
-        $output      .= ($lastStyle ? '<b class="' . $lastStyle . '">' : '<b>') . $m . '</b>';    
-        $lastIsQuant  = false;
-
-      }elseif($m === '|'){
-        if($lastType === 1 || ($lastType === 2 && !count($openGroups)))
-          throw new \Exception('Empty alternative effectively truncates the regex here');
-
-        $output      .= count($openGroups) ? sprintf('<b class="g%d">|</b>', $groupStyleDepth) : '<b>|</b>';
-        $lastIsQuant  = false;
-        $lastType     = 2;
-        $lastStyle    = '';
-        continue;
-
-      }elseif($m === '^' || $m === '$'){
-        $output      .= '<b>' . $m . '</b>';
-        $lastIsQuant  = false;
-
-      }elseif($m === '.'){
-        $output      .= '<b>.</b>';
-        $lastIsQuant  = true;
-   
-      }else{
-        $output      .= static::escape($m);
-        $lastIsQuant  = true;
-      }
-
-      $lastType  = 0;
-      $lastStyle = '';    
-    }
-
-    if($openGroups)
-      throw new \Exception('Unclosed grouping');
-
-    return $this->entity('strRegex', $output, sprintf('Capturing groups: %d', $capturingGroupCount));
   }  
 
 }
