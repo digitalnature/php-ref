@@ -363,6 +363,7 @@
 
 /* inherited methods */
 .ref b[data-method-inherited]{
+  font-weight: bold;
   color: #6da5de;
 }
 
@@ -387,6 +388,7 @@
 }
 
 /* tiny bubbles that indicate visibility info or class features */
+.ref b[data-mod-interface],
 .ref b[data-mod-final],
 .ref b[data-mod-abstract],
 .ref b[data-mod-protected],
@@ -397,7 +399,6 @@
   margin: 0 2px;  
   width: 14px;
   height: 14px;
-  text-transform: uppercase;
   text-align: center;
   text-shadow: none;
   line-height: 15px;
@@ -406,6 +407,7 @@
   color:#fff;          
 }
 
+.ref b[data-mod-interface],
 .ref b[data-mod-abstract]{
   background: #baed78;
 }

@@ -817,7 +817,9 @@ class ref{
           foreach(array_slice($tokens, $i + 2) as $token){
 
             if(is_array($token)){
-              $expressions[$index][] = $token[1];
+              if($token[0] !== T_COMMENT)
+                $expressions[$index][] = ($token[0] !== T_WHITESPACE) ? $token[1] : ' ';
+
               continue;
             }
 
@@ -1147,12 +1149,12 @@ class ref{
         if(($context !== null) && ($context->getShortName() !== $item->getDeclaringClass()->getShortName()))
           $meta['sub'][] = array('Inherited from', sprintf('::%s', $item->getDeclaringClass()->getShortName()));
 
-        try{
-          if($item instanceof \ReflectionMethod)
+        if($item instanceof \ReflectionMethod){
+          try{
             $proto = $item->getPrototype();
-
-          $meta['sub'][] = array('Prototype defined by', sprintf('::%s', $proto->class));
-        }catch(\Exception $e){}
+            $meta['sub'][] = array('Prototype defined by', sprintf('::%s', $proto->class));
+          }catch(\Exception $e){}
+        }  
 
         $item = $this->linkify($this->format('text', 'name', $name, $meta), $item);
         continue;
@@ -1164,19 +1166,22 @@ class ref{
       if(!($item->isInterface() || ($this->is54 && $item->isTrait()))){
 
         if($item->isAbstract())
-          $bubbles[] = $this->format('text', 'mod-abstract', 'A', 'This class is abstract');
+          $bubbles[] = $this->format('text', 'mod-abstract', 'A', 'Abstract');
 
         if($item->isFinal())
-          $bubbles[] = $this->format('text', 'mod-final', 'F', 'This class is final and cannot be extended');
+          $bubbles[] = $this->format('text', 'mod-final', 'F', 'Final');
 
         // php 5.4+ only
         if($this->is54 && $item->isCloneable())
-          $bubbles[] = $this->format('text', 'mod-cloneable', 'C', 'Instances of this class can be cloned');
+          $bubbles[] = $this->format('text', 'mod-cloneable', 'C', 'Cloneable');
 
         if($item->isIterateable())
-          $bubbles[] = $this->format('text', 'mod-iterateable', 'X', 'Instances of this class are iterateable');            
+          $bubbles[] = $this->format('text', 'mod-iterateable', 'X', 'Iterateable');            
       
       }
+
+      if($item->isInterface() && $single !== '')
+       $bubbles[] = $this->format('text', 'mod-interface', 'I', 'Interface');
 
       $bubbles = $bubbles ? $this->format('bubbles', $bubbles) : '';
       $name = $this->format('text', 'name', $name, $meta);
@@ -1783,7 +1788,7 @@ class ref{
 
       if($prop->isProtected()){
         $prop->setAccessible(false);        
-        $bubbles[] = $this->format('text', 'mod-protected', 'P', 'This property is protected');        
+        $bubbles[] = $this->format('text', 'mod-protected', 'P', 'Protected');        
       }  
 
       $type = $inherited ? 'property-inherited' : 'property';
@@ -1847,8 +1852,8 @@ class ref{
           // @see https://bugs.php.net/bug.php?id=32177&edit=1
         }
 
-        if($paramClass) 
-          $parts[] = $this->fromReflector($paramClass, $paramClass->getName());
+        if($paramClass)
+          $parts[] = $this->fromReflector($paramClass, $paramClass->name);
         
         if($parameter->isArray())
           $parts[] = $this->format('text', 'name', 'array');
@@ -1865,13 +1870,13 @@ class ref{
       }
   
       if($method->isAbstract())
-        $bubbles[] = $this->format('text', 'mod-abstract', 'A', 'This method is abstract');                
+        $bubbles[] = $this->format('text', 'mod-abstract', 'A', 'Abstract');
 
       if($method->isFinal())
-        $bubbles[] = $this->format('text', 'mod-final', 'F', 'This method is final and cannot be overridden');
+        $bubbles[] = $this->format('text', 'mod-final', 'F', 'Final');
 
       if($method->isProtected())
-        $bubbles[] = $this->format('text', 'mod-protected', 'P', 'This method is protected');
+        $bubbles[] = $this->format('text', 'mod-protected', 'P', 'Protected');
 
       $name = $method->name;
 
@@ -1922,7 +1927,7 @@ class ref{
     if(strpos($expression, '(') === false)
       return $prefix . $this->format('text', 'expTxt', $expression);
 
-    $fn    = explode('(', $expression, 2);
+    $fn    = array_map('trim', explode('(', $expression, 2));
     $fn[1] = $this->format('text', 'expTxt', $fn[1]); // @todo, maybe: parse $fn[1] too (content within brackets)
 
     // try to find out if this is a function
