@@ -1104,7 +1104,7 @@ class ref{
       if(!$internalOnly || ($internalOnly && $haveParent->isInternal()))
         $parents[] = $haveParent;
 
-      $haveParent = $haveParent->getParentClass();
+      $haveParent = $haveParent->getParentClass();      
     }
 
     return $parents;
@@ -1145,7 +1145,14 @@ class ref{
 
       if(($item instanceof \ReflectionFunction) || ($item instanceof \ReflectionMethod)){
         if(($context !== null) && ($context->getShortName() !== $item->getDeclaringClass()->getShortName()))
-          $meta['sub'][] = array('Inherited from', sprintf('::%s', $context->getShortName()));
+          $meta['sub'][] = array('Inherited from', sprintf('::%s', $item->getDeclaringClass()->getShortName()));
+
+        try{
+          if($item instanceof \ReflectionMethod)
+            $proto = $item->getPrototype();
+
+          $meta['sub'][] = array('Prototype defined by', sprintf('::%s', $proto->class));
+        }catch(\Exception $e){}
 
         $item = $this->linkify($this->format('text', 'name', $name, $meta), $item);
         continue;
@@ -1154,7 +1161,7 @@ class ref{
       $bubbles = array();
 
       // @todo: maybe - list interface methods
-      if(!$item->isInterface()){
+      if(!($item->isInterface() || ($this->is54 && $item->isTrait()))){
 
         if($item->isAbstract())
           $bubbles[] = $this->format('text', 'mod-abstract', 'A', 'This class is abstract');
