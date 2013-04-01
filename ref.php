@@ -1054,15 +1054,17 @@ class ref{
         return "<i>(</i>{$prefix}{$arg1}<i>)</i>";
 
       case 'section':
-        $title = ($arg2 !== null) ? "<h4>{$arg2}</h4>" : '';
 
-        foreach($arg1 as &$row){
-          $last = array_pop($row);
-          $row  = implode('</dt><dt>', $row);
-          $row  = "<dl><dt>{$row}</dt><dd>{$last}</dd></dl>";
+        $title  = ($arg2 !== null) ? "<h4>{$arg2}</h4>" : '';
+        $output = '';
+
+        foreach($arg1 as $row){
+          $last    = array_pop($row);
+          $row     = implode('</dt><dt>', $row);
+          $output .= "<dl><dt>{$row}</dt><dd>{$last}</dd></dl>";
         }
 
-        return $title . '<section>' . implode('', $arg1) . '</section>';
+        return $title . '<section>' . $output . '</section>';
 
       case 'bubbles':
         return '<b>' . implode('', $arg1) . '</b>';
@@ -1151,20 +1153,31 @@ class ref{
 
       $bubbles = array();
 
-      if($item->isAbstract())
-        $bubbles[] = $this->format('text', 'mod-abstract', 'A', 'This class is abstract');
+      // @todo: maybe - list interface methods
+      if(!$item->isInterface()){
 
-      if($item->isFinal())
-        $bubbles[] = $this->format('text', 'mod-final', 'F', 'This class is final and cannot be extended');
+        if($item->isAbstract())
+          $bubbles[] = $this->format('text', 'mod-abstract', 'A', 'This class is abstract');
 
-      // php 5.4+ only
-      if($this->is54 && $item->isCloneable())
-        $bubbles[] = $this->format('text', 'mod-cloneable', 'C', 'Instances of this class can be cloned');
+        if($item->isFinal())
+          $bubbles[] = $this->format('text', 'mod-final', 'F', 'This class is final and cannot be extended');
 
-      if($item->isIterateable())
-        $bubbles[] = $this->format('text', 'mod-iterateable', 'X', 'Instances of this class are iterateable');            
+        // php 5.4+ only
+        if($this->is54 && $item->isCloneable())
+          $bubbles[] = $this->format('text', 'mod-cloneable', 'C', 'Instances of this class can be cloned');
 
-      $item = $this->format('bubbles', $bubbles) . $this->linkify($this->format('text', 'name', $name, $meta), $item);
+        if($item->isIterateable())
+          $bubbles[] = $this->format('text', 'mod-iterateable', 'X', 'Instances of this class are iterateable');            
+      
+      }
+
+      $bubbles = $bubbles ? $this->format('bubbles', $bubbles) : '';
+      $name = $this->format('text', 'name', $name, $meta);
+
+      if($item->isInterface() && $single === '')
+        $name .= sprintf(' (%d)', count($item->getMethods()));
+
+      $item = $bubbles . $this->linkify($name, $item);
     }
 
     return count($items) > 1 ? implode($this->format('sep', ' :: '), $items) : $items[0];
@@ -1695,7 +1708,7 @@ class ref{
     if($interfaces){
       $items = array();            
       foreach($interfaces as $name => $interface)
-        $items[] = $this->fromReflector($interface, $name);
+        $items[] = $this->fromReflector($interface);
 
       $row    = array($this->format('contain', 'interfaces', implode($this->format('sep', ', '), $items)));
       $group .= $this->format('section', array($row), 'Implements');      
@@ -1705,7 +1718,7 @@ class ref{
     if($traits){       
       $items = array();      
       foreach($traits as $name => $trait)
-        $items[] = $this->fromReflector($trait, $name);
+        $items[] = $this->fromReflector($trait);
 
       $row    = array($this->format('contain', 'traits', implode($this->format('sep', ', '), $items)));
       $group .= $this->format('section', array($row), 'Uses');            

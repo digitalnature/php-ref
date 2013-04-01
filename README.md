@@ -49,7 +49,7 @@ Currently available options and their default values:
 | Option name       | Default value       | Description
 |:----------------- |:------------------- |:-----------------------------------------------
 | `'expandDepth'`   | `1`                 | Initial expand depth (for HTML mode only). A negative value will expand all levels
-| `'extendedInfo'`  | `true`              | When this is set to `true`, additional information is returned. **Note that this seriously affects performance for queries that involve large data (like arrays/iterators with a large number of string elements)**
+| `'extendedInfo'`  | `true`              | When this is set to `true`, additional information is returned. **Note that this seriously affects performance for queries that involve large amounts of data (like arrays/iterators with many string elements)**
 | `'formatter'`     | `array()`           | Callbacks for custom/external formatters (as associative array: format => callback)
 | `'shortcutFunc'`  | `array('r', 'rt')`  | Shortcut functions used to detect the input expression. If they are namespaced, the namespace must be present as well (methods are not  supported) 
 | `'stylePath'`     | `'{:dir}/ref.css'`  | Local path to a custom stylesheet (HTML only); `false` means that no CSS is included.
