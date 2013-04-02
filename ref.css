@@ -71,7 +71,7 @@
   box-shadow:0 0 4px rgba(0,0,0, 0.25);  
   -webkit-transition: opacity .25s, margin .25s;
      -moz-transition: opacity .25s, margin .25s;
-      -ie-transition: opacity .25s, margin .25s;
+      -ms-transition: opacity .25s, margin .25s;
           transition: opacity .25s, margin .25s;
 }
 
@@ -190,7 +190,6 @@
 /* hide next element when checkbox is not checked */
 .ref input ~ label + div{
   display: none;
-  overflow: auto;      
 }
 
 /* show it when checkbox is checked */

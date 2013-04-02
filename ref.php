@@ -1257,7 +1257,7 @@ class ref{
 
     // internal function/method/class/property/constant
     if($parent->isInternal()){
-      $args[] = $reflector->getName();
+      $args[] = $reflector->name;
 
       if(in_array($type, array('method', 'property'), true))
         $args[] = $reflector->getDeclaringClass()->getName();
@@ -1267,8 +1267,8 @@ class ref{
       }, $args);
 
       // check for some special cases that have no links
-      $valid = ($type !== 'class') || (strcasecmp($reflector->getName(), 'stdClass') !== 0);
-      $valid = $valid && (($type !== 'method') || (strcasecmp($reflector->getName(), '__invoke') !== 0));
+      $valid = ($type === 'method') || (strcasecmp($parent->name, 'stdClass') !== 0);
+      $valid = $valid && (($type !== 'method') || (strcasecmp($reflector->name, '__invoke') !== 0));
 
       if($valid)
         $url = vsprintf($phpNetSchemes[$type], $args);
@@ -1282,7 +1282,7 @@ class ref{
         // so we're using queryposts.com as doc source for API
         case ($type === 'function') && class_exists('WP') && defined('ABSPATH') && defined('WPINC'):
           if(strpos($reflector->getFileName(), realpath(ABSPATH . WPINC)) === 0){
-            $uri = sprintf('http://queryposts.com/function/%s', urlencode(strtolower($reflector->getName())));
+            $url = sprintf('http://queryposts.com/function/%s', urlencode(strtolower($reflector->getName())));
             break;
           }
 
