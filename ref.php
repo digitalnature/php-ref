@@ -1026,8 +1026,12 @@ class ref{
           if($tags)
             $tip .= "<u>{$tags}</u>";
        
+          $sub = '';
           foreach($meta['sub'] as $line)
-            $tip .= sprintf('<u>%s</u>', sprintf('<b>%s</b>', implode('</b> <b>', $line)));
+            $sub .= sprintf('<i>%s</i>', sprintf('<b>%s</b>', implode('</b> <b>', $line)));
+
+          if($sub !== '')
+            $tip .= "<u>{$sub}</u>";
        
       
           $tip = "<q>{$tip}</q>";
@@ -1069,7 +1073,7 @@ class ref{
         return $title . '<section>' . $output . '</section>';
 
       case 'bubbles':
-        return '<b>' . implode('', $arg1) . '</b>';
+        return '<b data-mod>' . implode('', $arg1) . '</b>';
 
       case 'root':
         static $counter = 0;
@@ -1094,22 +1098,15 @@ class ref{
    * Get all parent classes of a class
    *
    * @param   string|Reflector $class   Class name or reflection object
-   * @param   bool $internalOnly        Retrieve only PHP-internal classes
-   * @return  array
+   * @return  array                     Array of ReflectionClass objects (starts with the ancestor, ends with the given class)
    */
-  protected static function getParentClasses($class, $internalOnly = false){
+  protected static function getParentClasses(\Reflector $class){
 
-    $haveParent = ($class instanceof \Reflector) ? $class : new \ReflectionClass($class);
-    $parents = array();
-
-    while($haveParent !== false){
-      if(!$internalOnly || ($internalOnly && $haveParent->isInternal()))
-        $parents[] = $haveParent;
-
-      $haveParent = $haveParent->getParentClass();      
-    }
-
-    return $parents;
+    $parents = array($class);
+    while(($class = $class->getParentClass()) !== false)
+      $parents[] = $class;
+   
+    return array_reverse($parents);
   }
 
 
@@ -1124,7 +1121,10 @@ class ref{
    */
   protected function fromReflector(\Reflector $reflector, $single = '', \Reflector $context = null){
 
-    $items = ($single !== '') || !($reflector instanceof \ReflectionClass) ? array($reflector) : array_reverse(static::getParentClasses($reflector));
+    $items  = array($reflector);
+
+    if(($single === '') && ($reflector instanceof \ReflectionClass))
+      $items = static::getParentClasses($reflector);
 
     foreach($items as &$item){
 
@@ -1147,12 +1147,12 @@ class ref{
 
       if(($item instanceof \ReflectionFunction) || ($item instanceof \ReflectionMethod)){
         if(($context !== null) && ($context->getShortName() !== $item->getDeclaringClass()->getShortName()))
-          $meta['sub'][] = array('Inherited from', sprintf('::%s', $item->getDeclaringClass()->getShortName()));
+          $meta['sub'][] = array('Inherited from', $item->getDeclaringClass()->getShortName());
 
         if($item instanceof \ReflectionMethod){
           try{
             $proto = $item->getPrototype();
-            $meta['sub'][] = array('Prototype defined by', sprintf('::%s', $proto->class));
+            $meta['sub'][] = array('Prototype defined by', $proto->class);
           }catch(\Exception $e){}
         }  
 
@@ -1250,7 +1250,9 @@ class ref{
         $type = 'class';
     }
 
-    // properties don't have the internal flag
+    // properties don't have the internal flag;
+    // also note that many internal classes use some kind of magic as properties (eg. DateTime);
+    // these will only get linkifed if the declared class is internal one, and not an extension :(
     $parent = ($type !== 'property') ? $reflector : $reflector->getDeclaringClass();
 
     // internal function/method/class/property/constant
@@ -1270,17 +1272,16 @@ class ref{
 
       if($valid)
         $url = vsprintf($phpNetSchemes[$type], $args);
-    
+
     // custom
     }else{
-      $sourceFile = $reflector->getFileName();   
       switch(true){      
 
         // WordPress function;
         // like pretty much everything else in WordPress, API links are inconsistent as well;
         // so we're using queryposts.com as doc source for API
         case ($type === 'function') && class_exists('WP') && defined('ABSPATH') && defined('WPINC'):
-          if(strpos($sourceFile, realpath(ABSPATH . WPINC)) === 0){
+          if(strpos($reflector->getFileName(), realpath(ABSPATH . WPINC)) === 0){
             $uri = sprintf('http://queryposts.com/function/%s', urlencode(strtolower($reflector->getName())));
             break;
           }
@@ -1646,7 +1647,7 @@ class ref{
       return $this->format('text', 'object') . $this->format('group', null, 'Incomplete');
   
     $reflector  = new \ReflectionObject($subject);
-    $objectName = $this->fromReflector($reflector) . ' ' . $this->format('text', 'object');
+    $objectName = $this->format('contain', 'class', $this->fromReflector($reflector) . ' ' . $this->format('text', 'object'));
     $hash       = spl_object_hash($subject);
 
     // tracks objects to detect recursion
@@ -1694,12 +1695,12 @@ class ref{
       $group .= $this->format('section', $section, sprintf('Contents (%d)', $count));
     }
 
-    $props           = $reflector->getProperties(\ReflectionProperty::IS_PUBLIC | \ReflectionProperty::IS_PROTECTED);    
-    $methods         = static::$config['extendedInfo'] ? $reflector->getMethods(\ReflectionMethod::IS_PUBLIC | \ReflectionMethod::IS_PROTECTED) : array();
-    $constants       = $reflector->getConstants();
-    $interfaces      = $reflector->getInterfaces();
-    $traits          = $this->is54 ? $reflector->getTraits() : array();
-    $internalParents = static::getParentClasses($reflector, true);        
+    $props      = $reflector->getProperties(\ReflectionProperty::IS_PUBLIC | \ReflectionProperty::IS_PROTECTED);    
+    $methods    = static::$config['extendedInfo'] ? $reflector->getMethods(\ReflectionMethod::IS_PUBLIC | \ReflectionMethod::IS_PROTECTED) : array();
+    $constants  = $reflector->getConstants();
+    $interfaces = $reflector->getInterfaces();
+    $traits     = $this->is54 ? $reflector->getTraits() : array();
+    $parents    = static::getParentClasses($reflector);        
 
     // work-around for https://bugs.php.net/bug.php?id=49154
     // @see http://stackoverflow.com/questions/15672287/strange-behavior-of-reflectiongetproperties-with-numeric-keys
@@ -1739,18 +1740,21 @@ class ref{
     // class constants
     $section = array();
     foreach($constants as $name => $value){
-      $key = $this->format('contain', 'constant', $this->format('text', 'name', $name));
-
-      foreach($internalParents as $parent){
+      $inherited = '';
+      $meta = null;
+      foreach($parents as $parent){
         if($parent->hasConstant($name)){
-          $key = $this->linkify($key, $parent, $name);
+          if($parent !== $reflector){
+            $inherited = '-inherited';
+            $meta = array('sub' => array(array('Prototype defined by', $parent->name)));
+          }  
           break;
         }
-      }   
+      }
 
       $section[] = array(
         $this->format('sep', '::'),          
-        $key,
+        $this->format('contain', "constant{$inherited}", $this->linkify($this->format('text', 'name', $name, $meta), $parent, $name)),
         $this->format('sep', '='),
         $this->evaluate($value),
       );
@@ -1765,14 +1769,14 @@ class ref{
     foreach($props as $idx => $prop){
       $bubbles     = array();
       $sourceClass = $prop->getDeclaringClass();
-      $inherited   = $reflector->getShortName() !== $sourceClass->getShortName();
+      $inherited   = $reflector->getShortName() !== $sourceClass->getShortName() ? '-inherited' : '';
 
       // weird memory leak in ReflectionProperty::getDocComment() ?
       $meta        = $sourceClass->isInternal() ? null : static::parseComment($prop->getDocComment());
 
       if($meta){
         if($inherited)
-          $meta['sub'] = array(array('Inherited from', sprintf('::%s', $sourceClass->getShortName())));
+          $meta['sub'] = array(array('Declared in', $sourceClass->getShortName()));
 
         // note that we need to make the left meta area have the same height as the content
         if(isset($meta['tags']['var'][0]))
@@ -1791,20 +1795,10 @@ class ref{
         $bubbles[] = $this->format('text', 'mod-protected', 'P', 'Protected');        
       }  
 
-      $type = $inherited ? 'property-inherited' : 'property';
-      $name = $this->format('text', 'name', $prop->name, $meta);
-
-      foreach($internalParents as $parent){
-        if($parent->hasProperty($prop->name)){
-          $name = $this->linkify($name, $prop);
-          break;
-        }
-      }              
-
       $section[] = array(
         $this->format('sep', $prop->isStatic() ? '::' : '->'),
         $this->format('bubbles', $bubbles),
-        $this->format('contain', $type, $name),
+        $this->format('contain', "property{$inherited}", $this->linkify($this->format('text', 'name', $prop->name, $meta), $prop)),
         $this->format('sep', '='),
         $this->evaluate($value),
       );

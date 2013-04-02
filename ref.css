@@ -15,8 +15,9 @@
 .ref ins,
 .ref dl,
 .ref dt,
-.ref dd
-.ref h4{
+.ref dd,
+.ref h4,
+.ref h5{
   font-style: inherit;  
   font-weight: inherit;
   margin: 0;
@@ -37,7 +38,9 @@
 .ref > div{
   background: #f9f9f9;        
   border: 1px solid #eee;
+  border-top: 0;
   border-radius: 0 0 4px 4px;
+  box-shadow: inset 0px 4px 4px #f3f3f3, inset 0px -8px 8px #fff;
   padding: 2px 5px;  
   margin: 0 0 4px;
   text-shadow: 0 1px 0 #fff;
@@ -89,11 +92,12 @@
 #rTip > i > i{
   padding: 0 10px 10px 10px;
   display: block;
+  color: #777;
 }
 
 #rTip > i > i:first-child{
+  padding-top: 10px;  
   color: #ccc;  
-  padding-top: 10px;
 }
 
 #rTip > b{
@@ -138,21 +142,6 @@
   color: #edd078;
 }
 
-#rTip > u > u{
-  font: bold 11px Helvetica, Arial;     
-  display: block;  
-  margin-top: 5px;
-  padding: 5px 0;
-}
-
-#rTip > u > i + u{
-  border-top:1px dotted #666;
-}
-
-#rTip > u > u > b{
-  font-weight: bold;  
-  color: #ccc;
-}
 
 /* source expression (input) */
 .ref > kbd{
@@ -352,6 +341,7 @@
   color:#CC0033;
 }
 
+.ref b[data-constant-inherited],
 .ref b[data-property-inherited]{
   color: #999;
 }
@@ -388,23 +378,24 @@
 }
 
 /* tiny bubbles that indicate visibility info or class features */
-.ref b[data-mod-interface],
-.ref b[data-mod-final],
-.ref b[data-mod-abstract],
-.ref b[data-mod-protected],
-.ref b[data-mod-iterateable],
-.ref b[data-mod-cloneable]{
-  font: bold 11px Helvetica, Arial;    
+.ref b[data-mod]{
+  font: bold 11px Helvetica, Arial;      
+  text-shadow: none;
+  color: #fff;            
+}
+
+.ref > kbd b[data-mod]{
+  color: #444;
+}
+
+.ref b[data-mod] b{
   display: inline-block;  
   margin: 0 2px;  
   width: 14px;
   height: 14px;
-  text-align: center;
-  text-shadow: none;
-  line-height: 15px;
-  border-radius: 30px;
-  background: #78bded;  
-  color:#fff;          
+  text-align: center;  
+  border-radius: 30px;   
+  line-height: 15px;    
 }
 
 .ref b[data-mod-interface],
@@ -422,6 +413,10 @@
 
 .ref b[data-mod-cloneable]{
   background: #bdd7d1;
+}
+
+.ref b[data-mod-final]{
+  background: #78bded;  
 }
 
 /* regular expression (colors partially match RegexBuddy and RegexPal) */

@@ -50,7 +50,7 @@
 
     }else{
 
-      rt(true, false, 'I can haz a 강남스타일 string', '2012-12-26 04:20:00', null, 4.20);
+      rt(true, false, 'I can haz a 강남스타일 string', '2012-12-26 04:20:00', null, 17, 4.20);
       rt(array(), $array, serialize(array('A', 'serialized', 'string')));     
       rt(fopen('php://stdin', 'r'), function($x, $d){}); 
       rt(new \DateTimeZone('Pacific/Honolulu'));
