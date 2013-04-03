@@ -13,9 +13,6 @@
 .ref label,
 .ref kbd,
 .ref ins,
-.ref dl,
-.ref dt,
-.ref dd,
 .ref h4,
 .ref h5{
   font-style: inherit;  
@@ -150,15 +147,16 @@
   display: block;
   color: #ccc;
   background-color: #333;
+  background-image: -webkit-linear-gradient(top, #444, #333);  
   background-image: -moz-linear-gradient(top, #444, #333);
   background-image: -ms-linear-gradient(top, #444, #333);
-  background-image: -webkit-linear-gradient(top, #444, #333);
   background-image: linear-gradient(top, #444, #333);  
   border-radius: 4px 4px 0 0;
   border-bottom: 1px solid #fff;  
 }
 
-.ref input[type="checkbox"]{
+/* hidden checkbox that controls group expansion */
+.ref input{
   display: none;
 }
 
@@ -208,7 +206,7 @@
   font: bold 11px Helvetica, Arial;
   color: #bcbcbc;
   text-transform: lowercase;
-  display: inline-block;
+  display: block;
   margin: 12px 0 2px 10px;
 }
 
@@ -223,7 +221,6 @@
 }
 
 /* section cells */
-.ref dt,
 .ref dd{
   display: table-cell;
   vertical-align: top;
@@ -231,7 +228,7 @@
 }
 
 /* last cell of a row (forces table to adjust width like we want to) */
-.ref dd{
+.ref dd:last-child{
   width: 100%;
 }
 
@@ -252,26 +249,26 @@
 
 /* show help cursor when mouse is over an entity with a tooltip */
 /* note that this attribute is added with javascript */
-.ref b[data-has-tip]{
+.ref [data-has-tip]{
   cursor: help;
 }
 
 /* pointer if inside a link */
-.ref a > b[data-has-tip]{
+.ref a > [data-has-tip]{
   cursor: pointer;
 }
 
 /* key-value dividers, property & method modifiers etc. */
 .ref i{
   white-space: pre;  
-  color: #bbb;
+  color: #aaa;
 }
 
 /* tag-like appearance for boolean, null and resource types */
-.ref b[data-true],
-.ref b[data-false],
-.ref b[data-null],
-.ref b[data-resource],
+.ref [data-true],
+.ref [data-false],
+.ref [data-null],
+.ref [data-resource],
 .ref s{
   font: bold 11px Helvetica, Arial; 
   color: #fff;        
@@ -293,77 +290,77 @@
 }
 
 /* boolean true */
-.ref b[data-true]{
+.ref [data-true]{
   background-color: #339900;
 }
 
 /* boolean false */
-.ref b[data-false]{
+.ref [data-false]{
   background-color: #CC0033;
   color: #fff;
 }   
 
 /* null value */
-.ref b[data-null]{
+.ref [data-null]{
   background-color: #eee;
   color: #999;
   text-shadow: inherit;
 }
 
 /* resources */
-.ref b[data-resource]{
+.ref [data-resource]{
   background-color: #0057ae;
 }   
 
-.ref b[data-resourceInfo]{
+.ref [data-resourceInfo]{
   font: bold 11px Helvetica, Arial;   
   color: #999;
 }
 
 /* integer or double values */
-.ref b[data-integer],
-.ref b[data-double]{
+.ref [data-integer],
+.ref [data-double]{
   color: #0099CC;
 }   
 
 /* string values */
-.ref b[data-string]{
+.ref [data-string]{
   color: #669933;  
 }
 
 /* arrays & objects */
-.ref b[data-array],
-.ref b[data-array] ~ i,
-.ref b[data-object],
-.ref b[data-object] ~ i,
-.ref b[data-resource] ~ i{
+.ref [data-array],
+.ref [data-array] ~ i,
+.ref [data-object],
+.ref [data-object] ~ i,
+.ref [data-resource] ~ i{
   color:#CC0033;
 }
 
-.ref b[data-constant-inherited],
-.ref b[data-property-inherited]{
+.ref [data-constant-inherited],
+.ref [data-property-inherited]{
   color: #999;
 }
 
-.ref b[data-method]{
+.ref [data-method]{
   font-weight: bold;
   color: #0057ae;
 }
 
 /* inherited methods */
-.ref b[data-method-inherited]{
+.ref [data-method-inherited]{
   font-weight: bold;
   color: #6da5de;
 }
 
 /* method arguments */
-.ref b[data-parameter]{
+.ref [data-parameter]{
   font-weight: normal;  
   color: #333;
 }
 
 /* optional method arguments */
-.ref b[data-parameter-optional]{
+.ref [data-parameter-optional]{
   font-style: italic;
   font-weight: normal;    
   color: #aaa;
@@ -377,17 +374,17 @@
 }
 
 /* tiny bubbles that indicate visibility info or class features */
-.ref b[data-mod]{
+.ref [data-mod]{
   font: bold 11px Helvetica, Arial;      
   text-shadow: none;
   color: #fff;            
 }
 
-.ref > kbd b[data-mod]{
+.ref > kbd [data-mod]{
   color: #444;
 }
 
-.ref b[data-mod] b{
+.ref [data-mod] b{
   display: inline-block;  
   margin: 0 2px;  
   width: 14px;
@@ -397,29 +394,29 @@
   line-height: 15px;    
 }
 
-.ref b[data-mod-interface],
-.ref b[data-mod-abstract]{
+.ref [data-mod-interface],
+.ref [data-mod-abstract]{
   background: #baed78;
 }
 
-.ref b[data-mod-protected]{
+.ref [data-mod-protected]{
   background: #edd078;
 }
 
-.ref b[data-mod-iterateable]{
+.ref [data-mod-iterateable]{
   background: #d5dea5;
 }
 
-.ref b[data-mod-cloneable]{
+.ref [data-mod-cloneable]{
   background: #bdd7d1;
 }
 
-.ref b[data-mod-final]{
+.ref [data-mod-final]{
   background: #78bded;  
 }
 
 /* regular expression (colors partially match RegexBuddy and RegexPal) */
-.ref b[data-regex]{
+.ref [data-regex]{
   font-weight: bold;
   text-shadow: none;
   padding: 1px 0;
@@ -428,46 +425,46 @@
 }
 
 /* char class */
-.ref b[data-regex-chr]{
+.ref [data-regex-chr]{
   background: #ffc080;
   color: #694c07;
 }
 
-.ref b[data-regex-chr-meta]{background: #e0a060;} /* char class: metasequence */
-.ref b[data-regex-chr-range]{background: #ffcf9b;} /* char class: range-hyphen */
+.ref [data-regex-chr-meta]{background: #e0a060;} /* char class: metasequence */
+.ref [data-regex-chr-range]{background: #ffcf9b;} /* char class: range-hyphen */
 
 /* metasequence */
-.ref b[data-regex-meta]{
+.ref [data-regex-meta]{
   background: #80c0ff;
   color: #105f8c;
 } 
 
 /* group: depth 1 */
-.ref b[data-regex-g1]{
+.ref [data-regex-g1]{
   background: #00c000;
   color: #fff;
 }
 
 /* group: depth 2 */
-.ref b[data-regex-g2]{
+.ref [data-regex-g2]{
   background: #c3e86c;
   color: #648c1c;
 }
 
 /* group: depth 3 */
-.ref b[data-regex-g3]{
+.ref [data-regex-g3]{
   background: #008000;
   color: #fff;
 }
 
 /* group: depth 4 */
-.ref b[data-regex-g4]{
+.ref [data-regex-g4]{
   background: #6dcb99;
   color: #fff;
 }
 
 /* group: depth 5 */
-.ref b[data-regex-g5]{
+.ref [data-regex-g5]{
   background: #00ff00;
   color: #2c8e24;
 }

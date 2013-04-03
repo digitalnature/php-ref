@@ -181,7 +181,7 @@ class ref{
   /**
    * Constructor
    *
-   * @param   string|null $format   Output format, defaults to 'html'
+   * @param   string $format        Output format, defaults to 'html'
    * @param   int|null $expDepth    Maximum expand depth (relevant to the HTML format)
    */
   public function __construct($format = 'html', $expDepth = null){
@@ -244,7 +244,7 @@ class ref{
     // instance index (gets displayed as comment in html-mode)
     static $counter = 1;  
 
-    $startTime = microtime(true);         
+    $startTime = microtime(true);
     $output    = $this->format('root', $this->evaluate($subject), $this->evaluateExp($expression));
     $endTime   = round(microtime(true) - $startTime, 4);
 
@@ -765,8 +765,8 @@ class ref{
     while($callee = array_pop($trace)){
 
       // extract only the information we neeed
-      $calee = array_intersect_key($callee, array_fill_keys(array('file', 'function', 'line'), false));
-      extract($calee);
+      $callee = array_intersect_key($callee, array_fill_keys(array('file', 'function', 'line'), false));
+      extract($callee);
 
       // skip, if the called function doesn't match the shortcut function name
       if(!$function || !preg_grep("/{$function}/i" , static::$config['shortcutFunc']))
@@ -910,7 +910,7 @@ class ref{
         $prefix = ($arg2 !== null) ? $arg2 : '';
         if($arg1){
           $arg1 =  $arg1 . "\n";
-          $prefix .= ' ▼';
+          $prefix .= " \xe2\x96\xbc";
         }
 
         return "({$prefix}{$arg1})";
@@ -946,6 +946,7 @@ class ref{
               continue;
             }
        
+            // indent the entire block
             $output .= str_replace("\n", "\n" . str_repeat(' ', $padLen + 2), $c);
           }         
         }
@@ -979,7 +980,7 @@ class ref{
 
     switch($element){
       case 'sep':
-        return sprintf('<i>%s</i>', static::escape($arg1));
+        return '<i>' . static::escape($arg1) . '</i>';
 
       case 'text':
         $tip  = '';
@@ -1000,7 +1001,8 @@ class ref{
 
           $meta = static::escape($meta);
 
-          $tip = $meta['title'] ? "<i>{$meta['title']}</i>" : '';
+          if($meta['title'])
+            $tip = "<i>{$meta['title']}</i>";
 
           if($meta['description'])
             $tip .= "<i>{$meta['description']}</i>";
@@ -1028,7 +1030,7 @@ class ref{
        
           $sub = '';
           foreach($meta['sub'] as $line)
-            $sub .= sprintf('<i>%s</i>', sprintf('<b>%s</b>', implode('</b> <b>', $line)));
+            $sub .= '<i><b>' . implode('</b> <b>', $line) . '</b></i>';
 
           if($sub !== '')
             $tip .= "<u>{$sub}</u>";
@@ -1040,7 +1042,7 @@ class ref{
         return ($arg1 !== 'name') ? "<b data-{$arg1}>{$arg2}{$tip}</b>" : "<b>{$arg2}{$tip}</b>";
 
       case 'match':
-        return "<br><s>{$arg1}</s><b data-$arg1>{$arg2}</b>";
+        return "<br><s>{$arg1}</s>{$arg2}";
 
       case 'contain':
         return "<b data-{$arg1}>{$arg2}</b>";
@@ -1052,25 +1054,22 @@ class ref{
         static $groupIdx = 0;
 
         if($arg1){
+          ++$groupIdx;          
           $checked = ($this->expDepth < 0) || (($this->expDepth > 0) && ($this->level <= $this->expDepth)) ? 'checked' : '';
-          $arg1 = sprintf('<input type="checkbox" id="refGrp%1$d" %3$s /><label for="refGrp%1$d"></label><div>%2$s</div>', ++$groupIdx, $arg1, $checked);
+          $arg1 = "<input type=\"checkbox\" id=\"rGrp{$groupIdx}\" {$checked} /><label for=\"rGrp{$groupIdx}\"></label><div>{$arg1}</div>";
         }
 
-        $prefix = ($arg2 !== null) ? sprintf('<ins>%s</ins>', static::escape($arg2)) : '';
+        $prefix = ($arg2 !== null) ? '<ins>' . static::escape($arg2) . '</ins>' : '';
         return "<i>(</i>{$prefix}{$arg1}<i>)</i>";
 
       case 'section':
-
         $title  = ($arg2 !== null) ? "<h4>{$arg2}</h4>" : '';
         $output = '';
 
-        foreach($arg1 as $row){
-          $last    = array_pop($row);
-          $row     = implode('</dt><dt>', $row);
-          $output .= "<dl><dt>{$row}</dt><dd>{$last}</dd></dl>";
-        }
+        foreach($arg1 as $row)
+          $output .= '<dl><dd>' . implode('</dd><dd>', $row) . '</dd></dl>';
 
-        return $title . '<section>' . $output . '</section>';
+        return "{$title}<section>{$output}</section>";
 
       case 'bubbles':
         return '<b data-mod>' . implode('', $arg1) . '</b>';
@@ -1097,8 +1096,8 @@ class ref{
   /**
    * Get all parent classes of a class
    *
-   * @param   string|Reflector $class   Class name or reflection object
-   * @return  array                     Array of ReflectionClass objects (starts with the ancestor, ends with the given class)
+   * @param   Reflector $class   Reflection object
+   * @return  array              Array of ReflectionClass objects (starts with the ancestor, ends with the given class)
    */
   protected static function getParentClasses(\Reflector $class){
 
@@ -1114,9 +1113,9 @@ class ref{
   /**
    * Generate class / function info
    *
-   * @param   string|Reflector $class   Class name or reflection object
+   * @param   Reflector $reflector      Class name or reflection object
    * @param   string $single            Skip parent classes
-   * @param   mixed $context            Object context
+   * @param   Reflector|null $context   Object context (for methods)
    * @return  string
    */
   protected function fromReflector(\Reflector $reflector, $single = '', \Reflector $context = null){
@@ -1300,20 +1299,24 @@ class ref{
 
 
   /**
-   * Internal shortcut for to(Format) methods
-   *
+   * Internal shortcut for to(Format) methods 
+   *   
+   * @param   string $element
+   * @param   string|null $arg1
+   * @param   string|null $arg2
+   * @param   string|array|null $meta
    * @return  string
    */
   protected function format($element, $arg1 = null, $arg2 = null, $meta = null){
-    return $this->{'to' . ucfirst($this->format)}($element, $arg1, $arg2, $meta);
+    return $this->{"to{$this->format}"}($element, $arg1, $arg2, $meta);
   }
 
 
 
   /**
-   * Builds a report with information about $subject
+   * Evaluates the given variable
    *
-   * @param   mixed $subject          Variable to query   
+   * @param   mixed &$subject         Variable to query (reference)
    * @param   bool $skipStringChecks  Skip advanced string checks
    * @return  mixed                   Result (both HTML and text modes generate strings)
    */
@@ -1627,7 +1630,7 @@ class ref{
               foreach($components as $component)
                 $regex .= $this->format('text', 'regex-' . key($component), reset($component));
 
-              $add .= $this->format('match', 'regex', $regex);
+              $add .= $this->format('match', 'regex', $this->format('contain', 'regex', $regex));
             }  
 
           }catch(\Exception $e){}
@@ -1644,10 +1647,10 @@ class ref{
     // sometimes incomplete objects may be created from string unserialization,
     // if the class to which the object belongs wasn't included until the unserialization stage...
     if($subject instanceof \__PHP_Incomplete_Class)
-      return $this->format('text', 'object') . $this->format('group', null, 'Incomplete');
+      return $this->format('text', 'object') . $this->format('group', null, 'incomplete');
   
     $reflector  = new \ReflectionObject($subject);
-    $objectName = $this->format('contain', 'class', $this->fromReflector($reflector) . ' ' . $this->format('text', 'object'));
+    $objectName = $this->format('contain', 'class', $this->fromReflector($reflector)) . ' ' . $this->format('text', 'object');
     $hash       = spl_object_hash($subject);
 
     // tracks objects to detect recursion
@@ -1655,15 +1658,8 @@ class ref{
 
     // already been here?
     if(isset($hashes[$hash]))
-      return $objectName . $this->format('group', null, 'Recursion');
+      return $objectName . $this->format('group', null, 'recursion');
 
-    // sometimes incomplete objects may be created from string unserialization,
-    // if the class to which the object belongs wasn't included until the unserialization stage...
-    if($subject instanceof \__PHP_Incomplete_Class){
-      unset($hashes[$hash]);
-      return $this->format('text', 'object') . $this->format('group', null, 'Incomplete');
-    }  
-    
     $hashes[$hash] = 1;
     $group = '';
     $this->level++;
@@ -1905,8 +1901,8 @@ class ref{
    * Scans for known classes and functions inside the provided expression,
    * and linkifies them when possible
    *
-   * @param   string $expression      Expression to format
-   * @return  string                  Formatted output
+   * @param   string $expression   Expression to format
+   * @return  string               Formatted output
    */
   protected function evaluateExp($expression = null){
 
@@ -2028,8 +2024,8 @@ class ref{
   /**
    * Escapes variable for HTML output
    *
-   * @param   mixed $var
-   * @return  mixed
+   * @param   string|array $var
+   * @return  string|array
    */
   protected static function escape($var){
     return is_array($var) ? array_map('static::escape', $var) : htmlspecialchars($var, ENT_QUOTES);
