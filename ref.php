@@ -112,7 +112,7 @@ class ref{
                 // initial expand depth (for HTML mode only)
                 'expandDepth'  => 1,
 
-                // shortcut functions used to access the ::build() method below;
+                // shortcut functions used to access the query method below;
                 // if they are namespaced, the namespace must be present as well (methods are not supported)
                 'shortcutFunc' => array('r', 'rt'),
 
@@ -246,12 +246,11 @@ class ref{
 
     $startTime = microtime(true);
     $output    = $this->format('root', $this->evaluate($subject), $this->evaluateExp($expression));
-    $endTime   = round(microtime(true) - $startTime, 4);
+    $endTime   = microtime(true) - $startTime;
 
     static::$time += $endTime; 
     return $output;
   }
-
 
 
 
@@ -739,10 +738,11 @@ class ref{
   /**
    * Total CPU time used by the class
    *   
+   * @param   int precision
    * @return  double
    */
-  public static function getTime(){
-    return static::$time;
+  public static function getTime($precision = 4){
+    return round(static::$time, $precision);
   }
 
 
@@ -756,7 +756,7 @@ class ref{
   public static function getInputExpressions(array &$options = null){    
 
     // used to determine the position of the current call,
-    // if more ::build() calls were made on the same line
+    // if more queries calls were made on the same line
     static $lineInst = array();
 
     // pull only basic info with php 5.3.6+ to save some memory
@@ -1054,7 +1054,7 @@ class ref{
         static $groupIdx = 0;
 
         if($arg1){
-          ++$groupIdx;          
+          $groupIdx++;
           $checked = ($this->expDepth < 0) || (($this->expDepth > 0) && ($this->level <= $this->expDepth)) ? 'checked' : '';
           $arg1 = "<input type=\"checkbox\" id=\"rGrp{$groupIdx}\" {$checked} /><label for=\"rGrp{$groupIdx}\"></label><div>{$arg1}</div>";
         }
@@ -1083,7 +1083,7 @@ class ref{
         $assets = static::getAssets();
         $counter++;
 
-        return "<!-- ref #{$counter} --><div>{$assets}<div class=\"ref\">{$arg2}<div>{$arg1}</div></div></div><!-- /ref -->";
+        return "<!-- ref#{$counter} --><div>{$assets}<div class=\"ref\">{$arg2}<div>{$arg1}</div></div></div><!-- /ref#{$counter} -->";
 
       default:
         return '';
@@ -1312,6 +1312,24 @@ class ref{
   }
 
 
+  public function refsMatch(&$a, &$b){
+    // saving current value in temporary variable
+    $buffer = $a;
+
+    // assigning new value to memory block, pointed by reference
+    $a = microtime(true);
+
+    // if they're still equal, then they're point to the same place.
+    $result = ($a === $b);
+
+    // restoring value
+    $a = $buffer;
+
+    // returning result
+    return $result;
+  }
+
+
 
   /**
    * Evaluates the given variable
@@ -1345,22 +1363,10 @@ class ref{
       if(empty($subject))
         return $this->format('text', 'array') . $this->format('group');
 
-      // temporary element (marker) for arrays, used to track recursions
-      static $marker = null;
-
-      // set a marker to detect recursion
-      if(!$marker)
-        $marker = uniqid('', true);
-
-      // if our marker element is present in the array it means that we were here before
-      if(isset($subject[$marker]))
-        return $this->format('text', 'array') . $this->format('group', null, 'recursion');
-
-      $this->level++;
-      $subject[$marker] = true;
-
-      // note that we must substract the marker element
-      $count   = count($subject) - 1;
+      // clone array (we need this in order to track recursion)
+      $tmpArr = $subject;
+      $pin    = microtime(true);
+      $count  = count($subject);
 
       // use splFixedArray() on PHP 5.4+ to save up some memory, because the subject array
       // might contain a huge amount of entries.
@@ -1372,32 +1378,42 @@ class ref{
       $section = $this->is54 ? new \SplFixedArray($count) : array();
       $idx     = 0;
 
+      $this->level++;
       foreach($subject as $key => &$value){
-
-        // ignore our marker
-        if($key === $marker)
-          continue;
-
         $keyInfo = gettype($key);
 
         if(is_string($key)){
-          $encoding  = $this->mbStr ? mb_detect_encoding($key) : '';
-          $keyLength = $encoding && ($encoding !== 'ASCII') ? static::strLen($key) . '; ' . $encoding : static::strLen($key);
-          $keyInfo   = "{$keyInfo}({$keyLength})";
+          $encoding = $this->mbStr ? mb_detect_encoding($key) : '';
+          $keyLen = $encoding && ($encoding !== 'ASCII') ? static::strLen($key) . '; ' . $encoding : static::strLen($key);
+          $keyInfo = "{$keyInfo}({$keyLen})";
         }
+
+        // check if the value is a reference to our array
+        if(is_array($value)){
+          $tmpArr[$key][$pin] = 1;
+          $fmtVal = isset($subject[$key][$pin]) ? $this->format('text', 'array') . $this->format('group', null, 'recursion') : $this->evaluate($value);
+        
+        }else{
+          $fmtVal = $this->evaluate($value);
+        }
+
+        // free some memory
+        unset($subject[$key], $tmpArr[$key]);
 
         $section[$idx++] = array(
           $this->format('text', 'key', $key, "Key: {$keyInfo}"),
           $this->format('sep', '=>'),
-          $this->evaluate($value),
+          $fmtVal,
         );
 
-        // free some memory
-        unset($subject[$key]);
       }
+
+      $tmpArr = null;
+      unset($tmpArr);     
 
       $output = $this->format('text', 'array') . $this->format('group', $this->format('section', $section), $count);
       $this->level--;
+
       return $output;
     }  
 
