@@ -240,9 +240,6 @@ class ref{
    * @return  string
    */
   public function query($subject, $expression = null){
- 
-    // instance index (gets displayed as comment in html-mode)
-    static $counter = 1;  
 
     $startTime = microtime(true);
     $output    = $this->format('root', $this->evaluate($subject), $this->evaluateExp($expression));
@@ -287,116 +284,113 @@ class ref{
    *
    * @link    http://pear.php.net/manual/en/standards.sample.php
    * @param   string $comment    DocBlock comment (must start with /**)
-   * @param   string $key        Field to return (optional)
+   * @param   string|null $key   Field to return (optional)
    * @return  array|string|null  Array containing all fields, array/string with the contents of
    *                             the requested field, or null if the comment is empty/invalid
    */
   public static function parseComment($comment, $key = null){
 
-    $title       = '';
     $description = '';
     $tags        = array();
     $tag         = null;
-    $pointer     = null;
-    $padding     = false;
-    $comment     = array_slice(preg_split('/\r\n|\r|\n/', $comment), 1, -1);
+    $pointer     = '';
+    $padding     = 0;
+    $comment     = '* ' . trim($comment, "/* \t\n\r\0\x0B");
+    $comment     = preg_split('/\r\n|\r|\n/', $comment);
 
+    // analyze each line
     foreach($comment as $line){
 
-      // drop any leading spaces
-      $line = ltrim($line);
+      // drop any wrapping spaces
+      $line = trim($line);
 
       // drop "* "
       if($line !== '')
         $line = substr($line, 2);      
 
-      if(strpos($line, '@') === 0){
-        $padding = false;        
-        $pos     = strpos($line, ' ');
-        $tag     = substr($line, 1, $pos - 1);
-        $line    = trim(substr($line, $pos));
+      if(strpos($line, '@') !== 0){
 
-        // tags that have two or more values;
-        // note that 'throws' may also have two values, however most people use it like "@throws ExceptioClass if whatever...",
-        // which, if broken into two values, leads to an inconsistent description sentence...
-        if(in_array($tag, array('global', 'param', 'return', 'var'))){
-          $parts = array();
+        // preserve formatting of tag descriptions,
+        // because they may span across multiple lines
+        if($tag !== null){
+          $trimmed = trim($line);
 
-          if(($pos = strpos($line, ' ')) !== false){
-            $parts[] = substr($line, 0, $pos);
-            $line = ltrim(substr($line, $pos));
+          if($padding !== 0)
+            $trimmed = static::strPad($trimmed, static::strLen($line) - $padding, ' ', STR_PAD_LEFT);
+          else
+            $padding = static::strLen($line) - static::strLen($trimmed);
 
-            if(($pos = strpos($line, ' ')) !== false){
-
-              // we expect up to 3 elements in 'param' tags
-              if(($tag === 'param') && in_array($line[0], array('&', '$'), true)){
-                $parts[] = substr($line, 0, $pos);
-                $parts[] = ltrim(substr($line, $pos));
-
-              }else{
-                if($tag === 'param')
-                  $parts[] = '';
-
-                $parts[] = ltrim($line);
-              }
-
-            }else{
-              $parts[] = $line;
-            }
-          
-          }else{
-            $parts[] = $line;            
-          }
-
-          $parts += array_fill(0, ($tag !== 'param') ? 2 : 3, '');
-
-          // maybe we should leave out empty (invalid) entries?
-          if(array_filter($parts)){
-            $tags[$tag][] = $parts;
-            $pointer = &$tags[$tag][count($tags[$tag]) - 1][count($parts) - 1];
-          }  
-
-        // tags that have only one value (eg. 'link', 'license', 'author' ...)
-        }else{
-          $tags[$tag][] = trim($line);
-          $pointer = &$tags[$tag][count($tags[$tag]) - 1];
+          $pointer .= "\n{$trimmed}";
+          continue;
         }
+        
+        // tag definitions have not started yet; assume this is part of the description text
+        $description .= "\n{$line}";        
+        continue;
+      }  
 
+      $padding = 0;
+      $parts = explode(' ', $line, 2);
+
+      // invalid tag? (should we include it as an empty array?)
+      if(!isset($parts[1]))
+        continue;
+
+      $tag = substr($parts[0], 1);
+      $line = ltrim($parts[1]);
+
+      // tags that have a single component (eg. link, license, author, throws...);
+      // note that @throws may have 2 components, however most people use it like "@throws ExceptionClass if whatever...",
+      // which, if broken into two values, leads to an inconsistent description sentence
+      if(!in_array($tag, array('global', 'param', 'return', 'var'))){
+        $tags[$tag][] = $line;
+        end($tags[$tag]);
+        $pointer = &$tags[$tag][key($tags[$tag])];
         continue;
       }
 
-      // preserve formatting of tag descriptions, because
-      // in some frameworks (like Lithium) they span across multiple lines
-      if($tag !== null){
+      // tags with 2 or 3 components (var, param, return);
+      $parts = explode(' ', $line, 2);
+      $parts[1] = isset($parts[1]) ? ltrim($parts[1]) : null;
+      $lastIdx = 1;
 
-        $trimmed = trim($line);
-
-        if($padding !== false){
-          $trimmed = static::strPad($trimmed, static::strLen($line) - $padding, ' ', STR_PAD_LEFT);
-          
+      // expecting 3 components on the 'param' tag: type varName varDescription
+      if($tag === 'param'){
+        $lastIdx = 2;
+        if(in_array($parts[1][0], array('&', '$'), true)){
+          $line     = ltrim(array_pop($parts));
+          $parts    = array_merge($parts, explode(' ', $line, 2));        
+          $parts[2] = isset($parts[2]) ? ltrim($parts[2]) : null;
         }else{
-          $padding = static::strLen($line) - static::strLen($trimmed);
-        }  
+          $parts[2] = $parts[1];
+          $parts[1] = null;
+        }
+      }  
 
-        $pointer .=  "\n{$trimmed}";
-        continue;
-      }
-      
-      // tag definitions have not started yet;
-      // assume this is title / description text
-      $description .= "\n{$line}";
+      $tags[$tag][] = $parts;
+      end($tags[$tag]);
+      $pointer = &$tags[$tag][key($tags[$tag])][$lastIdx];
     }
-    
-    $description = trim($description);
 
-    // determine the real title and description by splitting the text
-    // at the nearest encountered [dot + space] or [2x new line]
-    if($description !== ''){
-      $stop = min(array_filter(array(static::strLen($description), strpos($description, '. '), strpos($description, "\n\n"))));
-      $title = substr($description, 0, $stop + 1);
-      $description = trim(substr($description, $stop + 1));
+    // split title from the description texts at the nearest 2x new-line combination
+    // (note: loose check because 0 isn't valid as well)
+    if(strpos($description, "\n\n")){
+      list($title, $description) = explode("\n\n", $description, 2);
+
+    // if we don't have 2 new lines, try to extract first sentence
+    }else{  
+      // in order for a sentence to be considered valid,
+      // the next one must start with an uppercase letter    
+      $sentences = preg_split('/(?<=[.?!])\s+(?=[A-Z])/', $description, 2, PREG_SPLIT_NO_EMPTY);
+
+      // failed to detect a second sentences? then assume there's only title and no description text
+      $title = isset($sentences[0]) ? $sentences[0] : $description;
+      $description = isset($sentences[1]) ? $sentences[1] : '';
     }
-    
+
+    $title = ltrim($title);
+    $description = ltrim($description);
+
     $data = compact('title', 'description', 'tags');
 
     if(!array_filter($data))
@@ -1312,33 +1306,15 @@ class ref{
   }
 
 
-  public function refsMatch(&$a, &$b){
-    // saving current value in temporary variable
-    $buffer = $a;
-
-    // assigning new value to memory block, pointed by reference
-    $a = microtime(true);
-
-    // if they're still equal, then they're point to the same place.
-    $result = ($a === $b);
-
-    // restoring value
-    $a = $buffer;
-
-    // returning result
-    return $result;
-  }
-
-
 
   /**
    * Evaluates the given variable
    *
-   * @param   mixed &$subject         Variable to query (reference)
-   * @param   bool $skipStringChecks  Skip advanced string checks
-   * @return  mixed                   Result (both HTML and text modes generate strings)
+   * @param   mixed &$subject      Variable to query (reference)
+   * @param   bool $skipStrChecks  Skip advanced string checks
+   * @return  mixed                Result (both HTML and text modes generate strings)
    */
-  protected function evaluate(&$subject, $skipStringChecks = false){
+  protected function evaluate(&$subject, $skipStrChecks = false){
 
     // null value
     if(is_null($subject))
@@ -1441,7 +1417,6 @@ class ref{
 
         // gd image extension resource
         case 'gd':
-
           if(!static::$config['extendedInfo'])
             break;
 
@@ -1453,7 +1428,6 @@ class ref{
         break;  
 
         case 'ldap link':
-
           if(!static::$config['extendedInfo'])
             break;
 
@@ -1496,7 +1470,6 @@ class ref{
 
         // mysql result
         case 'mysql result':
-
           if(!static::$config['extendedInfo'])
             break;
 
@@ -1536,7 +1509,7 @@ class ref{
       $add      = '';
 
       // advanced checks only if there are 3 characteres or more
-      if(static::$config['extendedInfo'] && !$skipStringChecks && $length > 2){
+      if(static::$config['extendedInfo'] && !$skipStrChecks && $length > 2){
 
         // file?
         if(($length < 1000) && file_exists($subject)){
@@ -1586,16 +1559,17 @@ class ref{
         if(($length < 100) && class_exists($subject, false))
           $add .= $this->format('match', 'class', $this->fromReflector(new \ReflectionClass($subject)));
 
+        // interface?
         if(($length < 100) && interface_exists($subject, false))
           $add .= $this->format('match', 'interface', $this->fromReflector(new \ReflectionClass($subject)));
 
-        // class name?
+        // function?
         if(($length < 70) && function_exists($subject))
           $add .= $this->format('match', 'function', $this->fromReflector(new \ReflectionFunction($subject)));
 
         // skip serialization/json/date checks if the string appears to be numeric,
         // or if it's shorter than 5 characters
-        if(!is_numeric($subject) && ($length > 4)){
+        if(($length > 4) && !is_numeric($subject)){
 
           // date?
           if(($length > 4) && ($length < 100)){
