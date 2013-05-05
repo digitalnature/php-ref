@@ -275,7 +275,39 @@ class ref{
     }
     
     return round($time, 4);
-  }  
+  }
+
+
+
+  /**
+   * Timery utility
+   *
+   * First call of this function will start the timer.
+   * The second call will stop the timer and return the elapsed time
+   * since the timer started.
+   *
+   * Multiple timers can be controlled simultaneously by specifying a timer ID.
+   *
+   * @since   1.0   
+   * @param   int $id          Timer ID, optional
+   * @param   int $precision   Precision of the result, optional
+   * @return  void|double      Elapsed time, or void if the timer was just started
+   */
+  public static function timer($id = 1, $precision = 4){
+
+    static
+      $timers = array();
+
+    // check if this timer was started, and display the elapsed time if so
+    if(isset($timers[$id])){
+      $elapsed = round(microtime(true) - $timers[$id], $precision);
+      unset($timers[$id]);
+      return $elapsed;
+    }
+
+    // ID doesn't exist, start new timer
+    $timers[$id] = microtime(true);
+  }
 
 
 
@@ -295,8 +327,7 @@ class ref{
     $tag         = null;
     $pointer     = '';
     $padding     = 0;
-    $comment     = '* ' . trim($comment, "/* \t\n\r\0\x0B");
-    $comment     = preg_split('/\r\n|\r|\n/', $comment);
+    $comment     = preg_split('/\r\n|\r|\n/', '* ' . trim($comment, "/* \t\n\r\0\x0B"));
 
     // analyze each line
     foreach($comment as $line){
@@ -350,9 +381,9 @@ class ref{
       }
 
       // tags with 2 or 3 components (var, param, return);
-      $parts = explode(' ', $line, 2);
+      $parts    = explode(' ', $line, 2);
       $parts[1] = isset($parts[1]) ? ltrim($parts[1]) : null;
-      $lastIdx = 1;
+      $lastIdx  = 1;
 
       // expecting 3 components on the 'param' tag: type varName varDescription
       if($tag === 'param'){
@@ -383,7 +414,7 @@ class ref{
       // the next one must start with an uppercase letter    
       $sentences = preg_split('/(?<=[.?!])\s+(?=[A-Z])/', $description, 2, PREG_SPLIT_NO_EMPTY);
 
-      // failed to detect a second sentences? then assume there's only title and no description text
+      // failed to detect a second sentence? then assume there's only title and no description text
       $title = isset($sentences[0]) ? $sentences[0] : $description;
       $description = isset($sentences[1]) ? $sentences[1] : '';
     }
@@ -1314,7 +1345,7 @@ class ref{
    * @param   bool $skipStrChecks  Skip advanced string checks
    * @return  mixed                Result (both HTML and text modes generate strings)
    */
-  protected function evaluate(&$subject, $skipStrChecks = false){
+  protected function evaluate($subject, $skipStrChecks = false){
 
     // null value
     if(is_null($subject))
@@ -1573,11 +1604,45 @@ class ref{
 
           // date?
           if(($length > 4) && ($length < 100)){
-            $date = date_parse($subject);
-            if(($date !== false) && empty($date['errors']))
-              $add .= $this->format('match', 'date', $this->format('text', 'date', static::humanTime(@strtotime($subject))));
-          }
+            try{
+              $date   = new \DateTime($subject);
+              $errors = \DateTime::getLastErrors();
 
+              if(($errors['warning_count'] < 1) && ($errors['error_count'] < 1)){
+                $now    = new \Datetime('now');
+                $nowGmt = new \Datetime('now', new \DateTimeZone('GMT'));
+                $diff   = $now->diff($date);
+
+                $map = array(
+                  'y' => 'yr',
+                  'm' => 'mo',
+                  'd' => 'da',                  
+                  'h' => 'hr',
+                  'i' => 'min',
+                  's' => 'sec',
+                );
+
+                $timeAgo = 'now';
+                foreach($map as $k => $label){
+                  if($diff->{$k} > 0){
+                    $timeAgo = $diff->format("%R%{$k}{$label}");
+                    break;
+                  }
+                }
+
+                $tz   = $date->getTimezone();
+                $offs = round($tz->getOffset($nowGmt) / 3600);
+
+                if($offs > 0)
+                  $offs = "+{$offs}";
+
+                $timeAgo .= ((int)$offs !== 0) ? ' ' . sprintf('%s (GMT %s)', $tz->getName(), $offs) : ' UTC';
+                $add     .= $this->format('match', 'date', $this->format('text', 'date', $timeAgo));
+                
+              }  
+            }catch(\Exception $e){}
+
+          }
 
           // attempt to detect if this is a serialized string     
           static $unserializing = 0;      
@@ -2020,47 +2085,5 @@ class ref{
   protected static function escape($var){
     return is_array($var) ? array_map('static::escape', $var) : htmlspecialchars($var, ENT_QUOTES);
   }
-
-
-
-  /**
-   * Generates a human readable date string from a given timestamp
-   *
-   * @param    int $timestamp      Date in UNIX time format
-   * @param    int $currentTime    Optional. Use a custom date instead of the current time returned by the server
-   * @return   string              Human readable date string
-   */
-  protected static function humanTime($time, $currentTime = null){
-
-    $prefix      = '-';
-    $time        = (int)$time;
-    $currentTime = $currentTime !== null ? (int)$currentTime : time();
-
-    if($currentTime === $time)
-      return 'now';
-
-    // swap values if the given time occurs in the future,
-    // or if it's higher than the given current time
-    if($currentTime < $time){
-      $time  ^= $currentTime ^= $time ^= $currentTime;
-      $prefix = '+';
-    }
-
-    $units = array(
-      'y' => 31536000,   // 60 * 60 * 24 * 365 seconds
-      'm' => 2592000,    // 60 * 60 * 24 * 30
-      'w' => 604800,     // 60 * 60 * 24 * 7
-      'd' => 86400,      // 60 * 60 * 24
-      'h' => 3600,       // 60 * 60
-      'i' => 60,
-      's' => 1,
-    );
-
-    foreach($units as $unit => $seconds)
-      if(($count = (int)floor(($currentTime - $time) / $seconds)) !== 0)
-        break;
-
-    return $prefix . $count . $unit;
-  }  
 
 }
