@@ -1610,7 +1610,7 @@ class ref{
 
               if(($errors['warning_count'] < 1) && ($errors['error_count'] < 1)){
                 $now    = new \Datetime('now');
-                $nowGmt = new \Datetime('now', new \DateTimeZone('GMT'));
+                $nowUtc = new \Datetime('now', new \DateTimeZone('UTC'));
                 $diff   = $now->diff($date);
 
                 $map = array(
@@ -1631,12 +1631,12 @@ class ref{
                 }
 
                 $tz   = $date->getTimezone();
-                $offs = round($tz->getOffset($nowGmt) / 3600);
+                $offs = round($tz->getOffset($nowUtc) / 3600);
 
                 if($offs > 0)
                   $offs = "+{$offs}";
 
-                $timeAgo .= ((int)$offs !== 0) ? ' ' . sprintf('%s (GMT %s)', $tz->getName(), $offs) : ' UTC';
+                $timeAgo .= ((int)$offs !== 0) ? ' ' . sprintf('%s (UTC%s)', $tz->getName(), $offs) : ' UTC';
                 $add     .= $this->format('match', 'date', $this->format('text', 'date', $timeAgo));
                 
               }  
