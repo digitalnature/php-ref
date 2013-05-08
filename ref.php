@@ -255,6 +255,7 @@ class ref{
 
     $startTime     = microtime(true);
     $output        = $this->format('root', $this->evaluate($subject), $this->evaluateExp($expression));
+    $this->cache   = array();
     static::$time += microtime(true) - $startTime; 
 
     return $output;
@@ -1451,20 +1452,22 @@ class ref{
 
       $this->level++;
       foreach($subject as $key => &$value){
-        $keyInfo   = gettype($key);
         
+        // ignore our temporary marker
         if($key === $markerKey)
-          continue;
+          continue;      
 
+        // first recursion level detection;
+        // this is optional (used to print consistent recursion info)
         if(is_array($value)){
 
-          // saving current value in temporary variable
+          // save current value in a temporary variable
           $buffer = $value;
 
-          // assigning new value to memory block, pointed by reference
+          // assign new value
           $value = ($value !== 1) ? 1 : 2;
           
-          // if they're still equal, then they're point to the same place.
+          // if they're still equal, then we have a reference
           if($value === $subject){
             $value = $buffer;                      
             $value[$markerKey] = true;
@@ -1475,7 +1478,9 @@ class ref{
 
           // restoring original value
           $value = $buffer;          
-        }         
+        }
+
+        $keyInfo = gettype($key);
 
         if(is_string($key)){
           $encoding = $this->env['mbStr'] ? mb_detect_encoding($key) : '';
