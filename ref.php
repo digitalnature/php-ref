@@ -161,20 +161,14 @@ class ref{
     $format   = null,
 
 
-    /**
-     * Running on PHP 5.4+
-     *
-     * @var  bool
-     */ 
-    $is54     = false,
-
 
     /**
-     * mb_string installed?
+     * Some environment variables
+     * used to determine feature support
      *
-     * @var  bool
+     * @var  string
      */ 
-    $mbStr    = false;
+    $env      = array();
 
 
 
@@ -185,10 +179,21 @@ class ref{
    * @param   int|null $expDepth    Maximum expand depth (relevant to the HTML format)
    */
   public function __construct($format = 'html', $expDepth = null){
-    $this->is54     = (version_compare(PHP_VERSION, '5.4') >= 0);    
-    $this->mbStr    = function_exists('mb_detect_encoding');
+
     $this->format   = $format;
     $this->expDepth = ($expDepth !== null) ? $expDepth : static::$config['expandDepth'];
+
+    $this->env = array(
+
+      // php 5.4+ ?
+      'is54'         => version_compare(PHP_VERSION, '5.4') >= 0,
+
+      // is the 'mbstring' extension active?
+      'mbStr'        => function_exists('mb_detect_encoding'),
+
+      // @see: https://bugs.php.net/bug.php?id=52469     
+      'supportsDate' => (strncasecmp(PHP_OS, 'WIN', 3) !== 0) || (version_compare(PHP_VERSION, '5.3.10') >= 0),
+    );
   }
 
 
@@ -201,6 +206,7 @@ class ref{
   public function __get($name){
     throw new \Exception('No such property');
   }
+
 
 
   /**
@@ -241,11 +247,10 @@ class ref{
    */
   public function query($subject, $expression = null){
 
-    $startTime = microtime(true);
-    $output    = $this->format('root', $this->evaluate($subject), $this->evaluateExp($expression));
-    $endTime   = microtime(true) - $startTime;
+    $startTime     = microtime(true);
+    $output        = $this->format('root', $this->evaluate($subject), $this->evaluateExp($expression));
+    static::$time += microtime(true) - $startTime; 
 
-    static::$time += $endTime; 
     return $output;
   }
 
@@ -1187,7 +1192,7 @@ class ref{
       $bubbles = array();
 
       // @todo: maybe - list interface methods
-      if(!($item->isInterface() || ($this->is54 && $item->isTrait()))){
+      if(!($item->isInterface() || ($this->env['is54'] && $item->isTrait()))){
 
         if($item->isAbstract())
           $bubbles[] = $this->format('text', 'mod-abstract', 'A', 'Abstract');
@@ -1196,7 +1201,7 @@ class ref{
           $bubbles[] = $this->format('text', 'mod-final', 'F', 'Final');
 
         // php 5.4+ only
-        if($this->is54 && $item->isCloneable())
+        if($this->env['is54'] && $item->isCloneable())
           $bubbles[] = $this->format('text', 'mod-cloneable', 'C', 'Cloneable');
 
         if($item->isIterateable())
@@ -1382,7 +1387,7 @@ class ref{
       // by concatenating the info foreach entry, but then we loose the flexibility that the
       // entity/group/section methods provide us (exporting data in different formats
       // and indenting in text mode would become harder)
-      $section = $this->is54 ? new \SplFixedArray($count) : array();
+      $section = $this->env['is54'] ? new \SplFixedArray($count) : array();
       $idx     = 0;
 
       $this->level++;
@@ -1390,7 +1395,7 @@ class ref{
         $keyInfo = gettype($key);
 
         if(is_string($key)){
-          $encoding = $this->mbStr ? mb_detect_encoding($key) : '';
+          $encoding = $this->env['mbStr'] ? mb_detect_encoding($key) : '';
           $keyLen = $encoding && ($encoding !== 'ASCII') ? static::strLen($key) . '; ' . $encoding : static::strLen($key);
           $keyInfo = "{$keyInfo}({$keyLen})";
         }
@@ -1535,7 +1540,7 @@ class ref{
     // string
     if(is_string($subject)){
       $length   = static::strLen($subject);       
-      $encoding = $this->mbStr ? mb_detect_encoding($subject) : false;      
+      $encoding = $this->env['mbStr'] ? mb_detect_encoding($subject) : false;      
       $info     = $encoding && ($encoding !== 'ASCII') ? $length . '; ' . $encoding : $length;
       $add      = '';
 
@@ -1603,7 +1608,7 @@ class ref{
         if(($length > 4) && !is_numeric($subject)){
 
           // date?
-          if(($length > 4) && ($length < 100)){
+          if($this->env['supportsDate'] && ($length > 4) && ($length < 100)){
             try{
               $date   = new \DateTime($subject);
               $errors = \DateTime::getLastErrors();
@@ -1727,11 +1732,11 @@ class ref{
         $count++;
 
       $idx = 0;
-      $section = $this->is54 ? new \SplFixedArray($count) : array();
+      $section = $this->env['is54'] ? new \SplFixedArray($count) : array();
       foreach($subject as $key => $value){
         $keyInfo = gettype($key);
         if(is_string($key)){
-          $encoding = $this->mbStr ? mb_detect_encoding($key) : '';
+          $encoding = $this->env['mbStr'] ? mb_detect_encoding($key) : '';
           $length   = $encoding && ($encoding !== 'ASCII') ? static::strLen($key) . '; ' . $encoding : static::strLen($key);
           $keyInfo  = sprintf('%s(%s)', $keyInfo, $length);        
         }            
@@ -1750,12 +1755,12 @@ class ref{
     $methods    = static::$config['extendedInfo'] ? $reflector->getMethods(\ReflectionMethod::IS_PUBLIC | \ReflectionMethod::IS_PROTECTED) : array();
     $constants  = $reflector->getConstants();
     $interfaces = $reflector->getInterfaces();
-    $traits     = $this->is54 ? $reflector->getTraits() : array();
+    $traits     = $this->env['is54'] ? $reflector->getTraits() : array();
     $parents    = static::getParentClasses($reflector);        
 
     // work-around for https://bugs.php.net/bug.php?id=49154
     // @see http://stackoverflow.com/questions/15672287/strange-behavior-of-reflectiongetproperties-with-numeric-keys
-    if(!$this->is54){      
+    if(!$this->env['is54']){      
       $props = array_values(array_filter($props, function($prop) use($subject){
         return !$prop->isPublic() || property_exists($subject, $prop->name);
       }));
