@@ -43,7 +43,7 @@
   text-shadow: 0 1px 0 #fff;
 }
 
-/* meta content (used to generate tooltips */
+/* meta content (used to generate tooltips) */
 .ref > q{
   display: none;  
 }

@@ -160,15 +160,21 @@ class ref{
      */     
     $format   = null,
 
-
-
     /**
      * Some environment variables
      * used to determine feature support
      *
      * @var  string
      */ 
-    $env      = array();
+    $env      = array(),
+
+    /**
+     * Used to cache output to speed up processing.
+     * Cached objects will not be processed again
+     *
+     * @var  array
+     */ 
+    $cache    = array();
 
 
 
@@ -940,10 +946,7 @@ class ref{
         return ($arg1 !== 'regex') ? "\n~~ {$arg1}: {$arg2}" : '';
 
       case 'contain':
-        if($arg1 === 'regex')
-          return '';
-
-        return $arg2;        
+        return ($arg1 !== 'regex') ? $arg2 : '';
 
       case 'link':
         return $arg1;
@@ -1195,7 +1198,14 @@ class ref{
    */
   protected function fromReflector(\Reflector $reflector, $single = '', \Reflector $context = null){
 
-    $items  = array($reflector);
+    // @todo: test this
+    $hash = serialize(func_get_args());
+
+    // check if we already have this in the cache
+    if(isset($this->cache[__FUNCTION__][$hash]))
+      return $this->cache[__FUNCTION__][$hash];
+
+    $items = array($reflector);
 
     if(($single === '') && ($reflector instanceof \ReflectionClass))
       $items = static::getParentClasses($reflector);
@@ -1266,7 +1276,8 @@ class ref{
       $item = $bubbles . $this->linkify($name, $item);
     }
 
-    return count($items) > 1 ? implode($this->format('sep', ' :: '), $items) : $items[0];
+    // store in cache and return
+    return $this->cache[__FUNCTION__][$hash] = count($items) > 1 ? implode($this->format('sep', ' :: '), $items) : $items[0];
   }
 
 
@@ -1395,8 +1406,8 @@ class ref{
    * @param   bool $specialStr  Should this be interpreted as a special string?
    * @return  mixed             Result (both HTML and text modes generate strings)
    */
-  protected function evaluate($subject, $specialStr = false){
-
+  protected function evaluate(&$subject, $specialStr = false){
+    
     // null value
     if(is_null($subject))
       return $this->format('text', 'null');
@@ -1416,14 +1427,17 @@ class ref{
     // arrays
     if(is_array($subject)){
 
+      $markerKey = '_phpRefArrayMarker_';
+
       // empty array?
       if(empty($subject))
         return $this->format('text', 'array') . $this->format('group');
 
-      // clone array (we need this in order to track recursion)
-      $tmpArr = $subject;
-      $pin    = microtime(true);
-      $count  = count($subject);
+      if(isset($subject[$markerKey]))
+        return $this->format('text', 'array') . $this->format('group', null, 'recursion');          
+
+      $count = count($subject);
+      $subject[$markerKey] = true;
 
       // use splFixedArray() on PHP 5.4+ to save up some memory, because the subject array
       // might contain a huge amount of entries.
@@ -1437,7 +1451,31 @@ class ref{
 
       $this->level++;
       foreach($subject as $key => &$value){
-        $keyInfo = gettype($key);
+        $keyInfo   = gettype($key);
+        
+        if($key === $markerKey)
+          continue;
+
+        if(is_array($value)){
+
+          // saving current value in temporary variable
+          $buffer = $value;
+
+          // assigning new value to memory block, pointed by reference
+          $value = ($value !== 1) ? 1 : 2;
+          
+          // if they're still equal, then they're point to the same place.
+          if($value === $subject){
+            $value = $buffer;                      
+            $value[$markerKey] = true;
+            $output = $this->evaluate($value);
+            $this->level--;
+            return $output;
+          }
+
+          // restoring original value
+          $value = $buffer;          
+        }         
 
         if(is_string($key)){
           $encoding = $this->env['mbStr'] ? mb_detect_encoding($key) : '';
@@ -1445,28 +1483,14 @@ class ref{
           $keyInfo = "{$keyInfo}({$keyLen})";
         }
 
-        // check if the value is a reference to our array
-        if(is_array($value)){
-          $tmpArr[$key][$pin] = 1;
-          $fmtVal = isset($subject[$key][$pin]) ? $this->format('text', 'array') . $this->format('group', null, 'recursion') : $this->evaluate($value);
-        
-        }else{
-          $fmtVal = $this->evaluate($value);
-        }
-
-        // free some memory
-        unset($subject[$key], $tmpArr[$key]);
-
         $section[$idx++] = array(
           $this->format('text', 'key', $key, "Key: {$keyInfo}"),
           $this->format('sep', '=>'),
-          $fmtVal,
+          $this->evaluate($value, $specialStr),
         );
 
-      }
-
-      $tmpArr = null;
-      unset($tmpArr);     
+        unset($subject[$key]);
+      }   
 
       $output = $this->format('text', 'array') . $this->format('group', $this->format('section', $section), $count);
       $this->level--;
@@ -1752,6 +1776,13 @@ class ref{
  
     // if we reached this point, $subject must be an object
 
+    // hash ID of this object
+    $hash = spl_object_hash($subject);
+
+    // do we have it in the cache?
+    if(isset($this->cache[__FUNCTION__][$hash]))
+      return $this->cache[__FUNCTION__][$hash];    
+
     // sometimes incomplete objects may be created from string unserialization,
     // if the class to which the object belongs wasn't included until the unserialization stage...
     if($subject instanceof \__PHP_Incomplete_Class)
@@ -1759,9 +1790,8 @@ class ref{
   
     $reflector  = new \ReflectionObject($subject);
     $objectName = $this->format('contain', 'class', $this->fromReflector($reflector)) . ' ' . $this->format('text', 'object');
-    $hash       = spl_object_hash($subject);
 
-    // tracks objects to detect recursion
+    // track objects to detect recursion
     static $hashes = array();
 
     // already been here?
@@ -2000,7 +2030,9 @@ class ref{
     unset($hashes[$hash]);
     $objectName .= $this->format('group', $group);
     $this->level--;
-    return $objectName;
+
+    // store in cache, and return output
+    return $this->cache[__FUNCTION__][$hash] = $objectName;
   }
 
 
