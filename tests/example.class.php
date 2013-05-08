@@ -229,7 +229,7 @@ class ClassTest extends AbstractTest implements Testable{
    * @since   1.0
    * @return  array    Indexed array containing list items
    */
-  public function getList(ClassTest $x = null, $regexToIgnore = "/a\tbc/"){}
+  public function getList(ClassTest $x = null, $regexToIgnore = "#special\tabc\n#"){}
 
 
 

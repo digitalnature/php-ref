@@ -324,8 +324,14 @@
 }   
 
 /* string values */
-.ref [data-string]{
+.ref [data-string],
+.ref [data-specialString]{
   color: #669933;  
+}
+
+.ref [data-specialString] ins{
+  background: #faf3dc;
+  color: #d78035;
 }
 
 /* arrays & objects */

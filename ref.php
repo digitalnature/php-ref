@@ -910,6 +910,18 @@ class ref{
         if($arg2 === null)
           $arg2 = $arg1;
 
+        if($arg1 === 'specialString'){
+          $arg2 = strtr($arg2, array(
+            "\r" => '\r',     // carriage return
+            "\t" => '\t',     // horizontal tab
+            "\n" => '\n',     // linefeed (new line)
+            "\v" => '\v',     // vertical tab
+            "\e" => '\e',     // escape
+            "\f" => '\f',     // form feed
+            "\0" => '\0',
+          ));
+        }        
+
         $formatMap = array(
           'string'   => '%3$s "%2$s"',
           'integer'  => 'int(%2$s)',
@@ -1015,6 +1027,18 @@ class ref{
       case 'text':
         $tip  = '';
         $arg2 = ($arg2 !== null) ? static::escape($arg2) : static::escape($arg1);
+
+        if($arg1 === 'specialString'){
+          $arg2 = strtr($arg2, array(
+            "\r" => '<ins>\r</ins>',     // carriage return
+            "\t" => '<ins>\t</ins>',     // horizontal tab
+            "\n" => '<ins>\n</ins>',     // linefeed (new line)
+            "\v" => '<ins>\v</ins>',     // vertical tab
+            "\e" => '<ins>\e</ins>',     // escape
+            "\f" => '<ins>\f</ins>',     // form feed
+            "\0" => '<ins>\0</ins>',
+          ));
+        }
 
         // generate tooltip
         if($meta !== null){
@@ -1346,11 +1370,11 @@ class ref{
   /**
    * Evaluates the given variable
    *
-   * @param   mixed &$subject      Variable to query (reference)
-   * @param   bool $skipStrChecks  Skip advanced string checks
-   * @return  mixed                Result (both HTML and text modes generate strings)
+   * @param   mixed $subject    Variable to query
+   * @param   bool $specialStr  Should this be interpreted as a special string?
+   * @return  mixed             Result (both HTML and text modes generate strings)
    */
-  protected function evaluate($subject, $skipStrChecks = false){
+  protected function evaluate($subject, $specialStr = false){
 
     // null value
     if(is_null($subject))
@@ -1544,8 +1568,11 @@ class ref{
       $info     = $encoding && ($encoding !== 'ASCII') ? $length . '; ' . $encoding : $length;
       $add      = '';
 
+      if($specialStr)
+        return $this->format('sep', '"') . $this->format('text', 'specialString', $subject, "string({$info})") . $this->format('sep', '"');
+
       // advanced checks only if there are 3 characteres or more
-      if(static::$config['extendedInfo'] && !$skipStrChecks && $length > 2){
+      if(static::$config['extendedInfo'] && $length > 2){
 
         // file?
         if(($length < 1000) && file_exists($subject)){
