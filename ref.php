@@ -1020,6 +1020,12 @@ class ref{
    */
   protected function toHtml($element, $arg1 = null, $arg2 = null, $meta = null){
 
+    // stores tooltip content for all entries;
+    // to avoid having duplicate tooltip data in the HTML, we generate them once,
+    // and use references (the Q index) to pull data when required; 
+    // this improves performance significantly
+    static $tips = array();
+
     switch($element){
       case 'sep':
         return '<i>' . static::escape($arg1) . '</i>';
@@ -1040,60 +1046,17 @@ class ref{
           ));
         }
 
-        // generate tooltip
-        if($meta !== null){
-          if(!is_array($meta))
-            $meta = array('title' => $meta);
+        // generate tooltip reference (probably the slowest part of the code ;)
+        if($meta !== null){       
+          $tipIdx = array_search($meta, $tips, true);
 
-          $meta += array(
-            'title'       => '',
-            'left'        => '',
-            'description' => '',
-            'tags'        => array(),
-            'sub'         => array(),            
-          );
+          if($tipIdx === false)
+            $tipIdx = array_push($tips, $meta) - 1;
 
-          $meta = static::escape($meta);
+          $tip = ' data-tip="' . $tipIdx . '"';
+        }  
 
-          if($meta['title'])
-            $tip = "<i>{$meta['title']}</i>";
-
-          if($meta['description'])
-            $tip .= "<i>{$meta['description']}</i>";
-
-          $tip = "<i>{$tip}</i>";
-
-          if($meta['left'])
-            $tip = "<b>{$meta['left']}</b>{$tip}";
-
-          $tags = '';
-          foreach($meta['tags'] as $tag => $values){
-            foreach($values as $value){
-              if($tag === 'param'){
-                $value[0] = "{$value[0]} {$value[1]}";
-                unset($value[1]);
-              }
-
-              $value  = is_array($value) ? implode('</b><b>', $value) : $value;
-              $tags  .= "<i><b>@{$tag}</b><b>{$value}</b></i>";
-            }
-          }
-
-          if($tags)
-            $tip .= "<u>{$tags}</u>";
-       
-          $sub = '';
-          foreach($meta['sub'] as $line)
-            $sub .= '<i><b>' . implode('</b> <b>', $line) . '</b></i>';
-
-          if($sub !== '')
-            $tip .= "<u>{$sub}</u>";
-       
-      
-          $tip = "<q>{$tip}</q>";
-        }
-
-        return ($arg1 !== 'name') ? "<b data-{$arg1}>{$arg2}{$tip}</b>" : "<b>{$arg2}{$tip}</b>";
+        return ($arg1 !== 'name') ? "<b data-{$arg1}{$tip}>{$arg2}</b>" : "<b{$tip}>{$arg2}</b>";
 
       case 'match':
         return "<br><s>{$arg1}</s>{$arg2}";
@@ -1137,7 +1100,65 @@ class ref{
         $assets = static::getAssets();
         $counter++;
 
-        return "<!-- ref#{$counter} --><div>{$assets}<div class=\"ref\">{$arg2}<div>{$arg1}</div></div></div><!-- /ref#{$counter} -->";
+        // process tooltips
+        $tipHtml = '';
+        foreach($tips as $idx => $meta){
+
+          $tip = '';
+          if(!is_array($meta))
+            $meta = array('title' => $meta);
+
+          $meta += array(
+            'title'       => '',
+            'left'        => '',
+            'description' => '',
+            'tags'        => array(),
+            'sub'         => array(),            
+          );
+
+          $meta = static::escape($meta);
+
+          if($meta['title'])
+            $tip = "<i>{$meta['title']}</i>";
+
+          if($meta['description'])
+            $tip .= "<i>{$meta['description']}</i>";
+
+          $tip = "<i>{$tip}</i>";
+
+          if($meta['left'])
+            $tip = "<b>{$meta['left']}</b>{$tip}";
+
+          $tags = '';
+          foreach($meta['tags'] as $tag => $values){
+            foreach($values as $value){
+              if($tag === 'param'){
+                $value[0] = "{$value[0]} {$value[1]}";
+                unset($value[1]);
+              }
+
+              $value  = is_array($value) ? implode('</b><b>', $value) : $value;
+              $tags  .= "<i><b>@{$tag}</b><b>{$value}</b></i>";
+            }
+          }
+
+          if($tags)
+            $tip .= "<u>{$tags}</u>";
+
+          $sub = '';
+          foreach($meta['sub'] as $line)
+            $sub .= '<i><b>' . implode('</b> <b>', $line) . '</b></i>';
+
+          if($sub !== '')
+            $tip .= "<u>{$sub}</u>";
+
+          $tipHtml .= "<q>{$tip}</q>";
+        }
+
+        // empty tip array
+        $tips = array();
+
+        return "<!-- ref#{$counter} --><div>{$assets}<div class=\"ref\">{$arg2}<div>{$arg1}</div>{$tipHtml}</div></div><!-- /ref#{$counter} -->";
 
       default:
         return '';

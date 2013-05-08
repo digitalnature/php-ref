@@ -43,6 +43,21 @@
   text-shadow: 0 1px 0 #fff;
 }
 
+/* meta content (used to generate tooltips */
+.ref > q{
+  display: none;  
+}
+
+/* show help cursor when mouse is over an entity with a tooltip */
+.ref [data-tip]{
+  cursor: help;
+}
+
+/* pointer if inside a link */
+.ref a > [data-tip]{
+  cursor: pointer;
+}
+
 /* links */
 .ref a{
   color: inherit;
@@ -240,22 +255,6 @@
 .ref b{
   white-space: pre;
   display: inline;
-}
-
-/* meta content (used to generate the tooltip */
-.ref b > q{
-  display: none;  
-}
-
-/* show help cursor when mouse is over an entity with a tooltip */
-/* note that this attribute is added with javascript */
-.ref [data-has-tip]{
-  cursor: help;
-}
-
-/* pointer if inside a link */
-.ref a > [data-has-tip]{
-  cursor: pointer;
 }
 
 /* key-value dividers, property & method modifiers etc. */
