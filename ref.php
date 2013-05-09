@@ -1168,9 +1168,8 @@ class ref{
 
         // add input/label IDs;
         // @note: we can't do it in the group processing block, because groups can be cached
-        $dom = new \DomDocument();
-        $dom->preserveWhiteSpace = true;
-        $dom->loadHTML("<div>{$arg1}</div>");
+        $dom = new \DomDocument('1.0', 'UTF-8');
+        $dom->loadHTML('<?xml version="1.0" encoding="utf-8"><div>' . $arg1. '</div>');
 
         $labels = $dom->getElementsByTagName('label');
         static $groupIdx = 0;
@@ -1182,11 +1181,12 @@ class ref{
 
         // remove html wrappers added by DomDocument
         if(version_compare(PHP_VERSION, '5.3.6') >= 0){
+          $arg1 = $dom->saveHTML($dom->lastChild->firstChild->firstChild);                    
+        }else{
+          $dom->removeChild($dom->firstChild);            
           $dom->removeChild($dom->firstChild);            
           $dom->replaceChild($dom->firstChild->firstChild->firstChild, $dom->firstChild);  
-          $arg1 = $dom->saveHTML();      
-        }else{
-          $arg1 = $dom->saveHTML($dom->lastChild->firstChild->firstChild);
+          $arg1 = $dom->saveHTML();                
         }  
 
         return "<!-- ref#{$counter} --><div>{$assets}<div class=\"ref\">{$arg2}{$arg1}{$tipHtml}</div></div><!-- /ref#{$counter} -->";
