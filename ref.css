@@ -201,17 +201,17 @@
 }
 
 /* hide next element when checkbox is not checked */
-.ref input ~ label + div{
+.ref input ~ label ~ div{
   display: none;
 }
 
 /* show it when checkbox is checked */
-.ref input:checked ~ label + div{
+.ref input:checked ~ label ~ div{
   display: block;
 }
 
 /* group sections */
-.ref span{
+.ref div > div{
   display: table;
   width: 100%;
 }

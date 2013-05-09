@@ -1094,7 +1094,7 @@ class ref{
         foreach($arg1 as $row)
           $output .= '<dl><dd>' . implode('</dd><dd>', $row) . '</dd></dl>';
 
-        return "{$title}<span>{$output}</span>";
+        return "{$title}<div>{$output}</div>";
 
       case 'bubbles':
         return '<b data-mod>' . implode('', $arg1) . '</b>';
