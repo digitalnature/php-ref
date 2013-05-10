@@ -155,7 +155,6 @@
   color: #edd078;
 }
 
-
 /* source expression (input) */
 .ref > kbd{
   margin: 2px 0 0;
@@ -169,22 +168,6 @@
   background-image: linear-gradient(top, #444, #333);  
   border-radius: 4px 4px 0 0;
   border-bottom: 1px solid #fff;  
-}
-
-/* hidden checkbox that controls group expansion */
-.ref input{
-
-}
-
-
-
-.ref input{  
-  display: inline-block;
-  opacity: 0.5;
-}
-
-.ref input ~ i{
-  left: -20px;
 }
 
 /* expand/collapse toggle link for groups */
@@ -212,15 +195,8 @@
           transform: rotate(90deg);  
 }
 
-/* show it when checkbox is checked */
-.ref div kbd + div{
-  display: none;
-}
-
-/* hide next element when checkbox is not checked */
-.ref div kbd[data-exp] + div{
-  display: block;
-}
+.ref div kbd + div{display: none;}
+.ref div kbd[data-exp] + div{display: block;}
 
 /* group sections */
 .ref div > div{
