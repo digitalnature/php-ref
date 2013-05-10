@@ -53,4 +53,4 @@ Currently available options and their default values:
 | `'formatter'`     | `array()`           | Callbacks for custom/external formatters (as associative array: format => callback)
 | `'shortcutFunc'`  | `array('r', 'rt')`  | Shortcut functions used to detect the input expression. If they are namespaced, the namespace must be present as well (methods are not  supported) 
 | `'stylePath'`     | `'{:dir}/ref.css'`  | Local path to a custom stylesheet (HTML only); `false` means that no CSS is included.
-| `'scriptPath'`    | `'{:dir}/ref.js'`   | Local path to a custom javascript (HTML only); `false` means no javascript (currently only the tooltips / kbd shortcuts require JS)
+| `'scriptPath'`    | `'{:dir}/ref.js'`   | Local path to a custom javascript (HTML only); `false` means no javascript (tooltips / toggle / kbd shortcuts require JS)

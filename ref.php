@@ -1033,7 +1033,7 @@ class ref{
     // stores tooltip content for all entries;
     // to avoid having duplicate tooltip data in the HTML, we generate them once,
     // and use references (the Q index) to pull data when required; 
-    // this improves performance significantly
+    // this improves performance significantly    
     static $tips = array();
 
     switch($element){
@@ -1080,8 +1080,8 @@ class ref{
       case 'group':
 
         if($arg1){
-          $checked = ($this->expDepth < 0) || (($this->expDepth > 0) && ($this->level <= $this->expDepth)) ? 'checked' : '';
-          $arg1 = "<input type=\"checkbox\" {$checked} /><label></label><div>{$arg1}</div>";
+          $exp = ($this->expDepth < 0) || (($this->expDepth > 0) && ($this->level <= $this->expDepth)) ? ' data-exp' : '';
+          $arg1 = "<kbd{$exp}></kbd><div>{$arg1}</div>";          
         }
 
         $prefix = ($arg2 !== null) ? '<ins>' . static::escape($arg2) . '</ins>' : '';
@@ -1166,30 +1166,7 @@ class ref{
         // empty tip array
         $tips = array();
 
-        // add input/label IDs;
-        // @note: we can't do it in the group processing block, because groups can be cached
-        $dom = new \DomDocument('1.0', 'UTF-8');
-        $dom->loadHTML('<?xml version="1.0" encoding="utf-8"><div>' . $arg1. '</div>');
-
-        $labels = $dom->getElementsByTagName('label');
-        static $groupIdx = 0;
-
-        foreach($labels as $label){
-          $label->setAttribute('for', ++$groupIdx);
-          $label->previousSibling->setAttribute('id', $groupIdx);
-        }
-
-        // remove html wrappers added by DomDocument
-        if(version_compare(PHP_VERSION, '5.3.6') >= 0){
-          $arg1 = $dom->saveHTML($dom->lastChild->firstChild->firstChild);                    
-        }else{
-          $dom->removeChild($dom->firstChild);            
-          $dom->removeChild($dom->firstChild);            
-          $dom->replaceChild($dom->firstChild->firstChild->firstChild, $dom->firstChild);  
-          $arg1 = $dom->saveHTML();                
-        }  
-
-        return "<!-- ref#{$counter} --><div>{$assets}<div class=\"ref\">{$arg2}{$arg1}{$tipHtml}</div></div><!-- /ref#{$counter} -->";
+        return "<!-- ref#{$counter} --><div>{$assets}<div class=\"ref\">{$arg2}<div>{$arg1}</div>{$tipHtml}</div></div><!-- /ref#{$counter} -->";
 
       default:
         return '';
@@ -1448,8 +1425,10 @@ class ref{
         if(empty($subject))
           return $this->{$f}('text', 'array') . $this->{$f}('group');
 
-        if(isset($subject[static::MARKER_KEY]))
+        if(isset($subject[static::MARKER_KEY])){
+          unset($subject[static::MARKER_KEY]);
           return $this->{$f}('text', 'array') . $this->{$f}('group', null, 'recursion');          
+        }  
 
         $count = count($subject);
         $subject[static::MARKER_KEY] = true;
@@ -1481,7 +1460,7 @@ class ref{
             // assign new value
             $value = ($value !== 1) ? 1 : 2;
             
-            // if they're still equal, then we have a reference
+            // if they're still equal, then we have a reference            
             if($value === $subject){
               $value = $buffer;                      
               $value[static::MARKER_KEY] = true;
@@ -1507,9 +1486,9 @@ class ref{
             $this->{$f}('sep', '=>'),
             $this->evaluate($value, $specialStr),
           );
+        }
 
-          unset($subject[$key]);
-        }   
+        unset($subject[static::MARKER_KEY]);
 
         $output = $this->{$f}('text', 'array') . $this->{$f}('group', $this->{$f}('section', $section), $count);
         $this->level--;
@@ -1518,9 +1497,8 @@ class ref{
 
       // resource
       case 'resource':
-
+        $meta    = array();
         $resType = get_resource_type($subject);
-        $meta = array();
 
         // @see: http://php.net/manual/en/resource.php
         // need to add more...
@@ -1637,68 +1615,79 @@ class ref{
         // advanced checks only if there are 3 characteres or more
         if(static::$config['extendedInfo'] && $length > 2){
 
-          // file?
-          if(($length < 1000) && file_exists($subject)){
+          $isNumeric = is_numeric($subject);
 
-            $file  = new \SplFileInfo($subject);
-            $flags = array();
-            $perms = $file->getPerms();
+          // very simple check to determine if the string could match a file path
+          // @note: this part of the code is very expensive
+          $isFile = ($length < 2048)
+            && (max(array_map('strlen', explode('/', str_replace('\\', '/', $subject)))) < 128)
+            && !preg_match('/[^\w\.\-\/\\\\:]|\..*\.|\.$|:(?!(?<=^[a-zA-Z]:)[\/\\\\])/', $subject);            
 
-            if(($perms & 0xC000) === 0xC000)       // socket
-              $flags[] = 's';
-            elseif(($perms & 0xA000) === 0xA000)   // symlink        
-              $flags[] = 'l';
-            elseif(($perms & 0x8000) === 0x8000)   // regular
-              $flags[] = '-';
-            elseif(($perms & 0x6000) === 0x6000)   // block special
-              $flags[] = 'b';
-            elseif(($perms & 0x4000) === 0x4000)   // directory
-              $flags[] = 'd';
-            elseif(($perms & 0x2000) === 0x2000)   // character special
-              $flags[] = 'c';
-            elseif(($perms & 0x1000) === 0x1000)   // FIFO pipe
-              $flags[] = 'p';
-            else                                   // unknown
-              $flags[] = 'u';        
+          if($isFile){
+            try{
+              $file  = new \SplFileInfo($subject);
+              $flags = array();
+              $perms = $file->getPerms();
 
-            // owner
-            $flags[] = (($perms & 0x0100) ? 'r' : '-');
-            $flags[] = (($perms & 0x0080) ? 'w' : '-');
-            $flags[] = (($perms & 0x0040) ? (($perms & 0x0800) ? 's' : 'x' ) : (($perms & 0x0800) ? 'S' : '-'));
+              if(($perms & 0xC000) === 0xC000)       // socket
+                $flags[] = 's';
+              elseif(($perms & 0xA000) === 0xA000)   // symlink        
+                $flags[] = 'l';
+              elseif(($perms & 0x8000) === 0x8000)   // regular
+                $flags[] = '-';
+              elseif(($perms & 0x6000) === 0x6000)   // block special
+                $flags[] = 'b';
+              elseif(($perms & 0x4000) === 0x4000)   // directory
+                $flags[] = 'd';
+              elseif(($perms & 0x2000) === 0x2000)   // character special
+                $flags[] = 'c';
+              elseif(($perms & 0x1000) === 0x1000)   // FIFO pipe
+                $flags[] = 'p';
+              else                                   // unknown
+                $flags[] = 'u';        
 
-            // group
-            $flags[] = (($perms & 0x0020) ? 'r' : '-');
-            $flags[] = (($perms & 0x0010) ? 'w' : '-');
-            $flags[] = (($perms & 0x0008) ? (($perms & 0x0400) ? 's' : 'x' ) : (($perms & 0x0400) ? 'S' : '-'));
+              // owner
+              $flags[] = (($perms & 0x0100) ? 'r' : '-');
+              $flags[] = (($perms & 0x0080) ? 'w' : '-');
+              $flags[] = (($perms & 0x0040) ? (($perms & 0x0800) ? 's' : 'x' ) : (($perms & 0x0800) ? 'S' : '-'));
 
-            // world
-            $flags[] = (($perms & 0x0004) ? 'r' : '-');
-            $flags[] = (($perms & 0x0002) ? 'w' : '-');
-            $flags[] = (($perms & 0x0001) ? (($perms & 0x0200) ? 't' : 'x' ) : (($perms & 0x0200) ? 'T' : '-'));
+              // group
+              $flags[] = (($perms & 0x0020) ? 'r' : '-');
+              $flags[] = (($perms & 0x0010) ? 'w' : '-');
+              $flags[] = (($perms & 0x0008) ? (($perms & 0x0400) ? 's' : 'x' ) : (($perms & 0x0400) ? 'S' : '-'));
 
-            $size = is_dir($subject) ? '' : sprintf(' %.2fK', $file->getSize() / 1024);
-            
-            $add .= $this->{$f}('match', 'file', $this->{$f}('text', 'file', implode('', $flags) . $size));
+              // world
+              $flags[] = (($perms & 0x0004) ? 'r' : '-');
+              $flags[] = (($perms & 0x0002) ? 'w' : '-');
+              $flags[] = (($perms & 0x0001) ? (($perms & 0x0200) ? 't' : 'x' ) : (($perms & 0x0200) ? 'T' : '-'));
+
+              $size = is_dir($subject) ? '' : sprintf(' %.2fK', $file->getSize() / 1024);
+              
+              $add .= $this->{$f}('match', 'file', $this->{$f}('text', 'file', implode('', $flags) . $size));
+
+            }catch(\Exception $e){
+              $isFile = false;
+            }
           }
 
-          // class name?
-          if(($length < 100) && class_exists($subject, false))
-            $add .= $this->{$f}('match', 'class', $this->fromReflector(new \ReflectionClass($subject)));
+          // class/interface/function
+          if(!preg_match('/[^\w+\\\\]/', $subject) && ($length < 96)){
+            $isClass = class_exists($subject, false);
+            if($isClass)
+              $add .= $this->{$f}('match', 'class', $this->fromReflector(new \ReflectionClass($subject)));
 
-          // interface?
-          if(($length < 100) && interface_exists($subject, false))
-            $add .= $this->{$f}('match', 'interface', $this->fromReflector(new \ReflectionClass($subject)));
+            if(!$isClass && interface_exists($subject, false))
+              $add .= $this->{$f}('match', 'interface', $this->fromReflector(new \ReflectionClass($subject)));
 
-          // function?
-          if(($length < 70) && function_exists($subject))
-            $add .= $this->{$f}('match', 'function', $this->fromReflector(new \ReflectionFunction($subject)));
+            if(function_exists($subject))
+              $add .= $this->{$f}('match', 'function', $this->fromReflector(new \ReflectionFunction($subject)));
+          }
+
 
           // skip serialization/json/date checks if the string appears to be numeric,
           // or if it's shorter than 5 characters
-          if(($length > 4) && !is_numeric($subject)){
-
-            // date?
-            if($this->env['supportsDate'] && ($length > 4) && ($length < 100)){
+          if(!$isNumeric && ($length > 4)){
+            if(($length < 128) && $this->env['supportsDate'] && !preg_match('/[^A-Za-z0-9.:+\s\-\/]/', $subject)){
               try{
                 $date   = new \DateTime($subject);
                 $errors = \DateTime::getLastErrors();
@@ -1735,57 +1724,60 @@ class ref{
                   $add     .= $this->{$f}('match', 'date', $this->{$f}('text', 'date', $timeAgo));
                   
                 }  
-              }catch(\Exception $e){}
+              }catch(\Exception $e){
+                // not a date
+              }
 
             }
 
             // attempt to detect if this is a serialized string     
-            static $unserializing = 0;      
+            static $unserializing = 0;
+            $isSerialized = ($unserializing < 3)
+              && (($subject[$length - 1] === ';') || ($subject[$length - 1] === '}'))              
+              && in_array($subject[0], array('s', 'a', 'O'), true)
+              && ((($subject[0] === 's') && ($subject[$length - 2] !== '"')) || preg_match("/^{$subject[0]}:[0-9]+:/s", $subject))
+              && (($unserialized = @unserialize($subject)) !== false);
 
-            if(($unserializing < 5) && in_array($subject[0], array('s', 'a', 'O'), true)){
+            if($isSerialized){
               $unserializing++;
-              if(($subject[$length - 1] === ';') || ($subject[$length - 1] === '}'))
-                if((($subject[0] === 's') && ($subject[$length - 2] !== '"')) || preg_match("/^{$subject[0]}:[0-9]+:/s", $subject))
-                  if(($unserialized = @unserialize($subject)) !== false)
-                    $add .= $this->{$f}('match', 'serialized', $this->evaluate($unserialized));
-
+              $add .= $this->{$f}('match', 'serialized', $this->evaluate($unserialized));
               $unserializing--;
-
-            }else{
-
-              // try to find out if it's a json-encoded string;
-              // only do this for json-encoded arrays or objects, because other types have too generic formats
-              static $decodingJson = 0;
-
-              if(($decodingJson < 5) && in_array($subject[0], array('{', '['), true)){     
-                $decodingJson++;
-                $json = json_decode($subject);
-
-                if(json_last_error() === JSON_ERROR_NONE)
-                  $add .= $this->{$f}('match', 'json', $this->evaluate($json));
-
-                $decodingJson--;
-              }
             }
 
-          }
+            // try to find out if it's a json-encoded string;
+            // only do this for json-encoded arrays or objects, because other types have too generic formats                
+            static $decodingJson = 0;
+            $isJson = !$isSerialized && ($decodingJson < 3) && in_array($subject[0], array('{', '['), true);
 
-          // attempt to match a regex
-          if($length < 10000){
-            try{
-              $components = $this->splitRegex($subject);
+            if($isJson){
+              $decodingJson++;
+              $json = json_decode($subject);
 
-              if($components){
-                $regex = '';
-                foreach($components as $component)
-                  $regex .= $this->{$f}('text', 'regex-' . key($component), reset($component));
+              if($isJson = (json_last_error() === JSON_ERROR_NONE))
+                $add .= $this->{$f}('match', 'json', $this->evaluate($json));
 
-                $add .= $this->{$f}('match', 'regex', $this->{$f}('contain', 'regex', $regex));
-              }  
+              $decodingJson--;            
+            }
 
-            }catch(\Exception $e){}
+            // attempt to match a regex            
+            if($length < 768){
+              try{
+                $components = $this->splitRegex($subject);
 
-          }
+                if($components){
+                  $regex = '';
+                  foreach($components as $component)
+                    $regex .= $this->{$f}('text', 'regex-' . key($component), reset($component));
+
+                  $add .= $this->{$f}('match', 'regex', $this->{$f}('contain', 'regex', $regex));
+                }  
+
+              }catch(\Exception $e){
+                // not a regex
+              }
+
+            }
+          }  
 
         }
 

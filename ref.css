@@ -23,6 +23,7 @@
   display: inline;
   text-decoration: inherit;
   white-space: normal;
+  background: none;
 }
 
 /* no quotes on Q */
@@ -172,11 +173,22 @@
 
 /* hidden checkbox that controls group expansion */
 .ref input{
-  display: none;
+
+}
+
+
+
+.ref input{  
+  display: inline-block;
+  opacity: 0.5;
+}
+
+.ref input ~ i{
+  left: -20px;
 }
 
 /* expand/collapse toggle link for groups */
-.ref label{
+.ref div kbd{
   display: inline-block;
   vertical-align: -3px;
   margin-left: 2px;
@@ -193,20 +205,20 @@
 }
 
 /* collapse graphic */
-.ref input:checked + label{
+.ref div kbd[data-exp]{
   -webkit-transform: rotate(90deg);
      -moz-transform: rotate(90deg);       
       -ms-transform: rotate(90deg);
           transform: rotate(90deg);  
 }
 
-/* hide next element when checkbox is not checked */
-.ref input ~ label ~ div{
+/* show it when checkbox is checked */
+.ref div kbd + div{
   display: none;
 }
 
-/* show it when checkbox is checked */
-.ref input:checked ~ label ~ div{
+/* hide next element when checkbox is not checked */
+.ref div kbd[data-exp] + div{
   display: block;
 }
 

@@ -3,8 +3,16 @@ window.addEventListener('load', function(){
       refs = document.querySelectorAll('.ref');
 
   for(var i = 0, m = refs.length; i < m; i++){
-    var tippable = refs[i].querySelectorAll('b[data-tip]'),
-        tips     = refs[i].querySelectorAll('q');
+    var kbds     = refs[i].querySelectorAll('kbd'),
+        tippable = refs[i].querySelectorAll('b[data-tip]'),
+        tips     = refs[i].querySelectorAll('q');        
+
+    for(var j = 0, n = kbds.length; j < n; j++){        
+      if(kbds[j].parentNode !== refs[i])
+        kbds[j].onclick = function(e){
+          ('exp' in this.dataset) ? delete this.dataset.exp : this.dataset.exp = 1;
+        }
+    }
 
     [].filter.call(tips, function(node){
       return node.parentNode == refs[i];
@@ -38,14 +46,14 @@ window.addEventListener('load', function(){
   document.body.appendChild(tip);
 });
 
-window.addEventListener('keydown', function(ev){
-  if(ev.keyCode != 88)
+window.addEventListener('keydown', function(e){
+  if(e.keyCode != 88)
     return;
 
-  var haveCollapsed = !!document.querySelector('.ref input[type="checkbox"]:not(:checked)'),
-      inputs = document.querySelectorAll('.ref input[type="checkbox"]');
+  var kbds = document.querySelectorAll('.ref div kbd'),
+      partlyExp = document.querySelectorAll('.ref div kbd[data-exp]').length !== kbds.length;
 
-  ev.preventDefault();
-  for(var i = 0, m = inputs.length; i < m; i++)
-    inputs[i].checked = !!haveCollapsed;
+  e.preventDefault();
+  for(var i = 0, m = kbds.length; i < m; i++)
+    partlyExp ? kbds[i].dataset.exp = 1 : delete kbds[i].dataset.exp;
 });
