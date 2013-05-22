@@ -1204,8 +1204,8 @@ class ref{
   protected function fromReflector(\Reflector $reflector, $single = '', \Reflector $context = null){
 
     // @todo: test this
-    $hash = serialize(func_get_args());
-
+    $hash = var_export(func_get_args(), true);
+    
     // check if we already have this in the cache
     if(isset($this->cache[__FUNCTION__][$hash]))
       return $this->cache[__FUNCTION__][$hash];
@@ -1305,16 +1305,10 @@ class ref{
 
     // most people don't have this set
     if(!$docRefRoot)
-      $docRefRoot = rtrim(ini_get('docref_root'), '/');
-
-    if(!$docRefRoot)
-      $docRefRoot = 'http://php.net/manual/en';
+      $docRefRoot = ($docRefRoot = rtrim(ini_get('docref_root'), '/')) ? $docRefRoot : 'http://php.net/manual/en';
 
     if(!$docRefExt)
-      $docRefExt = ini_get('docref_ext');
-
-    if(!$docRefExt)
-      $docRefExt = '.php';
+      $docRefExt = ($docRefExt = ini_get('docref_ext')) ? $docRefExt : '.php';
 
     $phpNetSchemes = array(
       'class'     => $docRefRoot . '/class.%s'    . $docRefExt,
@@ -1333,8 +1327,7 @@ class ref{
       $args[] = $constant;
     
     }else{
-      $type = get_class($reflector);
-      $type = explode('\\', $type); 
+      $type = explode('\\', get_class($reflector)); 
       $type = strtolower(ltrim(end($type), 'Reflection'));
 
       if($type === 'object')
@@ -1358,8 +1351,8 @@ class ref{
       }, $args);
 
       // check for some special cases that have no links
-      $valid = ($type === 'method') || (strcasecmp($parent->name, 'stdClass') !== 0);
-      $valid = $valid && (($type !== 'method') || (strcasecmp($reflector->name, '__invoke') !== 0));
+      $valid = (($type === 'method') || (strcasecmp($parent->name, 'stdClass') !== 0))
+            && (($type !== 'method') || (($reflector->name === '__construct') || strpos($reflector->name, '__') !== 0));
 
       if($valid)
         $url = vsprintf($phpNetSchemes[$type], $args);
@@ -1527,7 +1520,7 @@ class ref{
                'true_color' => imageistruecolor($subject),
             );
 
-          break;  
+          break;
 
           case 'ldap link':
             if(!static::$config['extendedInfo'])
@@ -1814,14 +1807,13 @@ class ref{
 
         // show contents for iterators
         if(static::$config['extendedInfo'] && $reflector->isIterateable()){
-          
-          $count = 0;
-          foreach($subject as $value)
-            $count++;
 
-          $idx = 0;
-          $section = $this->env['is54'] ? new \SplFixedArray($count) : array();
-          foreach($subject as $key => $value){
+          $itContents = iterator_to_array($subject);
+          $count      = count($itContents);
+          $idx        = 0;
+          $section    = $this->env['is54'] ? new \SplFixedArray($count) : array();
+
+          foreach($itContents as $key => $value){
             $keyInfo = gettype($key);
             if($keyInfo === 'string'){
               $encoding = $this->env['mbStr'] ? mb_detect_encoding($key) : '';
@@ -2019,7 +2011,7 @@ class ref{
           $name = $method->name;
 
           if($method->returnsReference())
-            $name = '&' . $name;
+            $name = "&{$name}";
 
           // is this method inherited?
           $inherited = $reflector->getShortName() !== $method->getDeclaringClass()->getShortName();

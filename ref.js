@@ -37,7 +37,7 @@ window.addEventListener('load', function(){
     refs[i].onmousemove = function(e){
       if(tip.className.indexOf('visible') < 0)
         return;
-      tip.style.top = ((document.documentElement.clientHeight - e.clientY) < tip.offsetHeight + 20 ? (e.pageY - tip.offsetHeight) : e.pageY) + 'px';
+      tip.style.top = ((document.documentElement.clientHeight - e.clientY) < tip.offsetHeight + 20 ? Math.max(e.pageY - tip.offsetHeight, 0) : e.pageY) + 'px';
       tip.style.left = ((document.documentElement.clientWidth - e.clientX) < tip.offsetWidth + 20 ? Math.max(e.pageX - tip.offsetWidth, 0) : e.pageX) + 'px';
     };    
   }
