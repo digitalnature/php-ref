@@ -396,6 +396,10 @@
   background: #edd078;
 }
 
+.ref [data-mod-private]{
+  background: #ed7878;
+}
+
 .ref [data-mod-iterateable]{
   background: #d5dea5;
 }
