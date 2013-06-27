@@ -140,6 +140,9 @@ class ref{
                 // 'false' means no js                      
                 'scriptPath'   => '{:dir}/ref.js',
 
+                // when this option is set to TRUE, private properties are shown
+                'showPrivateProperties' => false,
+
               );
 
 
@@ -150,21 +153,21 @@ class ref{
      *
      * @var  int
      */  
-    $level    = 0,
+    $level                 = 0,
 
     /**
      * Max. expand depth of this instance
      *
      * @var  int
      */     
-    $expDepth = 1,
+    $expDepth              = 1,
 
     /**
      * Output format of this instance
      *
      * @var  string
      */     
-    $format   = null,
+    $format                = null,
 
     /**
      * Some environment variables
@@ -172,7 +175,7 @@ class ref{
      *
      * @var  string
      */ 
-    $env      = array(),
+    $env                   = array(),
 
     /**
      * Used to cache output to speed up processing.
@@ -180,7 +183,14 @@ class ref{
      *
      * @var  array
      */ 
-    $cache    = array();
+    $cache                 = array(),
+
+    /**
+     * When set to TRUE, private properties are shown.
+     *
+     * @var boolean
+     */
+    $showPrivateProperties = false;
 
 
 
@@ -1831,7 +1841,12 @@ class ref{
           $group .= $this->{$f}('section', $section, sprintf('Contents (%d)', $count));
         }
 
-        $props      = $reflector->getProperties(\ReflectionProperty::IS_PUBLIC | \ReflectionProperty::IS_PROTECTED);    
+        $propertyTypes = \ReflectionProperty::IS_PUBLIC | \ReflectionProperty::IS_PROTECTED;
+        if(static::$config['showPrivateProperties']){
+          $propertyTypes |= \ReflectionProperty::IS_PRIVATE;
+        }
+
+        $props      = $reflector->getProperties($propertyTypes);
         $methods    = static::$config['extendedInfo'] ? $reflector->getMethods(\ReflectionMethod::IS_PUBLIC | \ReflectionMethod::IS_PROTECTED) : array();
         $constants  = $reflector->getConstants();
         $interfaces = $reflector->getInterfaces();
@@ -1921,7 +1936,7 @@ class ref{
             unset($meta['tags']);        
           }
 
-          if($prop->isProtected())        
+          if($prop->isProtected() || ($prop->isPrivate() && static::$config['showPrivateProperties']))
             $prop->setAccessible(true);
 
           $value = $prop->getValue($subject);
@@ -1930,6 +1945,11 @@ class ref{
             $prop->setAccessible(false);        
             $bubbles[] = $this->{$f}('text', 'mod-protected', 'P', 'Protected');        
           }  
+
+          if($prop->isPrivate() && static::$config['showPrivateProperties']){
+            $prop->setAccessible(false);
+            $bubbles[] = $this->{$f}('text', 'mod-private', 'P', 'Private');
+          }
 
           $section[] = array(
             $this->{$f}('sep', $prop->isStatic() ? '::' : '->'),
