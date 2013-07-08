@@ -70,7 +70,7 @@
 #rTip{
   display: none;  
   position: absolute;
-  z-index: 101;  
+  z-index: 99999;  
   font-size: 12px;
   white-space: pre;  
   text-align: left;  
