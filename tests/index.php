@@ -30,7 +30,7 @@
     $array = array(
       'hèllo world'                       => '(͡°͜ʖ͡°)',      
       'empty string'                      => '',
-      'multiline string'                  => "first line\nsecond line",
+      'multiline string'                  => "first line and some padding   \nsecond line",
       'infinity'                          => INF,      
       'regular expression (pcre)'         => '/^([0-9a-zA-Z]([-\.\w]*[0-9a-zA-Z])*@([0-9a-zA-Z][-\w]*[0-9a-zA-Z]\.)+[a-zA-Z]{2,9})$/',
       'multi'                             => array(1, 2, 3, array(4, 5, 6), 'FUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUU'),  

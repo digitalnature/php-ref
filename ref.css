@@ -291,7 +291,15 @@
 
 /* string values */
 .ref [data-string]{
+  background: #e8f0e1;
   color: #669933;  
+  padding: 1px;
+  border-radius: 2px;
+}
+
+.ref [data-string][data-special]{
+  background: none;
+  padding: 0;
 }
 
 .ref [data-string][data-special] i{
