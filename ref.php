@@ -121,10 +121,10 @@ class ref{
 
                 // depth limit (0 = no limit);
                 // this is not related to recursion
-                'maxDepth'             => 10,     
+                'maxDepth'             => 6,     
 
                 // display iterator contents
-                'showIteratorContents' => true,
+                'showIteratorContents' => false,
 
                 // display extra information about resources
                 'showResourceInfo'     => true,
@@ -133,7 +133,7 @@ class ref{
                 'showMethods'          => true,
 
                 // display private properties / methods
-                'showPrivateMembers'   => true,
+                'showPrivateMembers'   => false,
 
                 // peform string matches (date, file, functions, classes, json, serialized data, regex etc.)
                 // note: seriously slows down queries on large amounts of data
