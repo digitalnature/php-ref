@@ -1857,9 +1857,7 @@ class ref{
         // linkify 'new keyword' (as constructor)
         try{          
           $reflector = new \ReflectionMethod($cn[1], '__construct');
-
-          if($reflector->isInternal())            
-            $parts[] = array($cn[0], $reflector, '');
+          $parts[] = array($cn[0], $reflector, '');
 
         }catch(\Exception $e){
           $reflector = null;
