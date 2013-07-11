@@ -126,15 +126,13 @@ class ClassTest extends AbstractTest implements Testable{
      */
     $currentDate = null,
     
-
     /**
      * Image resource created with GD
      *
      * No @var definition here
      */   
     $image       = null,
-    
-    
+        
     /**
      * Curl resource
      *
@@ -142,13 +140,24 @@ class ClassTest extends AbstractTest implements Testable{
      */   
     $curl        = null,
 
-
     /**
      * A json-encoded object
      *
      * @var string
      */   
     $jsonString  = null;
+
+
+
+  private
+
+    /**
+     * A private property
+     *
+     * @var array
+     */   
+    $privProp    = 'asdf';
+
 
 
 

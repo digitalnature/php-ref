@@ -10,7 +10,7 @@ REF, or `r()` is a nicer alternative to PHP's [`print_r`](http://php.net/manual/
 
 ## Usage ##
 
-Basic usage:
+Basic example:
        
     // include the class
     require '/full/path/to/ref.php';
@@ -42,15 +42,38 @@ Keyboard shortcuts (javascript must be enabled):
 To modify the global configuration call `ref::config()`:
 
     // example: initially expand first 3 levels
-    ref::config('expandDepth', 3);
+    ref::config('expLvl', 3);
 
 Currently available options and their default values:
 
-| Option name       | Default value       | Description
-|:----------------- |:------------------- |:-----------------------------------------------
-| `'expandDepth'`   | `1`                 | Initial expand depth (for HTML mode only). A negative value will expand all levels
-| `'extendedInfo'`  | `true`              | When this is set to `true`, additional information is returned. **Note that this seriously affects performance for queries that involve large amounts of data** (like arrays/iterators with many string elements)
-| `'formatter'`     | `array()`           | Callbacks for custom/external formatters (as associative array: format => callback)
-| `'shortcutFunc'`  | `array('r', 'rt')`  | Shortcut functions used to detect the input expression. If they are namespaced, the namespace must be present as well (methods are not  supported) 
-| `'stylePath'`     | `'{:dir}/ref.css'`  | Local path to a custom stylesheet (HTML only); `false` means that no CSS is included.
-| `'scriptPath'`    | `'{:dir}/ref.js'`   | Local path to a custom javascript (HTML only); `false` means no javascript (tooltips / toggle / kbd shortcuts require JS)
+| Option                    | Default             | Description
+|:------------------------- |:------------------- |:-----------------------------------------------
+| `'expLvl'`                | `1`                 | Initially expanded levels (for HTML mode only). A negative value will expand all levels
+| `'maxDepth'`              | `6`                 | Maximum depth (`0` to disable); note that disabling it or setting a high value can get you a 100 MB+ page when large data is involved
+| `'showIteratorContents'`  | `false`             | Display iterator data (keys and values)
+| `'showResourceInfo'`      | `true`              | Display additional information about resources
+| `'showMethods'`           | `true`              | Display methods and parameter information on objects
+| `'showPrivateMembers'`    | `false`             | Include private properties and methods
+| `'showStringMatches'`     | `true`              | Perform and display string matches for dates, files, json strings, serialized data, regex patterns etc. (SLOW)
+| `'formatters'`            | `array()`           | Custom/external formatters (as associative array: format => className)
+| `'shortcutFunc'`          | `array('r', 'rt')`  | Shortcut functions used to detect the input expression. If they are namespaced, the namespace must be present as well (methods are not  supported) 
+| `'stylePath'`             | `'{:dir}/ref.css'`  | Local path to a custom stylesheet (HTML only); `false` means that no CSS is included.
+| `'scriptPath'`            | `'{:dir}/ref.js'`   | Local path to a custom javascript (HTML only); `false` means no javascript (tooltips / toggle / kbd shortcuts require JS)
+
+
+## Similar projects
+
+- [Kint](http://raveren.github.io/kint/)
+- [dump_r](https://github.com/leeoniya/dump_r.php)
+- [Krumo](http://sourceforge.net/projects/krumo/)
+- [dBug](http://dbug.ospinto.com/)
+
+
+## TODOs
+
+- Add back first level recursion detection on arrays
+- Display constant in parameter values when possible (5.4.6+)
+- Inherit DocBlock comments from parent or prototype, if missing
+- Refactor "bubbles" (for text-mode)
+- Correctly indent multi-line strings (text-mode)
+- Move separator tokens to ::before and ::after pseudo-elements (html-mode)

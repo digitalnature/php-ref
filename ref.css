@@ -1,3 +1,4 @@
+
 .ref{
   font: normal normal 12px/18px Consolas, Monaco, Andale Mono, Courier New, monospace;  
   color: #333;
@@ -6,15 +7,7 @@
 /* reset default styles for these elements */
 .ref i,
 .ref b,
-.ref q,
-.ref u,
-.ref a,
-.ref s,
-.ref label,
-.ref kbd,
-.ref ins,
-.ref h4,
-.ref h5{
+.ref a{
   font-style: inherit;  
   font-weight: inherit;
   margin: 0;
@@ -26,26 +19,8 @@
   background: none;
 }
 
-/* no quotes on Q */
-.ref q:after,
-.ref q:before{
-  content: '';
-  display: none; /* FF fix */
-}
-
-.ref > div{
-  background: #f9f9f9;        
-  border: 1px solid #eee;
-  border-top: 0;
-  border-radius: 0 0 4px 4px;
-  box-shadow: inset 0px 4px 4px #f3f3f3, inset 0px -8px 8px #fff;
-  padding: 2px 5px;  
-  margin: 0 0 4px;
-  text-shadow: 0 1px 0 #fff;
-}
-
 /* meta content (used to generate tooltips) */
-.ref > q{
+.ref > div{
   display: none;  
 }
 
@@ -89,7 +64,7 @@
 }
 
 #rTip.visible{
-  display: block;
+  display: table;
   margin: 10px 0 0 15px;  
 }
 
@@ -98,36 +73,31 @@
   margin: 20px 0 0 25px;
 }
 
-#rTip > i{
-  float: left;
+#rTip [data-cell]{
+  padding: 2px 7px;
 }
 
-#rTip > i > i{
-  padding: 0 10px 10px 10px;
+#rTip [data-title], #rTip [data-desc]{
+  padding: 8px;
   display: block;
-  color: #777;
+  color: #ccc;
 }
 
-#rTip > i > i:first-child{
-  padding-top: 10px;  
-  color: #ccc;  
+#rTip [data-desc]{
+  padding-top: 0px;  
+  color: #777;  
 }
 
-#rTip > b{
-  float: left;
-  position: relative;
+#rTip [data-cell][data-varType]{
   padding: 10px;
   background: #333;
   box-shadow: inset -1px 0 0 #444;    
   border-right:1px solid #111;
   border-top-left-radius: 4px;
   border-bottom-left-radius: 4px;  
-  min-height: 100%;  
 }
 
-#rTip > u{
-  display: block;
-  clear: both;
+#rTip [data-cell][data-sub]{
   padding: 8px 10px 10px 10px;
   background: #333;
   box-shadow: inset 0 1px 0 #444;    
@@ -136,27 +106,32 @@
   border-bottom-left-radius: 4px;
 }
 
-#rTip > u > i{
-  display: table-row;
-}
-
-#rTip > u > i > b{
-  display: table-cell;
-  padding: 2px 10px 2px 0;
-  color: #ccc;
-}
-
-#rTip > u > i > b:first-child{
+#rTip [data-table] [data-cell]:first-child{
   font: bold 11px Helvetica, Arial;   
   color: #888;
 }
 
-#rTip > u > i > b:nth-child(2){
+#rTip [data-table] [data-cell]:nth-child(2){
   color: #edd078;
 }
 
+
+
+
+/* base entity - can be nested */
+.ref b{
+  white-space: pre;
+  display: inline;
+}
+
+/* key-value dividers, property & method modifiers etc. */
+.ref i{
+  white-space: pre;  
+  color: #aaa;
+}
+
 /* source expression (input) */
-.ref > kbd{
+.ref [data-input]{
   margin: 2px 0 0;
   padding: 2px 7px 3px 4px;
   display: block;
@@ -170,8 +145,20 @@
   border-bottom: 1px solid #fff;  
 }
 
+.ref [data-output]{
+  background: #f9f9f9;        
+  border: 1px solid #eee;
+  border-top: 0;
+  border-radius: 0 0 4px 4px;
+  box-shadow: inset 0px 4px 4px #f3f3f3, inset 0px -8px 8px #fff;
+  padding: 2px 5px;  
+  margin: 0 0 4px;
+  text-shadow: 0 1px 0 #fff;
+  display: block;
+}
+
 /* expand/collapse toggle link for groups */
-.ref div kbd{
+.ref [data-toggle]{
   display: inline-block;
   vertical-align: -3px;
   margin-left: 2px;
@@ -188,75 +175,67 @@
 }
 
 /* collapse graphic */
-.ref div kbd[data-exp]{
+.ref [data-toggle][data-exp]{
   -webkit-transform: rotate(90deg);
      -moz-transform: rotate(90deg);       
       -ms-transform: rotate(90deg);
           transform: rotate(90deg);  
 }
 
-.ref div kbd + div{display: none;}
-.ref div kbd[data-exp] + div{display: block;}
+.ref [data-group]{
+  display: none;
+}
+
+.ref [data-toggle][data-exp] ~ [data-group]{
+  display: block;
+}
 
 /* group sections */
-.ref div > div{
+.ref [data-table]{
   display: table;
-  width: 100%;
 }
 
 /* section titles */
-.ref h4{
+.ref [data-tHead]{
   font: bold 11px Helvetica, Arial;
   color: #bcbcbc;
   text-transform: lowercase;
-  display: block;
   margin: 12px 0 2px 10px;
-}
-
-.ref h4:first-child{
-  margin-top: 5px;
+  display: block;
 }
 
 /* emulate a table for displaying array & object members */
 /* section row */
-.ref dl{
-  display: table-row;
+.ref [data-row]{
+  display: table-row; 
 }
 
+/* zebra-like rows */
+.ref [data-output] [data-row]:nth-child(odd){background: #f4f4f4;}
+.ref [data-output] [data-row]:nth-child(even){background: #f9f9f9;}
+
 /* section cells */
-.ref dd{
+.ref [data-cell]{
   display: table-cell;
+  width: auto;
   vertical-align: top;
   padding: 1px 0 1px 10px;
 }
 
 /* last cell of a row (forces table to adjust width like we want to) */
-.ref dd:last-child{
+.ref [data-output] [data-table],
+.ref [data-output] [data-cell]:last-child{
   width: 100%;
 }
 
-/* zebra-like rows */
-.ref dl:nth-child(odd){background: #f4f4f4;}
-.ref dl:nth-child(even){background: #f9f9f9;}
 
-/* base entity - can be nested */
-.ref b{
-  white-space: pre;
-  display: inline;
-}
-
-/* key-value dividers, property & method modifiers etc. */
-.ref i{
-  white-space: pre;  
-  color: #aaa;
-}
 
 /* tag-like appearance for boolean, null and resource types */
 .ref [data-true],
 .ref [data-false],
 .ref [data-null],
 .ref [data-resource],
-.ref s{
+.ref [data-match]{
   font: bold 11px Helvetica, Arial; 
   color: #fff;        
   padding: 1px 3px;
@@ -272,7 +251,7 @@
 }
 
 /* string matches */
-.ref s{
+.ref [data-match]{
   background-color: #d78035;
 }
 
@@ -297,9 +276,9 @@
 /* resources */
 .ref [data-resource]{
   background-color: #0057ae;
-}   
+}
 
-.ref [data-resourceInfo]{
+.ref [data-resourceProp]{
   font: bold 11px Helvetica, Arial;   
   color: #999;
 }
@@ -311,12 +290,11 @@
 }   
 
 /* string values */
-.ref [data-string],
-.ref [data-specialString]{
+.ref [data-string]{
   color: #669933;  
 }
 
-.ref [data-specialString] ins{
+.ref [data-string][data-special] i{
   background: #faf3dc;
   color: #d78035;
 }
@@ -330,37 +308,42 @@
   color:#CC0033;
 }
 
-.ref [data-constant-inherited],
-.ref [data-property-inherited]{
-  color: #999;
-}
-
 .ref [data-method]{
   font-weight: bold;
   color: #0057ae;
 }
 
+.ref [data-const][data-inherited],
+.ref [data-prop][data-inherited]{
+  color: #999;
+}
+
+.ref [data-prop][data-private],
+.ref [data-method][data-private]{
+  color: #CC0033;
+}
+
 /* inherited methods */
-.ref [data-method-inherited]{
+.ref [data-method][data-inherited]{
   font-weight: bold;
   color: #6da5de;
 }
 
 /* method arguments */
-.ref [data-parameter]{
+.ref [data-param]{
   font-weight: normal;  
   color: #333;
 }
 
 /* optional method arguments */
-.ref [data-parameter-optional]{
+.ref [data-param][data-optional]{
   font-style: italic;
   font-weight: normal;    
   color: #aaa;
 }
 
 /* group info prefix */
-.ref i + ins{
+.ref [data-gLabel]{
   font: bold 11px Helvetica, Arial;  
   padding: 0 3px;
   color: #333;
@@ -373,7 +356,7 @@
   color: #fff;            
 }
 
-.ref > kbd [data-mod]{
+.ref [data-input] [data-mod]{
   color: #444;
 }
 
@@ -397,7 +380,7 @@
 }
 
 .ref [data-mod-private]{
-  background: #ed7878;
+  background: #eea8b9;
 }
 
 .ref [data-mod-iterateable]{
