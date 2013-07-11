@@ -199,6 +199,9 @@ class ref{
       // php 5.4+ ?
       'is54'         => version_compare(PHP_VERSION, '5.4') >= 0,
 
+      // php 5.4.6+ ?
+      'is546'        => version_compare(PHP_VERSION, '5.4.6') >= 0,      
+
       // is the 'mbstring' extension active?
       'mbStr'        => function_exists('mb_detect_encoding'),
 
@@ -1801,7 +1804,13 @@ class ref{
           if($optional){
             $paramValue = $parameter->isDefaultValueAvailable() ? $parameter->getDefaultValue() : null;            
             $this->fmt->sep(' = ');
-            $this->evaluate($paramValue, true);            
+
+            if($this->env['is546'] && !$parameter->getDeclaringFunction()->isInternal() && $parameter->isDefaultValueConstant()){
+              $this->fmt->text('constant', $parameter->getDefaultValueConstantName(), 'Constant');
+
+            }else{
+              $this->evaluate($paramValue, true);
+            }  
           }
 
           $this->fmt->endContain();
