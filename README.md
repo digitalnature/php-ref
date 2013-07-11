@@ -71,7 +71,6 @@ Currently available options and their default values:
 
 ## TODOs
 
-- Add back first level recursion detection on arrays
 - Display constant in parameter values when possible (5.4.6+)
 - Inherit DocBlock comments from parent or prototype, if missing
 - Refactor "bubbles" (for text-mode)

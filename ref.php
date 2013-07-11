@@ -1080,55 +1080,57 @@ class ref{
 
       // arrays
       case 'array':
-        $this->fmt->text('array');
 
         // empty array?
-        if(empty($subject))
+        if(empty($subject)){
+          $this->fmt->text('array');          
           return $this->fmt->emptyGroup();
+        }  
 
         if(isset($subject[static::MARKER_KEY])){
           unset($subject[static::MARKER_KEY]);
-          return $this->fmt->emptyGroup('recursion');          
+          $this->fmt->text('array');
+          $this->fmt->emptyGroup('recursion');          
+          return;
         }
 
-        $count = count($subject);
+        // first recursion level detection;
+        // this is optional (used to print consistent recursion info)
+        foreach($subject as $key => &$value){
+          if(!is_array($value))
+            continue;
 
+          // save current value in a temporary variable
+          $buffer = $value;
+
+          // assign new value
+          $value = ($value !== 1) ? 1 : 2;
+          
+          // if they're still equal, then we have a reference            
+          if($value === $subject){
+            $value = $buffer;                      
+            $value[static::MARKER_KEY] = true;
+            $this->evaluate($value);
+            return;
+          }
+
+          // restoring original value
+          $value = $buffer;
+        }        
+
+        $this->fmt->text('array');
+        $count = count($subject);
         if(!$this->fmt->startGroup($count))
           return;               
 
         $max = max(array_map('static::strLen', array_keys($subject)));
         $subject[static::MARKER_KEY] = true;
-
+     
         foreach($subject as $key => &$value){
           
           // ignore our temporary marker
           if($key === static::MARKER_KEY)
             continue;      
-
-          /*
-          // first recursion level detection;  -- @todo: update code for the new formatter engine
-          // this is optional (used to print consistent recursion info)
-          if(is_array($value)){
-
-            // save current value in a temporary variable
-            $buffer = $value;
-
-            // assign new value
-            $value = ($value !== 1) ? 1 : 2;
-            
-            // if they're still equal, then we have a reference            
-            if($value === $subject){
-              $value = $buffer;                      
-              $value[static::MARKER_KEY] = true;
-              $output = $this->evaluate($value);
-              $this->level--;
-              return $output;
-            }
-
-            // restoring original value
-            $value = $buffer;          
-          }
-          */
 
           $keyInfo = gettype($key);
 
