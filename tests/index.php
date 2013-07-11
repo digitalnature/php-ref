@@ -7,6 +7,9 @@
     require dirname(__DIR__) . '/ref.php';
     require __DIR__ . '/example.class.php';
 
+    ref::config('showPrivateMembers', true);
+    ref::config('showIteratorContents', true);
+
     /**
      * Test class
      */ 

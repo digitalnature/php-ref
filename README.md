@@ -49,16 +49,16 @@ Currently available options and their default values:
 | Option                    | Default             | Description
 |:------------------------- |:------------------- |:-----------------------------------------------
 | `'expLvl'`                | `1`                 | Initially expanded levels (for HTML mode only). A negative value will expand all levels
-| `'maxDepth'`              | `6`                 | Maximum depth (`0` to disable); note that disabling it or setting a high value can get you a 100 MB+ page when large data is involved
-| `'showIteratorContents'`  | `false`             | Display iterator data (keys and values)
-| `'showResourceInfo'`      | `true`              | Display additional information about resources
-| `'showMethods'`           | `true`              | Display methods and parameter information on objects
-| `'showPrivateMembers'`    | `false`             | Include private properties and methods
-| `'showStringMatches'`     | `true`              | Perform and display string matches for dates, files, json strings, serialized data, regex patterns etc. (SLOW)
+| `'maxDepth'`              | `6`                 | Maximum depth (`0` to disable); note that disabling it or setting a high value can produce a 100+ MB page when input involves large data
+| `'showIteratorContents'`  | `FALSE`             | Display iterator data (keys and values)
+| `'showResourceInfo'`      | `TRUE`              | Display additional information about resources
+| `'showMethods'`           | `TRUE`              | Display methods and parameter information on objects
+| `'showPrivateMembers'`    | `FALSE`             | Include private properties and methods
+| `'showStringMatches'`     | `TRUE`              | Perform and display string matches for dates, files, json strings, serialized data, regex patterns etc. (SLOW)
 | `'formatters'`            | `array()`           | Custom/external formatters (as associative array: format => className)
 | `'shortcutFunc'`          | `array('r', 'rt')`  | Shortcut functions used to detect the input expression. If they are namespaced, the namespace must be present as well (methods are not  supported) 
-| `'stylePath'`             | `'{:dir}/ref.css'`  | Local path to a custom stylesheet (HTML only); `false` means that no CSS is included.
-| `'scriptPath'`            | `'{:dir}/ref.js'`   | Local path to a custom javascript (HTML only); `false` means no javascript (tooltips / toggle / kbd shortcuts require JS)
+| `'stylePath'`             | `'{:dir}/ref.css'`  | Local path to a custom stylesheet (HTML only); `FALSE` means that no CSS is included.
+| `'scriptPath'`            | `'{:dir}/ref.js'`   | Local path to a custom javascript (HTML only); `FALSE` means no javascript (tooltips / toggle / kbd shortcuts require JS)
 
 
 ## Similar projects

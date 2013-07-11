@@ -161,7 +161,7 @@ class ref{
     /**
      * Output formatter of this instance
      *
-     * @var  RefFormmatter
+     * @var  RFormatter
      */     
     $fmt = null,
 
@@ -178,15 +178,15 @@ class ref{
   /**
    * Constructor
    *
-   * @param   string|RefFormatter $format      Output format ID, or formatter instance defaults to 'html'
+   * @param   string|RFormatter $format      Output format ID, or formatter instance defaults to 'html'
    */
   public function __construct($format = 'html'){
 
-    if($format instanceof RefFormatter){
+    if($format instanceof RFormatter){
       $this->fmt = $format;
 
     }else{
-      $format = isset(static::$config['formatters'][$format]) ? static::$config['formatters'][$format] : 'Ref' . ucfirst($format) . 'Formatter';
+      $format = isset(static::$config['formatters'][$format]) ? static::$config['formatters'][$format] : 'R' . ucfirst($format) . 'Formatter';
 
       if(!class_exists($format))
         throw new \Exception(sprintf('%s class not found', $format));
@@ -1960,7 +1960,7 @@ class ref{
 /**
  * Formatter abstraction
  */ 
-abstract class RefFormatter{
+abstract class RFormatter{
 
   /**
    * Flush output and send contents to the output device
@@ -2103,7 +2103,7 @@ abstract class RefFormatter{
  * Generates the output in HTML5 format
  *   
  */
-class RefHtmlFormatter extends RefFormatter{
+class RHtmlFormatter extends RFormatter{
 
   public
 
@@ -2461,7 +2461,7 @@ class RefHtmlFormatter extends RefFormatter{
  * Generates the output in plain text format
  *   
  */
-class RefTextFormatter extends RefFormatter{
+class RTextFormatter extends RFormatter{
 
   protected
 
