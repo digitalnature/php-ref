@@ -1509,7 +1509,7 @@ class ref{
       if(static::$config['showPrivateMembers'])
         $flags |= \ReflectionMethod::IS_PRIVATE;          
 
-      $methods = $reflector->getMethods();
+      $methods = $reflector->getMethods($flags);
     }
 
     $constants  = $reflector->getConstants();
