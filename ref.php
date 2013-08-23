@@ -186,7 +186,8 @@ class ref{
       $this->fmt = $format;
 
     }else{
-      $format = isset(static::$config['formatters'][$format]) ? static::$config['formatters'][$format] : 'R' . ucfirst($format) . 'Formatter';
+        $formatters = static::config('formatters');
+      $format = isset($formatters[$format]) ? $formatters[$format] : 'R' . ucfirst($format) . 'Formatter';
 
       if(!class_exists($format))
         throw new \Exception(sprintf('%s class not found', $format));
@@ -712,16 +713,22 @@ class ref{
    */
   public static function config($key, $value = null){
 
-    if(!array_key_exists($key, static::$config))
-      throw new \Exception(sprintf('Unrecognized option: "%s". Valid options are: %s', $key, implode(', ', array_keys(static::$config))));
+    if (file_exists(__DIR__ . '/refconfig.php')) {
+        $config = require('refconfig.php');
+    } else {
+        $config = static::$config;
+    }
+
+    if(!array_key_exists($key, $config))
+      throw new \Exception(sprintf('Unrecognized option: "%s". Valid options are: %s', $key, implode(', ', array_keys($config))));
 
     if($value === null)
-      return static::$config[$key];
+      return $config[$key];
 
-    if(is_array(static::$config[$key]))
-      return static::$config[$key] = (array)$value;
+    if(is_array($config[$key]))
+      return $config[$key] = (array)$value;
 
-    return static::$config[$key] = $value;
+    return $config[$key] = $value;
   }
 
 
@@ -760,7 +767,7 @@ class ref{
       extract($callee);
 
       // skip, if the called function doesn't match the shortcut function name
-      if(!$function || !preg_grep("/{$function}/i" , static::$config['shortcutFunc']))
+      if(!$function || !preg_grep("/{$function}/i" , static::config('shortcutFunc')))
         continue;
 
       if(!$line || !$file)
@@ -1165,7 +1172,7 @@ class ref{
 
         $this->fmt->text('resource', strval($subject));
 
-        if(!static::$config['showResourceInfo'])
+        if(!static::config('showResourceInfo'))
           return $this->fmt->emptyGroup($resType);
 
         // @see: http://php.net/manual/en/resource.php
@@ -1279,7 +1286,7 @@ class ref{
         $this->fmt->text('string', $subject, "string({$info})");
 
         // advanced checks only if there are 3 characteres or more
-        if(static::$config['showStringMatches'] && ($length > 2) && (trim($subject) !== '')){
+        if(static::config('showStringMatches') && ($length > 2) && (trim($subject) !== '')){
 
           $isNumeric = is_numeric($subject);
 
@@ -1502,16 +1509,16 @@ class ref{
 
     $flags = \ReflectionProperty::IS_PUBLIC | \ReflectionProperty::IS_PROTECTED;
 
-    if(static::$config['showPrivateMembers'])
+    if(static::config('showPrivateMembers'))
       $flags |= \ReflectionProperty::IS_PRIVATE;
 
     $props   = $reflector->getProperties($flags);
     $methods = array();
 
-    if(static::$config['showMethods']){
+    if(static::config('showMethods')){
       $flags = \ReflectionMethod::IS_PUBLIC | \ReflectionMethod::IS_PROTECTED;
 
-      if(static::$config['showPrivateMembers'])
+      if(static::config('showPrivateMembers'))
         $flags |= \ReflectionMethod::IS_PRIVATE;
 
       $methods = $reflector->getMethods($flags);
@@ -1540,7 +1547,7 @@ class ref{
       return;
 
     // show contents for iterators
-    if(static::$config['showIteratorContents'] && $reflector->isIterateable()){
+    if(static::config('showIteratorContents') && $reflector->isIterateable()){
 
       $itContents = iterator_to_array($subject);
       $this->fmt->sectionTitle(sprintf('Contents (%d)', count($itContents)));
