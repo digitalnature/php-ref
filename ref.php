@@ -1787,7 +1787,7 @@ class ref{
             // @see https://bugs.php.net/bug.php?id=32177&edit=1
           }
 
-          if($paramClass){
+          if(!empty($paramClass)){
             $this->fmt->startContain('hint');
             $this->fromReflector($paramClass, $paramClass->name);
             $this->fmt->endContain();
