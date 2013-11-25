@@ -1070,6 +1070,10 @@ class ref{
   protected function evaluate(&$subject, $specialStr = false){
 
     switch($type = gettype($subject)){
+
+      // https://github.com/digitalnature/php-ref/issues/13
+      case 'unknown type':
+        return $this->fmt->text('unknown');
     
       // null value
       case 'NULL':

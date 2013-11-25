@@ -234,6 +234,7 @@
 .ref [data-true],
 .ref [data-false],
 .ref [data-null],
+.ref [data-unknown],
 .ref [data-resource],
 .ref [data-match]{
   font: bold 11px Helvetica, Arial; 
@@ -267,7 +268,8 @@
 }   
 
 /* null value */
-.ref [data-null]{
+.ref [data-null],
+.ref [data-unknown]{
   background-color: #eee;
   color: #999;
   text-shadow: inherit;
