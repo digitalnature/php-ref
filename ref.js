@@ -1,4 +1,5 @@
 window.addEventListener('load', function(){
+
   var tip  = document.createElement('div'),
       refs = document.querySelectorAll('.ref');
 

@@ -1,7 +1,5 @@
 <?php
 
-
-
 /**
  * Shortcut to ref, HTML mode
  *
@@ -153,7 +151,15 @@ class ref{
                 // javascript path (for HTML only);
                 // 'false' means no js                      
                 'scriptPath'           => '{:dir}/ref.js',
-              );
+              ),
+
+    /**
+     * Some environment variables
+     * used to determine feature support
+     *
+     * @var  array
+     */ 
+    $env = array();
 
 
   protected
@@ -163,15 +169,7 @@ class ref{
      *
      * @var  RFormatter
      */     
-    $fmt = null,
-
-    /**
-     * Some environment variables
-     * used to determine feature support
-     *
-     * @var  string
-     */ 
-    $env = array();
+    $fmt = null;
 
 
 
@@ -188,19 +186,25 @@ class ref{
     }else{
       $format = isset(static::$config['formatters'][$format]) ? static::$config['formatters'][$format] : 'R' . ucfirst($format) . 'Formatter';
 
-      if(!class_exists($format))
+      if(!class_exists($format, false))
         throw new \Exception(sprintf('%s class not found', $format));
 
       $this->fmt = new $format();
     }
 
-    $this->env = array(
+    if(static::$env)
+      return;
+
+    static::$env = array(
 
       // php 5.4+ ?
       'is54'         => version_compare(PHP_VERSION, '5.4') >= 0,
 
       // php 5.4.6+ ?
       'is546'        => version_compare(PHP_VERSION, '5.4.6') >= 0,      
+
+      // curl extension running?
+      'curlActive'   => function_exists('curl_version'),      
 
       // is the 'mbstring' extension active?
       'mbStr'        => function_exists('mb_detect_encoding'),
@@ -931,7 +935,7 @@ class ref{
       }
       
       // @todo: maybe - list interface methods
-      if(!($item->isInterface() || ($this->env['is54'] && $item->isTrait()))){
+      if(!($item->isInterface() || (static::$env['is54'] && $item->isTrait()))){
 
         if($item->isAbstract())
           $bubbles[] = array('A', 'Abstract');
@@ -940,7 +944,7 @@ class ref{
           $bubbles[] = array('F', 'Final');
 
         // php 5.4+ only
-        if($this->env['is54'] && $item->isCloneable())
+        if(static::$env['is54'] && $item->isCloneable())
           $bubbles[] = array('C', 'Cloneable');          
 
         if($item->isIterateable())
@@ -1040,7 +1044,7 @@ class ref{
         // WordPress function;
         // like pretty much everything else in WordPress, API links are inconsistent as well;
         // so we're using queryposts.com as doc source for API
-        case ($type === 'function') && class_exists('WP') && defined('ABSPATH') && defined('WPINC'):
+        case ($type === 'function') && class_exists('WP', false) && defined('ABSPATH') && defined('WPINC'):
           if(strpos($reflector->getFileName(), realpath(ABSPATH . WPINC)) === 0){
             $url = sprintf('http://queryposts.com/function/%s', urlencode(strtolower($reflector->getName())));
             break;
@@ -1138,7 +1142,7 @@ class ref{
           $keyInfo = gettype($key);
 
           if($keyInfo === 'string'){
-            $encoding = $this->env['mbStr'] ? mb_detect_encoding($key) : '';
+            $encoding = static::$env['mbStr'] ? mb_detect_encoding($key) : '';
             $keyLen   = $encoding && ($encoding !== 'ASCII') ? static::strLen($key) . '; ' . $encoding : static::strLen($key);
             $keyInfo  = "{$keyInfo}({$keyLen})";
           }else{
@@ -1155,6 +1159,7 @@ class ref{
         }
 
         unset($subject[static::MARKER_KEY]);
+
         $this->fmt->endGroup();
         return;
 
@@ -1266,7 +1271,7 @@ class ref{
       case 'string':
 
         $length   = static::strLen($subject);       
-        $encoding = $this->env['mbStr'] ? mb_detect_encoding($subject) : false;      
+        $encoding = static::$env['mbStr'] ? mb_detect_encoding($subject) : false;      
         $info     = $encoding && ($encoding !== 'ASCII') ? $length . '; ' . $encoding : $length;
 
         if($specialStr){
@@ -1364,7 +1369,26 @@ class ref{
           // skip serialization/json/date checks if the string appears to be numeric,
           // or if it's shorter than 5 characters
           if(!$isNumeric && ($length > 4)){
-            if(($length < 128) && $this->env['supportsDate'] && !preg_match('/[^A-Za-z0-9.:+\s\-\/]/', $subject)){
+
+            // url
+            if(static::$env['curlActive'] && filter_var($subject, FILTER_VALIDATE_URL)){
+              $ch = curl_init($subject);
+              curl_setopt($ch, CURLOPT_NOBODY, true);
+              curl_exec($ch);
+              $nfo = curl_getinfo($ch);
+              curl_close($ch);
+
+              if($nfo['http_code']){
+                $this->fmt->startContain('url', true);
+                $contentType = explode(';', $nfo['content_type']);
+                $this->fmt->text('url', sprintf('%s:%d %s %.2fms (%d)', $nfo['primary_ip'], $nfo['primary_port'], $contentType[0], $nfo['total_time'], $nfo['http_code']));
+                $this->fmt->endContain();
+              }
+
+            }
+
+            // date
+            if(($length < 128) && static::$env['supportsDate'] && !preg_match('/[^A-Za-z0-9.:+\s\-\/]/', $subject)){
               try{
                 $date   = new \DateTime($subject);
                 $errors = \DateTime::getLastErrors();
@@ -1519,12 +1543,12 @@ class ref{
 
     $constants  = $reflector->getConstants();
     $interfaces = $reflector->getInterfaces();
-    $traits     = $this->env['is54'] ? $reflector->getTraits() : array();
+    $traits     = static::$env['is54'] ? $reflector->getTraits() : array();
     $parents    = static::getParentClasses($reflector);        
 
     // work-around for https://bugs.php.net/bug.php?id=49154
     // @see http://stackoverflow.com/questions/15672287/strange-behavior-of-reflectiongetproperties-with-numeric-keys
-    if(!$this->env['is54']){      
+    if(!static::$env['is54']){      
       $props = array_values(array_filter($props, function($prop) use($subject){
         return !$prop->isPublic() || property_exists($subject, $prop->name);
       }));
@@ -1548,7 +1572,7 @@ class ref{
       foreach($itContents as $key => $value){
         $keyInfo = gettype($key);
         if($keyInfo === 'string'){
-          $encoding = $this->env['mbStr'] ? mb_detect_encoding($key) : '';
+          $encoding = static::$env['mbStr'] ? mb_detect_encoding($key) : '';
           $length   = $encoding && ($encoding !== 'ASCII') ? static::strLen($key) . '; ' . $encoding : static::strLen($key);
           $keyInfo  = sprintf('%s(%s)', $keyInfo, $length);        
         }            
@@ -1805,7 +1829,7 @@ class ref{
             $paramValue = $parameter->isDefaultValueAvailable() ? $parameter->getDefaultValue() : null;            
             $this->fmt->sep(' = ');
 
-            if($this->env['is546'] && !$parameter->getDeclaringFunction()->isInternal() && $parameter->isDefaultValueConstant()){
+            if(static::$env['is546'] && !$parameter->getDeclaringFunction()->isInternal() && $parameter->isDefaultValueConstant()){
               $this->fmt->text('constant', $parameter->getDefaultValueConstantName(), 'Constant');
 
             }else{
@@ -2114,7 +2138,7 @@ abstract class RFormatter{
  */
 class RHtmlFormatter extends RFormatter{
 
-  public
+  protected
 
     /**
      * Actual output
@@ -2206,7 +2230,7 @@ class RHtmlFormatter extends RFormatter{
   }  
 
   public function text($type, $text = null, $meta = null, $uri = null){
-    
+
     if(!is_array($type))
       $type = (array)$type;
 
@@ -2239,13 +2263,13 @@ class RHtmlFormatter extends RFormatter{
     if($uri !== null)
       $text = '<a href="' . $uri . '" target="_blank">' . $text . '</a>';
 
-    //$this->out .= ($type !== 'name') ? "<b data-{$type}{$tip}>{$text}</b>" : "<b{$tip}>{$text}</b>";   
+    //$this->out .= ($type !== 'name') ? "<span data-{$type}{$tip}>{$text}</span>" : "<span{$tip}>{$text}</span>";   
 
     $typeStr = '';
     foreach($type as $part)
       $typeStr .= " data-{$part}";
 
-    $this->out .= "<b{$typeStr}{$tip}>{$text}</b>";
+    $this->out .= "<span{$typeStr}{$tip}>{$text}</span>";
   }
 
   public function startContain($type, $label = false){
@@ -2260,20 +2284,20 @@ class RHtmlFormatter extends RFormatter{
     foreach($type as $part)
       $typeStr .= " data-{$part}";
 
-    $this->out .= "<b{$typeStr}>";
+    $this->out .= "<span{$typeStr}>";
 
     if($label)
-      $this->out .= "<b data-match>{$type[0]}</b>";
+      $this->out .= "<span data-match>{$type[0]}</span>";
   }    
 
   public function endContain(){
-    $this->out .= '</b>';
+    $this->out .= '</span>';
   } 
 
   public function emptyGroup($prefix = ''){
 
     if($prefix !== '')
-      $prefix = '<b data-gLabel>' . static::escape($prefix) . '</b>';
+      $prefix = '<span data-gLabel>' . static::escape($prefix) . '</span>';
     
     $this->out .= "<i>(</i>{$prefix}<i>)</i>";
   }    
@@ -2284,7 +2308,7 @@ class RHtmlFormatter extends RFormatter{
     $maxDepth = ref::config('maxDepth');
 
     if(($maxDepth > 0) && (($this->level + 1) > $maxDepth)){
-      $this->emptyGroup('...');              
+      $this->emptyGroup('...');   
       return false;
     }   
 
@@ -2294,32 +2318,32 @@ class RHtmlFormatter extends RFormatter{
     $exp = ($expLvl < 0) || (($expLvl > 0) && ($this->level <= $expLvl)) ? ' data-exp' : '';
     
     if($prefix !== '')
-      $prefix = '<b data-gLabel>' . static::escape($prefix) . '</b>';
+      $prefix = '<span data-gLabel>' . static::escape($prefix) . '</span>';
    
-    $this->out .= "<i>(</i>{$prefix}<b data-toggle{$exp}></b><b data-group><b data-table>";
+    $this->out .= "<i>(</i>{$prefix}<span data-toggle{$exp}></span><span data-group><span data-table>";
 
     return true;
   }
 
   public function endGroup(){
-    $this->out .= '</b></b><i>)</i>';
+    $this->out .= '</span></span><i>)</i>';
     $this->level--;
   }
  
   public function sectionTitle($title){
-    $this->out .= "</b><b data-tHead>{$title}</b><b data-table>";    
+    $this->out .= "</span><span data-tHead>{$title}</span><span data-table>";    
   }
 
   public function startRow(){
-    $this->out .= '<b data-row><b data-cell>';
+    $this->out .= '<span data-row><span data-cell>';
   } 
 
   public function endRow(){
-    $this->out .= '</b></b>';
+    $this->out .= '</span></span>';
   } 
      
   public function colDiv($padLen = null){
-    $this->out .= '</b><b data-cell>';
+    $this->out .= '</span><span data-cell>';
   }   
 
   public function bubbles(array $items){
@@ -2327,20 +2351,20 @@ class RHtmlFormatter extends RFormatter{
     if(!$items)
       return;
 
-    $this->out .= '<b data-mod>';   
+    $this->out .= '<span data-mod>';   
 
     foreach($items as $info)
       $this->out .= $this->text('mod-' . strtolower($info[1]), $info[0], $info[1]);
 
-    $this->out .= '</b>';
+    $this->out .= '</span>';
   }      
       
   public function startExp(){
-    $this->out .= '<b data-input>';
+    $this->out .= '<span data-input>';
   }                    
 
   public function endExp(){
-    $this->out .= '</b><b data-output>';
+    $this->out .= '</span><span data-output>';
   } 
 
   public function startRoot(){
@@ -2348,7 +2372,7 @@ class RHtmlFormatter extends RFormatter{
   }                    
 
   public function endRoot(){
-    $this->out .= '</b>';
+    $this->out .= '</span>';
 
     // process tooltips
     $tipHtml = '';
@@ -2370,10 +2394,10 @@ class RHtmlFormatter extends RFormatter{
       $cols = array();
 
       if($meta['left'])
-        $cols[] = "<b data-cell data-varType>{$meta['left']}</b>";
+        $cols[] = "<span data-cell data-varType>{$meta['left']}</span>";
 
-      $title = $meta['title'] ?       "<b data-title>{$meta['title']}</b>"       : '';
-      $desc  = $meta['description'] ? "<b data-desc>{$meta['description']}</b>"  : '';
+      $title = $meta['title'] ?       "<span data-title>{$meta['title']}</span>"       : '';
+      $desc  = $meta['description'] ? "<span data-desc>{$meta['description']}</span>"  : '';
       $tags  = '';
 
       foreach($meta['tags'] as $tag => $values){
@@ -2383,26 +2407,26 @@ class RHtmlFormatter extends RFormatter{
             unset($value[1]);
           }
 
-          $value  = is_array($value) ? implode('</b><b data-cell>', $value) : $value;
-          $tags  .= "<b data-row><b data-cell>@{$tag}</b><b data-cell>{$value}</b></b>";
+          $value  = is_array($value) ? implode('</span><span data-cell>', $value) : $value;
+          $tags  .= "<span data-row><span data-cell>@{$tag}</span><span data-cell>{$value}</span></span>";
         }
       }
 
       if($tags)
-        $tags = "<b data-table>{$tags}</b>";
+        $tags = "<span data-table>{$tags}</span>";
 
       if($title || $desc || $tags)
-        $cols[] = "<b data-cell>{$title}{$desc}{$tags}</b>";
+        $cols[] = "<span data-cell>{$title}{$desc}{$tags}</span>";
 
       if($cols)
-        $tip = '<b data-row>' . implode('', $cols) . '</b>';
+        $tip = '<span data-row>' . implode('', $cols) . '</span>';
 
       $sub = '';
       foreach($meta['sub'] as $line)
-        $sub .= '<b data-row><b data-cell>' . implode('</b><b data-cell>', $line) . '</b></b>';
+        $sub .= '<span data-row><span data-cell>' . implode('</span><span data-cell>', $line) . '</span></span>';
     
       if($sub)
-        $tip .= "<b data-row><b data-cell data-sub><b data-table>{$sub}</b></b></b>";
+        $tip .= "<span data-row><span data-cell data-sub><span data-table>{$sub}</span></span></span>";
 
       if($tip)
         $this->out .= "<div>{$tip}</div>";

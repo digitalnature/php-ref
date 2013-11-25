@@ -6,7 +6,7 @@
 
 /* reset default styles for these elements */
 .ref i,
-.ref b,
+.ref span,
 .ref a{
   font-style: inherit;  
   font-weight: inherit;
@@ -119,7 +119,7 @@
 
 
 /* base entity - can be nested */
-.ref b{
+.ref span{
   white-space: pre;
   display: inline;
 }
@@ -293,8 +293,7 @@
 .ref [data-string]{
   background: #e8f0e1;
   color: #669933;  
-  padding: 1px;
-  border-radius: 2px;
+  padding: 3px 1px;
 }
 
 .ref [data-string][data-special]{
@@ -368,7 +367,7 @@
   color: #444;
 }
 
-.ref [data-mod] b{
+.ref [data-mod] span{
   display: inline-block;  
   margin: 0 2px;  
   width: 14px;

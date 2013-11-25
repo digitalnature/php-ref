@@ -39,6 +39,7 @@
       'incomplete object'                 => unserialize('O:3:"Foo":1:{s:3:"bar";i:5;}'),
       'empty object'                      => new \StdClass(),
       'matching date/file/function/class' => 'today',      
+      'url'                               => 'http://google.com',
     );
 
     $array['reference to self'] = &$array;
@@ -46,7 +47,7 @@
     $obj = new \Tests\ClassTest(array('foo', 'bar'), $array);    
 
     if($htmlMode){
-    
+
       r(true, false, 'I can haz a 강남스타일 string', '1492-10-14 04:20:00 America/Nassau', null, 4.20);      
       r(array(), $array, serialize(array('A', 'serialized', 'string')));
       r(fopen('php://stdin', 'r'), function($x, $d){}); 
