@@ -75,3 +75,8 @@ Currently available options and their default values:
 - Refactor "bubbles" (for text-mode)
 - Correctly indent multi-line strings (text-mode)
 - Move separator tokens to ::before and ::after pseudo-elements (html-mode)
+
+
+## License
+
+http://opensource.org/licenses/mit-license.html
