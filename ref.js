@@ -48,7 +48,7 @@ window.addEventListener('load', function(){
 });
 
 window.addEventListener('keydown', function(e){
-  if(e.keyCode != 88)
+  if(e.keyCode != 27)
     return;
 
   var kbds = document.querySelectorAll('.ref [data-toggle]'),
