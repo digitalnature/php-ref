@@ -95,7 +95,7 @@ class ref{
   const
 
     MARKER_KEY = '_phpRefArrayMarker_';
-
+    
 
 
   protected static
@@ -119,7 +119,10 @@ class ref{
 
                 // depth limit (0 = no limit);
                 // this is not related to recursion
-                'maxDepth'             => 6,     
+                'maxDepth'             => 6,
+
+                // show the place where r() has been called from
+                'showBacktrace'        => true,
 
                 // display iterator contents
                 'showIteratorContents' => false,
@@ -253,7 +256,7 @@ class ref{
     
     $this->fmt->startRoot();
     $this->fmt->startExp();
-    $this->evaluateExp($expression);        
+    $this->evaluateExp($expression);
     $this->fmt->endExp();    
     $this->evaluate($subject);    
     $this->fmt->endRoot();        
@@ -2368,6 +2371,14 @@ class RHtmlFormatter extends RFormatter{
   }                    
 
   public function endExp(){
+    if (ref::config('showBacktrace')) {
+      $traces = debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS);
+      if (isset($traces[2])) {
+        $trace = $traces[2];
+        $this->out .= '<span data-backtrace>' . $trace['file'] . ':' . $trace['line'] . '</span>';
+      }
+    }
+
     $this->out .= '</span><span data-output>';
   } 
 
@@ -2649,6 +2660,14 @@ class RTextFormatter extends RFormatter{
   }      
 
   public function endExp(){
+    if (ref::config('showBacktrace')) {
+      $traces = debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS);
+      if (isset($traces[2])) {
+        $trace = $traces[2];
+        $this->out .= ' - ' . $trace['file'] . ':' . $trace['line'];
+      }
+    }
+
     $this->out .= "\n" . str_repeat('=', strlen($this->out)) . "\n";
   }                    
  

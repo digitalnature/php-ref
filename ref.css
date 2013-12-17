@@ -145,6 +145,10 @@
   border-bottom: 1px solid #fff;  
 }
 
+.ref [data-backtrace]{
+  float: right;
+}
+
 .ref [data-output]{
   background: #f9f9f9;        
   border: 1px solid #eee;
