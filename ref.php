@@ -2467,7 +2467,7 @@ class RHtmlFormatter extends RFormatter{
 
     if(ref::config('stylePath') !== false){
       ?>
-      <style scoped>
+      <style>
         <?php readfile(str_replace('{:dir}', __DIR__, ref::config('stylePath'))); ?>
       </style>
       <?php
