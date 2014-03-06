@@ -1388,7 +1388,7 @@ class ref{
               if($nfo['http_code']){
                 $this->fmt->startContain('url', true);
                 $contentType = explode(';', $nfo['content_type']);
-                $this->fmt->text('url', sprintf('%s:%d %s %.2fms (%d)', !empty($nfo['primary_ip']) ? $nfo['primary_ip'] : null, $nfo['primary_port'], $contentType[0], $nfo['total_time'], $nfo['http_code']));
+                $this->fmt->text('url', sprintf('%s:%d %s %.2fms (%d)', !empty($nfo['primary_ip']) ? $nfo['primary_ip'] : null, !empty($nfo['primary_port']) ? $nfo['primary_port'] : null, $contentType[0], $nfo['total_time'], $nfo['http_code']));
                 $this->fmt->endContain();
               }
 
