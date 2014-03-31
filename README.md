@@ -1,4 +1,3 @@
-
 REF, or `r()` is a nicer alternative to PHP's [`print_r`](http://php.net/manual/en/function.print-r.php) / [`var_dump`](http://php.net/manual/en/function.var-dump.php) functions.
 
 ## [DEMO](http://dev.digitalnature.eu/php-ref/) ##
@@ -8,11 +7,31 @@ REF, or `r()` is a nicer alternative to PHP's [`print_r`](http://php.net/manual/
 - (server) PHP 5.3+ (5.4+  displays additional info)
 - (client) Any browser, except IE 8 and lower of course
 
+## Installation using Composer
+
+Add REF to your `composer.json`:
+
+```js
+{
+    "require": {
+        "digitalnature/php-ref": "dev-master"
+    }
+}
+```
+
+Now tell composer to download the bundle by running:
+
+``` bash
+$ php composer.phar update digitalnature/php-ref
+```
+
+Composer will install the bundle to the directory `vendor/digitalnature`.
+
 ## Usage ##
 
 Basic example:
        
-    // include the class
+    // include the class (not needed if project runs with Composer because it's auto-loaded)
     require '/full/path/to/ref.php';
 
     // display info about defined classes
