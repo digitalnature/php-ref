@@ -154,6 +154,9 @@ class ref{
                 // javascript path (for HTML only);
                 // 'false' means no js                      
                 'scriptPath'           => '{:dir}/ref.js',
+
+                // display url info via cURL
+                'showUrls'           => true,
               ),
 
     /**
@@ -1378,7 +1381,7 @@ class ref{
           if(!$isNumeric && ($length > 4)){
 
             // url
-            if(static::$env['curlActive'] && filter_var($subject, FILTER_VALIDATE_URL)){
+            if(static::$config['showUrls'] &&static::$env['curlActive'] && filter_var($subject, FILTER_VALIDATE_URL)){
               $ch = curl_init($subject);
               curl_setopt($ch, CURLOPT_NOBODY, true);
               curl_exec($ch);
@@ -1388,7 +1391,7 @@ class ref{
               if($nfo['http_code']){
                 $this->fmt->startContain('url', true);
                 $contentType = explode(';', $nfo['content_type']);
-                $this->fmt->text('url', sprintf('%s:%d %s %.2fms (%d)', $nfo['primary_ip'], $nfo['primary_port'], $contentType[0], $nfo['total_time'], $nfo['http_code']));
+                $this->fmt->text('url', sprintf('%s:%d %s %.2fms (%d)', !empty($nfo['primary_ip']) ? $nfo['primary_ip'] : null, !empty($nfo['primary_port']) ? $nfo['primary_port'] : null, $contentType[0], $nfo['total_time'], $nfo['http_code']));
                 $this->fmt->endContain();
               }
 

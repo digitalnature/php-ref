@@ -78,6 +78,7 @@ Currently available options and their default values:
 | `'shortcutFunc'`          | `array('r', 'rt')`  | Shortcut functions used to detect the input expression. If they are namespaced, the namespace must be present as well (methods are not  supported) 
 | `'stylePath'`             | `'{:dir}/ref.css'`  | Local path to a custom stylesheet (HTML only); `FALSE` means that no CSS is included.
 | `'scriptPath'`            | `'{:dir}/ref.js'`   | Local path to a custom javascript (HTML only); `FALSE` means no javascript (tooltips / toggle / kbd shortcuts require JS)
+| `'showUrls'`              | `TRUE`              | Gets information about URLs. Setting to false can improve performance (requires showStringMatches to be TRUE)
 
 
 ## Similar projects
