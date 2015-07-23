@@ -157,6 +157,9 @@ class ref{
 
                 // display url info via cURL
                 'showUrls'           => true,
+
+                // the level of indirection for the debug_backtrace print (by defaut: 2)
+                'backtraceIndirection'  => 2
               ),
 
     /**
@@ -195,7 +198,7 @@ class ref{
       if(!class_exists($format, false))
         throw new \Exception(sprintf('%s class not found', $format));
 
-      $this->fmt = new $format();
+      $this->fmt = new $format(static::$config);
     }
 
     if(static::$env)
@@ -2005,6 +2008,17 @@ class ref{
  */ 
 abstract class RFormatter{
 
+  protected $config;
+
+  /**
+   * Formatter constructor, gets the Ref configuration array for further use
+   *
+   * @param   array $config
+   */
+  public function __construct(array $config){
+    $this->config = $config;
+  }
+
   /**
    * Flush output and send contents to the output device
    */ 
@@ -2203,7 +2217,9 @@ class RHtmlFormatter extends RFormatter{
      */    
     $didAssets = false;
 
-
+  public function __construct(array $config){
+    parent::__construct($config);
+  }
 
   public function flush(){
     print $this->out;
@@ -2376,8 +2392,8 @@ class RHtmlFormatter extends RFormatter{
   public function endExp(){
     if (ref::config('showBacktrace')) {
       $traces = debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS);
-      if (isset($traces[2])) {
-        $trace = $traces[2];
+      if (isset($traces[$this->config['backtraceIndirection']])) {
+        $trace = $traces[$this->config['backtraceIndirection']];
         $this->out .= '<span data-backtrace>' . $trace['file'] . ':' . $trace['line'] . '</span>';
       }
     }
@@ -2541,7 +2557,9 @@ class RTextFormatter extends RFormatter{
     $lastLineSt = 0,
     $levelPad   = array(0);
 
-
+  public function __construct(array $config){
+    parent::__construct($config);
+  }
 
   public function flush(){
     print $this->out;    
@@ -2665,8 +2683,8 @@ class RTextFormatter extends RFormatter{
   public function endExp(){
     if (ref::config('showBacktrace')) {
       $traces = debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS);
-      if (isset($traces[2])) {
-        $trace = $traces[2];
+      if (isset($traces[$this->config['backtraceIndirection']])) {
+        $trace = $traces[$this->config['backtraceIndirection']];
         $this->out .= ' - ' . $trace['file'] . ':' . $trace['line'];
       }
     }
