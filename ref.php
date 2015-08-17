@@ -762,6 +762,34 @@ class ref{
 
 
   /**
+   * Get relevant backtrace info for last ref call
+   *   
+   * @return  array|false
+   */
+  public static function getBacktrace(){
+
+    // pull only basic info with php 5.3.6+ to save some memory
+    $trace = defined('DEBUG_BACKTRACE_IGNORE_ARGS') ? debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS) : debug_backtrace();
+
+    while($callee = array_pop($trace)){
+
+      // extract only the information we neeed
+      $callee = array_intersect_key($callee, array_fill_keys(array('file', 'function', 'line'), false));
+      extract($callee, EXTR_OVERWRITE);
+
+      // skip, if the called function doesn't match the shortcut function name
+      if(!$function || !preg_grep("/{$function}/i" , static::$config['shortcutFunc']))
+        continue;
+
+      return compact('file', 'function', 'line');
+    }
+
+    return false;
+  }
+
+
+
+  /**
    * Determines the input expression(s) passed to the shortcut function
    *
    * @param   array &$options   Optional, options to gather (from operators)
@@ -773,104 +801,95 @@ class ref{
     // if more queries calls were made on the same line
     static $lineInst = array();
 
-    // pull only basic info with php 5.3.6+ to save some memory
-    $trace = defined('DEBUG_BACKTRACE_IGNORE_ARGS') ? debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS) : debug_backtrace();
-    
-    while($callee = array_pop($trace)){
+    $trace = static::getBacktrace();
 
-      // extract only the information we neeed
-      $callee = array_intersect_key($callee, array_fill_keys(array('file', 'function', 'line'), false));
-      extract($callee);
+    if(!$trace)
+      return array();
 
-      // skip, if the called function doesn't match the shortcut function name
-      if(!$function || !preg_grep("/{$function}/i" , static::$config['shortcutFunc']))
+    extract($trace);
+
+    $code     = file($file);
+    $code     = $code[$line - 1]; // multiline expressions not supported!
+    $instIndx = 0;
+    $tokens   = token_get_all("<?php {$code}");
+
+    // locate the caller position in the line, and isolate argument tokens
+    foreach($tokens as $i => $token){
+
+      // match token with our shortcut function name
+      if(is_string($token) || ($token[0] !== T_STRING) || (strcasecmp($token[1], $function) !== 0))
         continue;
 
-      if(!$line || !$file)
-        return array();
-    
-      $code     = file($file);
-      $code     = $code[$line - 1]; // multiline expressions not supported!
-      $instIndx = 0;
-      $tokens   = token_get_all("<?php {$code}");
+      // is this some method that happens to have the same name as the shortcut function?
+      if(isset($tokens[$i - 1]) && is_array($tokens[$i - 1]) && in_array($tokens[$i - 1][0], array(T_DOUBLE_COLON, T_OBJECT_OPERATOR), true))
+        continue;
 
-      // locate the caller position in the line, and isolate argument tokens
-      foreach($tokens as $i => $token){
+      // find argument definition start, just after '('
+      if(isset($tokens[$i + 1]) && ($tokens[$i + 1][0] === '(')){
+        $instIndx++;
 
-        // match token with our shortcut function name
-        if(is_string($token) || ($token[0] !== T_STRING) || (strcasecmp($token[1], $function) !== 0))
+        if(!isset($lineInst[$line]))
+          $lineInst[$line] = 0;
+
+        if($instIndx <= $lineInst[$line])
           continue;
 
-        // is this some method that happens to have the same name as the shortcut function?
-        if(isset($tokens[$i - 1]) && is_array($tokens[$i - 1]) && in_array($tokens[$i - 1][0], array(T_DOUBLE_COLON, T_OBJECT_OPERATOR), true))
-          continue;
+        $lineInst[$line]++;
 
-        // find argument definition start, just after '('
-        if(isset($tokens[$i + 1]) && ($tokens[$i + 1][0] === '(')){
-          $instIndx++;
+        // gather options
+        if($options !== null){
+          $j = $i - 1;
+          while(isset($tokens[$j]) && is_string($tokens[$j]) && in_array($tokens[$j], array('@', '+', '-', '!', '~')))
+            $options[] = $tokens[$j--];
+        }  
+       
+        $lvl = $index = $curlies = 0;
+        $expressions = array();
 
-          if(!isset($lineInst[$line]))
-            $lineInst[$line] = 0;
+        // get the expressions
+        foreach(array_slice($tokens, $i + 2) as $token){
 
-          if($instIndx <= $lineInst[$line])
+          if(is_array($token)){
+            if($token[0] !== T_COMMENT)
+              $expressions[$index][] = ($token[0] !== T_WHITESPACE) ? $token[1] : ' ';
+
             continue;
-
-          $lineInst[$line]++;
-
-          // gather options
-          if($options !== null){
-            $j = $i - 1;
-            while(isset($tokens[$j]) && is_string($tokens[$j]) && in_array($tokens[$j], array('@', '+', '-', '!', '~')))
-              $options[] = $tokens[$j--];
-          }  
-         
-          $lvl = $index = $curlies = 0;
-          $expressions = array();
-
-          // get the expressions
-          foreach(array_slice($tokens, $i + 2) as $token){
-
-            if(is_array($token)){
-              if($token[0] !== T_COMMENT)
-                $expressions[$index][] = ($token[0] !== T_WHITESPACE) ? $token[1] : ' ';
-
-              continue;
-            }
-
-            if($token === '{')
-              $curlies++;
-
-            if($token === '}')
-              $curlies--;        
-
-            if($token === '(')
-              $lvl++;
-
-            if($token === ')')
-              $lvl--;
-
-            // assume next argument if a comma was encountered,
-            // and we're not insde a curly bracket or inner parentheses
-            if(($curlies < 1) && ($lvl === 0) && ($token === ',')){
-              $index++;
-              continue;
-            }  
-
-            // negative parentheses count means we reached the end of argument definitions
-            if($lvl < 0){         
-              foreach($expressions as &$expression)
-                $expression = trim(implode('', $expression));
-
-              return $expressions;
-            }
-
-            $expressions[$index][] = $token;      
           }
 
-          break;
-        }    
-      }     
-    }
+          if($token === '{')
+            $curlies++;
+
+          if($token === '}')
+            $curlies--;        
+
+          if($token === '(')
+            $lvl++;
+
+          if($token === ')')
+            $lvl--;
+
+          // assume next argument if a comma was encountered,
+          // and we're not insde a curly bracket or inner parentheses
+          if(($curlies < 1) && ($lvl === 0) && ($token === ',')){
+            $index++;
+            continue;
+          }  
+
+          // negative parentheses count means we reached the end of argument definitions
+          if($lvl < 0){         
+            foreach($expressions as &$expression)
+              $expression = trim(implode('', $expression));
+
+            return $expressions;
+          }
+
+          $expressions[$index][] = $token;      
+        }
+
+        break;
+      }    
+    }     
+
   }
 
 
@@ -2387,13 +2406,8 @@ class RHtmlFormatter extends RFormatter{
   }                    
 
   public function endExp(){
-    if(ref::config('showBacktrace')) {
-      $traces = defined('DEBUG_BACKTRACE_IGNORE_ARGS') ? debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS) : debug_backtrace();
-      if (isset($traces[2])) {
-        $trace = $traces[2];
-        $this->out .= '<span data-backtrace>' . $trace['file'] . ':' . $trace['line'] . '</span>';
-      }
-    }
+    if(ref::config('showBacktrace') && ($trace = ref::getBacktrace()))
+      $this->out .= '<span data-backtrace>' . $trace['file'] . ':' . $trace['line'] . '</span>';
 
     $this->out .= '</span><span data-output>';
   } 
@@ -2676,13 +2690,9 @@ class RTextFormatter extends RFormatter{
   }      
 
   public function endExp(){
-    if(ref::config('showBacktrace')) {
-      $traces = defined('DEBUG_BACKTRACE_IGNORE_ARGS') ? debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS) : debug_backtrace();
-      if (isset($traces[2])) {
-        $trace = $traces[2];
-        $this->out .= ' - ' . $trace['file'] . ':' . $trace['line'];
-      }
-    }
+
+    if(ref::config('showBacktrace') && ($trace = ref::getBacktrace()))
+      $this->out .= ' - ' . $trace['file'] . ':' . $trace['line'];
 
     $this->out .= "\n" . str_repeat('=', strlen($this->out)) . "\n";
   }                    
