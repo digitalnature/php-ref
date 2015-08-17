@@ -27,7 +27,7 @@ function r(){
     $expressions = null;
 
   // IE goes funky if there's no doctype
-  if(!$capture && !headers_sent() && !ob_get_level())
+  if(!$capture && !headers_sent() && (!ob_get_level() || ini_get('output_buffering')))
     print '<!DOCTYPE HTML><html><head><title>REF</title><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" /></head><body>';
 
   if($capture)
@@ -156,7 +156,7 @@ class ref{
                 'scriptPath'           => '{:dir}/ref.js',
 
                 // display url info via cURL
-                'showUrls'           => true,
+                'showUrls'           => false,
               ),
 
     /**
@@ -185,6 +185,19 @@ class ref{
    * @param   string|RFormatter $format      Output format ID, or formatter instance defaults to 'html'
    */
   public function __construct($format = 'html'){
+
+    static $didIni = false;
+
+    if(!$didIni){
+      $didIni = true;
+      foreach(array_keys(static::$config) as $key){
+        $iniVal = get_cfg_var('ref.' . $key);
+        print_r($iniVal);
+        if($iniVal !== false)
+          static::$config[$key] = $iniVal;
+      }
+
+    }
 
     if($format instanceof RFormatter){
       $this->fmt = $format;
@@ -1381,7 +1394,7 @@ class ref{
           if(!$isNumeric && ($length > 4)){
 
             // url
-            if(static::$config['showUrls'] &&static::$env['curlActive'] && filter_var($subject, FILTER_VALIDATE_URL)){
+            if(static::$config['showUrls'] && static::$env['curlActive'] && filter_var($subject, FILTER_VALIDATE_URL)){
               $ch = curl_init($subject);
               curl_setopt($ch, CURLOPT_NOBODY, true);
               curl_exec($ch);
@@ -2374,8 +2387,8 @@ class RHtmlFormatter extends RFormatter{
   }                    
 
   public function endExp(){
-    if (ref::config('showBacktrace')) {
-      $traces = debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS);
+    if(ref::config('showBacktrace')) {
+      $traces = defined('DEBUG_BACKTRACE_IGNORE_ARGS') ? debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS) : debug_backtrace();
       if (isset($traces[2])) {
         $trace = $traces[2];
         $this->out .= '<span data-backtrace>' . $trace['file'] . ':' . $trace['line'] . '</span>';
@@ -2663,8 +2676,8 @@ class RTextFormatter extends RFormatter{
   }      
 
   public function endExp(){
-    if (ref::config('showBacktrace')) {
-      $traces = debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS);
+    if(ref::config('showBacktrace')) {
+      $traces = defined('DEBUG_BACKTRACE_IGNORE_ARGS') ? debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS) : debug_backtrace();
       if (isset($traces[2])) {
         $trace = $traces[2];
         $this->out .= ' - ' . $trace['file'] . ':' . $trace['line'];

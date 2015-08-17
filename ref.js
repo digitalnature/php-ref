@@ -48,7 +48,8 @@ window.addEventListener('load', function(){
 });
 
 window.addEventListener('keydown', function(e){
-  if((e.keyCode != 88) || (e.target.tagName.toLowerCase() == 'input') || (e.target.tagName.toLowerCase() == 'textarea'))
+  var tt = e.target.tagName.toLowerCase();
+  if((e.keyCode != 88) || (tt == 'input') || (tt == 'textarea') || (tt == 'select'))
     return;
 
   var kbds = document.querySelectorAll('.ref [data-toggle]'),

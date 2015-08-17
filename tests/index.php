@@ -9,6 +9,7 @@
 
     ref::config('showPrivateMembers', true);
     ref::config('showIteratorContents', true);
+    ref::config('showUrls', true);
 
     /**
      * Test class
