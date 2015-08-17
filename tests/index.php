@@ -10,6 +10,9 @@
     ref::config('showPrivateMembers', true);
     ref::config('showIteratorContents', true);
     ref::config('showUrls', true);
+	ref::config('showBacktrace', false);
+
+
 
     /**
      * Test class
