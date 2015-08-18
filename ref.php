@@ -1145,10 +1145,7 @@ class ref{
    * @param   bool $specialStr  Should this be interpreted as a special string?
    * @return  mixed             Result (both HTML and text modes generate strings)
    */
-  protected function evaluate(&$subject, $specialStr = false){
-
-    if($this->hasInstanceTimedOut())
-      return;    
+  protected function evaluate(&$subject, $specialStr = false){    
 
     switch($type = gettype($subject)){
 
