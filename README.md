@@ -85,6 +85,7 @@ Currently available options and their default values:
 | `'stylePath'`             | `'{:dir}/ref.css'`  | Local path to a custom stylesheet (HTML only); `FALSE` means that no CSS is included.
 | `'scriptPath'`            | `'{:dir}/ref.js'`   | Local path to a custom javascript (HTML only); `FALSE` means no javascript (tooltips / toggle / kbd shortcuts require JS)
 | `'showUrls'`              | `FALSE`             | Gets information about URLs. Setting to false can improve performance (requires showStringMatches to be TRUE)
+| `'timeout'`               | `10`                | Stop execution after this amount of seconds, forcing an incomplete listing. Applies to all calls
 
 
 ## Similar projects

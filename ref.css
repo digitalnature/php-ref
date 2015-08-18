@@ -461,3 +461,13 @@
   background: #00ff00;
   color: #2c8e24;
 }
+
+
+.ref [data-error]{
+  background: #CC0033;
+  color: #fff;
+  border-radius: 0 0 4px 4px;
+  padding: 2px 5px;  
+  margin: 0 0 4px;
+  display: block;
+}

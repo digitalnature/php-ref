@@ -105,7 +105,7 @@ class ref{
      *
      * @var  array
      */   
-    $time   = 0,
+    $time = 0,
 
     /**
      * Configuration (+ default values)
@@ -156,7 +156,10 @@ class ref{
                 'scriptPath'           => '{:dir}/ref.js',
 
                 // display url info via cURL
-                'showUrls'           => false,
+                'showUrls'             => false,
+
+                // stop evaluation after this amount of time (seconds)
+                'timeout'              => 10,
               ),
 
     /**
@@ -165,7 +168,14 @@ class ref{
      *
      * @var  array
      */ 
-    $env = array();
+    $env = array(),
+
+    /**
+     * Timeout point
+     *
+     * @var  bool
+     */ 
+    $timeout = -1;    
 
 
   protected
@@ -175,7 +185,14 @@ class ref{
      *
      * @var  RFormatter
      */     
-    $fmt = null;
+    $fmt = null,
+
+    /**
+     * Start time of the current instance
+     *
+     * @var  float
+     */ 
+    $startTime = 0;
 
 
 
@@ -268,17 +285,20 @@ class ref{
    */
   public function query($subject, $expression = null){
 
-    $startTime = microtime(true);
+    if(static::$timeout > 0)
+      return;
+
+    $this->startTime = microtime(true);
     
     $this->fmt->startRoot();
     $this->fmt->startExp();
     $this->evaluateExp($expression);
-    $this->fmt->endExp();    
+    $this->fmt->endExp();
     $this->evaluate($subject);    
-    $this->fmt->endRoot();        
+    $this->fmt->endRoot();
     $this->fmt->flush();
-    
-    static::$time += microtime(true) - $startTime;     
+
+    static::$time += microtime(true) - $this->startTime;     
   }
 
 
@@ -1097,6 +1117,26 @@ class ref{
   }
 
 
+  public static function getTimeoutPoint(){
+    return static::$timeout;
+  }
+
+
+
+  protected function hasInstanceTimedOut(){
+
+    if(static::$timeout > 0)
+      return true;
+
+    $timeout = static::$config['timeout'];
+
+    if(($timeout > 0) && ((microtime(true) - $this->startTime) > $timeout))
+      return (static::$timeout = (microtime(true) - $this->startTime));
+
+    return false;
+  }
+
+
 
   /**
    * Evaluates the given variable
@@ -1106,6 +1146,9 @@ class ref{
    * @return  mixed             Result (both HTML and text modes generate strings)
    */
   protected function evaluate(&$subject, $specialStr = false){
+
+    if($this->hasInstanceTimedOut())
+      return;    
 
     switch($type = gettype($subject)){
 
@@ -1146,6 +1189,7 @@ class ref{
         // first recursion level detection;
         // this is optional (used to print consistent recursion info)
         foreach($subject as $key => &$value){
+
           if(!is_array($value))
             continue;
 
@@ -1179,7 +1223,10 @@ class ref{
           
           // ignore our temporary marker
           if($key === static::MARKER_KEY)
-            continue;      
+            continue;
+
+          if($this->hasInstanceTimedOut())
+            break;
 
           $keyInfo = gettype($key);
 
@@ -1277,8 +1324,12 @@ class ref{
 
           // mysql result
           case 'mysql result':
-            while($row = @mysql_fetch_object($subject))
+            while($row = @mysql_fetch_object($subject)){              
               $meta[] = (array)$row;
+
+              if($this->hasInstanceTimedOut())
+                break;
+            }
 
           break;
 
@@ -1311,7 +1362,6 @@ class ref{
 
       // string      
       case 'string':
-
         $length   = static::strLen($subject);       
         $encoding = static::$env['mbStr'] ? mb_detect_encoding($subject) : false;      
         $info     = $encoding && ($encoding !== 'ASCII') ? $length . '; ' . $encoding : $length;
@@ -1713,6 +1763,9 @@ class ref{
 
       foreach($props as $idx => $prop){
 
+        if($this->hasInstanceTimedOut())
+          break;
+
         $bubbles     = array();
         $sourceClass = $prop->getDeclaringClass();
         $inherited   = $reflector->getShortName() !== $sourceClass->getShortName();
@@ -1767,7 +1820,7 @@ class ref{
     }    
 
     // class methods
-    if($methods){
+    if($methods && !$this->hasInstanceTimedOut()){
 
       $this->fmt->sectionTitle('Methods');  
       foreach($methods as $idx => $method){
@@ -2413,7 +2466,7 @@ class RHtmlFormatter extends RFormatter{
   } 
 
   public function startRoot(){
-    $this->out .= '<!-- ref#' . static::$counter++ . ' --><div>' . static::getAssets() . '<div class="ref">';
+    $this->out .= '<!-- ref#' . ++static::$counter . ' --><div>' . static::getAssets() . '<div class="ref">';
   }                    
 
   public function endRoot(){
@@ -2477,7 +2530,10 @@ class RHtmlFormatter extends RFormatter{
         $this->out .= "<div>{$tip}</div>";
     }
 
-    $this->out .= '</div></div><!-- /ref#' . static::$counter . ' -->';    
+    if(($timeout = ref::getTimeoutPoint()) > 0)
+      $this->out .= sprintf('<span data-error>Listing incomplete. Timed-out after %4.2fs</span>', $timeout);
+
+    $this->out .= '</div></div><!-- /ref#' . static::$counter . ' -->';        
   }
 
 
@@ -2699,10 +2755,13 @@ class RTextFormatter extends RFormatter{
  
   public function startRoot(){
     $this->out .= "\n\n";
+
   }                    
 
   public function endRoot(){
     $this->out .= "\n"; 
+    if(($timeout = ref::getTimeoutPoint()) > 0)
+      $this->out .= sprintf("\n-- Listing incomplete. Timed-out after %4.2fs -- \n", $timeout);    
   }
 
 }
