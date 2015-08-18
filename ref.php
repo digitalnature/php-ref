@@ -239,6 +239,9 @@ class ref{
       // php 5.4.6+ ?
       'is546'        => version_compare(PHP_VERSION, '5.4.6') >= 0,      
 
+      // php 5.6+
+      'is56'         => version_compare(PHP_VERSION, '5.6') >= 0,      
+
       // curl extension running?
       'curlActive'   => function_exists('curl_version'),      
 
@@ -1872,9 +1875,13 @@ class ref{
           $meta      = null;
           $paramName = "\${$parameter->name}";
           $optional  = $parameter->isOptional();
+          $variadic  = static::$env['is56'] && $parameter->isVariadic();
 
           if($parameter->isPassedByReference())
             $paramName = "&{$paramName}";
+
+          if($variadic)
+            $paramName = "...{$paramName}";
 
           $type = array('param');
 

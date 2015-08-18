@@ -1,5 +1,5 @@
 .ref{
-  font: normal normal 12px/18px Consolas, Monaco, Andale Mono, Courier New, monospace;  
+  font: normal normal 12px/18px Consolas, "Liberation Mono", Menlo, "Courier New", Courier, monospace;
   color: #333;
 }
 
@@ -461,7 +461,6 @@
   background: #00ff00;
   color: #2c8e24;
 }
-
 
 .ref [data-error]{
   background: #CC0033;
