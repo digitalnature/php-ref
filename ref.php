@@ -801,7 +801,7 @@ class ref{
       extract($callee, EXTR_OVERWRITE);
 
       // skip, if the called function doesn't match the shortcut function name
-      if(!$function || !preg_grep("/{$function}/i" , static::$config['shortcutFunc']))
+      if(!$function || !in_array(mb_strtolower((string)$function), static::$config['shortcutFunc']))
         continue;
 
       return compact('file', 'function', 'line');
