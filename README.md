@@ -94,6 +94,7 @@ Currently available options and their default values:
 - [dump_r](https://github.com/leeoniya/dump_r.php)
 - [Krumo](http://sourceforge.net/projects/krumo/)
 - [dBug](http://dbug.ospinto.com/)
+- [symfony-vardumper] (http://www.sitepoint.com/var_dump-introducing-symfony-vardumper/)
 
 
 ## TODOs
