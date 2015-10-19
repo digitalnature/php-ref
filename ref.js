@@ -53,9 +53,18 @@ window.addEventListener('keydown', function(e){
     return;
 
   var kbds = document.querySelectorAll('.ref [data-toggle]'),
-      partlyExp = document.querySelectorAll('.ref [data-toggle][data-exp]').length !== kbds.length;
+      partlyExp = document.querySelectorAll('.ref [data-toggle][data-exp]').length !== kbds.length,
+      _ref = document.querySelectorAll('.ref')[0];
 
   e.preventDefault();
-  for(var i = 0, m = kbds.length; i < m; i++)
-    partlyExp ? (kbds[i].dataset.exp = 1) : (delete kbds[i].dataset.exp);
+  if( e.ctrlKey && e.keyCode == 88 ){
+    if( _ref.style.display == 'none' ){
+      _ref.style.display = 'block';
+    }else{
+      _ref.style.display = 'none';      
+    }    
+  }else{    
+    for(var i = 0, m = kbds.length; i < m; i++)
+      partlyExp ? (kbds[i].dataset.exp = 1) : (delete kbds[i].dataset.exp);    
+  }
 });
