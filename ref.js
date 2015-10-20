@@ -48,23 +48,29 @@ window.addEventListener('load', function(){
 });
 
 window.addEventListener('keydown', function(e){
+
   var tt = e.target.tagName.toLowerCase();
   if((e.keyCode != 88) || (tt == 'input') || (tt == 'textarea') || (tt == 'select'))
     return;
 
   var kbds = document.querySelectorAll('.ref [data-toggle]'),
-      partlyExp = document.querySelectorAll('.ref [data-toggle][data-exp]').length !== kbds.length,
-      _ref = document.querySelectorAll('.ref')[0];
-
+      partlyExp = document.querySelectorAll('.ref [data-toggle][data-exp]').length !== kbds.length,      
+      _ref = document.querySelectorAll('.ref');      
+  
+  
   e.preventDefault();
-  if( e.ctrlKey && e.keyCode == 88 ){
-    if( _ref.style.display == 'none' ){
-      _ref.style.display = 'block';
-    }else{
-      _ref.style.display = 'none';      
+
+  if( e.ctrlKey && e.keyCode == 88 ){    
+    for(var i = 0, m = _ref.length; i < m; i++){
+      if( _ref[i].style.display == 'none' ){
+        _ref[i].style.display = 'block';
+      }else{
+        _ref[i].style.display = 'none';      
+      }     
     }    
-  }else{    
+  }else{      
     for(var i = 0, m = kbds.length; i < m; i++)
       partlyExp ? (kbds[i].dataset.exp = 1) : (delete kbds[i].dataset.exp);    
   }
+  
 });
