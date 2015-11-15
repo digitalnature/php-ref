@@ -86,7 +86,7 @@ Currently available options and their default values:
 | `'scriptPath'`            | `'{:dir}/ref.js'`   | Local path to a custom javascript (HTML only); `FALSE` means no javascript (tooltips / toggle / kbd shortcuts require JS)
 | `'showUrls'`              | `FALSE`             | Gets information about URLs. Setting to false can improve performance (requires showStringMatches to be TRUE)
 | `'timeout'`               | `10`                | Stop execution after this amount of seconds, forcing an incomplete listing. Applies to all calls
-
+| `'validHtml'`             | `FALSE`             | For HTML mode only. Whether to produce W3C-valid HTML (larger code output) or unintelligible, potentially browser-incompatible but much smaller code output
 
 ## Similar projects
 
@@ -94,7 +94,7 @@ Currently available options and their default values:
 - [dump_r](https://github.com/leeoniya/dump_r.php)
 - [Krumo](http://sourceforge.net/projects/krumo/)
 - [dBug](http://dbug.ospinto.com/)
-- [symfony-vardumper] (http://www.sitepoint.com/var_dump-introducing-symfony-vardumper/)
+- [symfony-vardumper](http://www.sitepoint.com/var_dump-introducing-symfony-vardumper/)
 
 
 ## TODOs

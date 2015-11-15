@@ -45,32 +45,29 @@ window.addEventListener('load', function(){
 
   tip.id = 'rTip';
   document.body.appendChild(tip);
-});
 
-window.addEventListener('keydown', function(e){
+  window.addEventListener('keydown', function(e){
+    if((e.keyCode != 88) || (['input', 'textarea', 'select'].indexOf(e.target.tagName.toLowerCase()) > -1))
+      return;
 
-  var tt = e.target.tagName.toLowerCase();
-  if((e.keyCode != 88) || (tt == 'input') || (tt == 'textarea') || (tt == 'select'))
-    return;
+    e.preventDefault();
 
-  var kbds = document.querySelectorAll('.ref [data-toggle]'),
-      partlyExp = document.querySelectorAll('.ref [data-toggle][data-exp]').length !== kbds.length,      
-      _ref = document.querySelectorAll('.ref');      
-  
-  
-  e.preventDefault();
+    if(e.ctrlKey && e.keyCode == 88){
+      var d = refs[0].style.display !== 'none' ? 'none' : 'block';
+      for(var i = 0, n = refs.length; i < n; i++)
+        refs[i].style.display = d;
 
-  if( e.ctrlKey && e.keyCode == 88 ){    
-    for(var i = 0, m = _ref.length; i < m; i++){
-      if( _ref[i].style.display == 'none' ){
-        _ref[i].style.display = 'block';
-      }else{
-        _ref[i].style.display = 'none';      
-      }     
-    }    
-  }else{      
-    for(var i = 0, m = kbds.length; i < m; i++)
+      return;
+    }
+
+    var kbds = document.querySelectorAll('.ref [data-toggle]'),
+        m = kbds.length,
+        partlyExp = document.querySelectorAll('.ref [data-toggle][data-exp]').length !== m;
+
+    for(var i = 0; i < m; i++)
       partlyExp ? (kbds[i].dataset.exp = 1) : (delete kbds[i].dataset.exp);    
-  }
-  
+
+  });
+
 });
+

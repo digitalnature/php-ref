@@ -15,8 +15,6 @@ function r(){
   // this variable gets passed as reference to getInputExpressions(), which will store the operators in it
   $options = array();
 
-  $ref = new ref('html');
-
   // names of the arguments that were passed to this function
   $expressions = ref::getInputExpressions($options);
   $capture = in_array('@', $options, true);
@@ -26,9 +24,14 @@ function r(){
   if(func_num_args() !== count($expressions))
     $expressions = null;
 
+  // use HTML formatter only if we're not in CLI mode, or if return was requested
+  $format = (php_sapi_name() !== 'cli') || $capture ? 'html' : 'cliText';
+
   // IE goes funky if there's no doctype
-  if(!$capture && !headers_sent() && (!ob_get_level() || ini_get('output_buffering')))
+  if(!$capture && ($format === 'html') && !headers_sent() && (!ob_get_level() || ini_get('output_buffering')))
     print '<!DOCTYPE HTML><html><head><title>REF</title><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" /></head><body>';
+
+  $ref = new ref($format);
 
   if($capture)
     ob_start();
@@ -41,7 +44,7 @@ function r(){
     return ob_get_clean();
   
   // stop the script if this function was called with the bitwise not operator
-  if(in_array('~', $options, true)){
+  if(in_array('~', $options, true) && ($format === 'html')){
     print '</body></html>';
     exit(0);
   }  
@@ -60,8 +63,8 @@ function rt(){
   $options     = array();  
   $output      = '';
   $expressions = ref::getInputExpressions($options);
-  $ref         = new ref('text');
   $capture     = in_array('@', $options, true);  
+  $ref         = new ref((php_sapi_name() !== 'cli') || $capture ? 'text' : 'cliText');  
 
   if(func_num_args() !== count($expressions))
     $expressions = null;
@@ -160,6 +163,10 @@ class ref{
 
                 // stop evaluation after this amount of time (seconds)
                 'timeout'              => 10,
+
+                // whether to produce W3c-valid HTML,
+                // or unintelligible, but optimized markup that takes less space
+                'validHtml'            => false,
               ),
 
     /**
@@ -175,7 +182,14 @@ class ref{
      *
      * @var  bool
      */ 
-    $timeout = -1;    
+    $timeout = -1,
+
+    $debug = array(
+      'cacheHits' => 0,
+      'objects'   => 0,
+      'arrays'    => 0,
+      'scalars'   => 0,
+    );    
 
 
   protected
@@ -946,9 +960,12 @@ class ref{
 
     // @todo: test this
     $hash = var_export(func_get_args(), true);
+    //$hash = $reflector->getName() . ';' . $single . ';' . ($context ? $context->getName() : '');
 
-    if($this->fmt->didCache($hash))
+    if($this->fmt->didCache($hash)){
+      static::$debug['cacheHits']++;
       return;
+    }
 
     $items = array($reflector);
 
@@ -1122,6 +1139,11 @@ class ref{
 
   public static function getTimeoutPoint(){
     return static::$timeout;
+  }
+
+
+  public static function getDebugInfo(){
+    return static::$debug;
   }
 
 
@@ -1601,8 +1623,10 @@ class ref{
     }
 
     // check cache at this point
-    if(!$recursion && $this->fmt->didCache($hash))
+    if(!$recursion && $this->fmt->didCache($hash)){
+      static::$debug['cacheHits']++;
       return;        
+    }
   
     $reflector = new \ReflectionObject($subject);
     $this->fmt->startContain('class');
@@ -1675,6 +1699,7 @@ class ref{
         $this->fmt->sep('=>');
         $this->fmt->colDiv();
         $this->evaluate($value);
+        //$this->evaluate($value instanceof \Traversable ? ((count($value) > 0) ? $value : (string)$value) : $value);
         $this->fmt->endRow();
       }
     }        
@@ -2244,14 +2269,14 @@ class RHtmlFormatter extends RFormatter{
      *
      * @var  string
      */  
-    $out    = '',
+    $out = '',
 
     /**
      * Tracks current nesting level
      *
      * @var  int
      */  
-    $level  = 0,
+    $level = 0,
      
     /**
      * Stores tooltip content for all entries
@@ -2262,7 +2287,7 @@ class RHtmlFormatter extends RFormatter{
      *
      * @var  array
      */     
-    $tips   = array(),
+    $tips = array(),
 
     /**
      * Used to cache output to speed up processing.
@@ -2272,7 +2297,14 @@ class RHtmlFormatter extends RFormatter{
      *
      * @var  array
      */ 
-    $cache  = array();
+    $cache = array(),
+
+    /**
+     * Map of used HTML tag and attributes
+     *
+     * @var string
+     */
+    $def = array();
 
 
 
@@ -2283,7 +2315,7 @@ class RHtmlFormatter extends RFormatter{
      *
      * @var  int
      */   
-    $counter   = 0,
+    $counter = 0,
 
     /**
      * Tracks style/jscript inclusion state
@@ -2291,6 +2323,42 @@ class RHtmlFormatter extends RFormatter{
      * @var  bool
      */    
     $didAssets = false;
+
+
+  public function __construct(){
+
+    if(ref::config('validHtml')){
+
+      $this->def = array(
+        'base'   => 'span',
+        'tip'    => 'div',
+        'cell'   => 'data-cell',
+        'table'  => 'data-table',
+        'row'    => 'data-row',
+        'group'  => 'data-group',
+        'gLabel' => 'data-gLabel',
+        'match'  => 'data-match',
+        'tipRef' => 'data-tip',
+      );
+
+
+    }else{
+
+      $this->def = array(
+        'base'   => 'r',
+        'tip'    => 't',
+        'cell'   => 'c',
+        'table'  => 't',        
+        'row'    => 'r',        
+        'group'  => 'g',
+        'gLabel' => 'gl',
+        'match'  => 'm',
+        'tipRef' => 'h',
+      );
+
+    }
+
+  }
 
 
 
@@ -2306,7 +2374,7 @@ class RHtmlFormatter extends RFormatter{
 
     if(!isset($this->cache[$id])){
       $this->cache[$id] = array();
-      $this->cache[$id][] = strlen($this->out);      
+      $this->cache[$id][] = strlen($this->out);     
       return false;
     }
 
@@ -2315,7 +2383,7 @@ class RHtmlFormatter extends RFormatter{
       return false;
     }
 
-    $this->out .= substr($this->out, $this->cache[$id][0], $this->cache[$id][1]);    
+    $this->out .= substr($this->out, $this->cache[$id][0], $this->cache[$id][1]);
     return true;
   }
   
@@ -2355,20 +2423,20 @@ class RHtmlFormatter extends RFormatter{
       if($tipIdx === false)
         $tipIdx = array_push($this->tips, $meta) - 1;
 
-      $tip = ' data-tip="' . $tipIdx . '"';
+      $tip = " {$this->def['tipRef']}=\"{$tipIdx}\"";      
+      //$tip = sprintf('%s="%d"', $this->def['tipRef'], $tipIdx);
     }
 
     // wrap text in a link?
     if($uri !== null)
       $text = '<a href="' . $uri . '" target="_blank">' . $text . '</a>';
 
-    //$this->out .= ($type !== 'name') ? "<span data-{$type}{$tip}>{$text}</span>" : "<span{$tip}>{$text}</span>";   
-
     $typeStr = '';
     foreach($type as $part)
       $typeStr .= " data-{$part}";
 
-    $this->out .= "<span{$typeStr}{$tip}>{$text}</span>";
+    $this->out .= "<{$this->def['base']}{$typeStr}{$tip}>{$text}</{$this->def['base']}>";    
+    //$this->out .= sprintf('<%1$s%2$s %3$s>%4$s</%1$s>', $this->def['base'], $typeStr, $tip, $text);
   }
 
   public function startContain($type, $label = false){
@@ -2383,20 +2451,20 @@ class RHtmlFormatter extends RFormatter{
     foreach($type as $part)
       $typeStr .= " data-{$part}";
 
-    $this->out .= "<span{$typeStr}>";
+    $this->out .= "<{$this->def['base']}{$typeStr}>";
 
     if($label)
-      $this->out .= "<span data-match>{$type[0]}</span>";
+      $this->out .= "<{$this->def['base']} {$this->def['match']}>{$type[0]}</{$this->def['base']}>";
   }    
 
   public function endContain(){
-    $this->out .= '</span>';
+    $this->out .= "</{$this->def['base']}>";
   } 
 
   public function emptyGroup($prefix = ''){
 
     if($prefix !== '')
-      $prefix = '<span data-gLabel>' . static::escape($prefix) . '</span>';
+      $prefix = "<{$this->def['base']} {$this->def['gLabel']}>" . static::escape($prefix) . "</{$this->def['base']}>";
     
     $this->out .= "<i>(</i>{$prefix}<i>)</i>";
   }    
@@ -2417,32 +2485,32 @@ class RHtmlFormatter extends RFormatter{
     $exp = ($expLvl < 0) || (($expLvl > 0) && ($this->level <= $expLvl)) ? ' data-exp' : '';
     
     if($prefix !== '')
-      $prefix = '<span data-gLabel>' . static::escape($prefix) . '</span>';
+      $prefix = "<{$this->def['base']} {$this->def['gLabel']}>" . static::escape($prefix) . "</{$this->def['base']}>";
    
-    $this->out .= "<i>(</i>{$prefix}<span data-toggle{$exp}></span><span data-group><span data-table>";
+    $this->out .= "<i>(</i>{$prefix}<{$this->def['base']} data-toggle{$exp}></{$this->def['base']}><{$this->def['base']} {$this->def['group']}><{$this->def['base']} {$this->def['table']}>";
 
     return true;
   }
 
   public function endGroup(){
-    $this->out .= '</span></span><i>)</i>';
+    $this->out .= "</{$this->def['base']}></{$this->def['base']}><i>)</i>";
     $this->level--;
   }
  
   public function sectionTitle($title){
-    $this->out .= "</span><span data-tHead>{$title}</span><span data-table>";    
+    $this->out .= "</{$this->def['base']}><{$this->def['base']} data-tHead>{$title}</{$this->def['base']}><{$this->def['base']} {$this->def['table']}>";
   }
 
   public function startRow(){
-    $this->out .= '<span data-row><span data-cell>';
+    $this->out .= "<{$this->def['base']} {$this->def['row']}><{$this->def['base']} {$this->def['cell']}>";
   } 
 
   public function endRow(){
-    $this->out .= '</span></span>';
+    $this->out .= "</{$this->def['base']}></{$this->def['base']}>";
   } 
      
   public function colDiv($padLen = null){
-    $this->out .= '</span><span data-cell>';
+    $this->out .= "</{$this->def['base']}><{$this->def['base']} {$this->def['cell']}>";
   }   
 
   public function bubbles(array $items){
@@ -2450,23 +2518,23 @@ class RHtmlFormatter extends RFormatter{
     if(!$items)
       return;
 
-    $this->out .= '<span data-mod>';   
+    $this->out .= "<{$this->def['base']} data-mod>";   
 
     foreach($items as $info)
       $this->out .= $this->text('mod-' . strtolower($info[1]), $info[0], $info[1]);
 
-    $this->out .= '</span>';
+    $this->out .= "</{$this->def['base']}>";
   }      
       
   public function startExp(){
-    $this->out .= '<span data-input>';
+    $this->out .= "<{$this->def['base']} data-input>";
   }                    
 
   public function endExp(){
     if(ref::config('showBacktrace') && ($trace = ref::getBacktrace()))
-      $this->out .= '<span data-backtrace>' . $trace['file'] . ':' . $trace['line'] . '</span>';
+      $this->out .= "<{$this->def['base']} data-backtrace>{$trace['file']}:{$trace['line']}</{$this->def['base']}>";
 
-    $this->out .= '</span><span data-output>';
+    $this->out .= "</{$this->def['base']}><{$this->def['base']} data-output>";
   } 
 
   public function startRoot(){
@@ -2474,7 +2542,7 @@ class RHtmlFormatter extends RFormatter{
   }                    
 
   public function endRoot(){
-    $this->out .= '</span>';
+    $this->out .= "</{$this->def['base']}>";
 
     // process tooltips
     $tipHtml = '';
@@ -2496,10 +2564,10 @@ class RHtmlFormatter extends RFormatter{
       $cols = array();
 
       if($meta['left'])
-        $cols[] = "<span data-cell data-varType>{$meta['left']}</span>";
+        $cols[] = "<{$this->def['base']} {$this->def['cell']} data-varType>{$meta['left']}</{$this->def['base']}>";
 
-      $title = $meta['title'] ?       "<span data-title>{$meta['title']}</span>"       : '';
-      $desc  = $meta['description'] ? "<span data-desc>{$meta['description']}</span>"  : '';
+      $title = $meta['title'] ?       "<{$this->def['base']} data-title>{$meta['title']}</{$this->def['base']}>"       : '';
+      $desc  = $meta['description'] ? "<{$this->def['base']} data-desc>{$meta['description']}</{$this->def['base']}>"  : '';
       $tags  = '';
 
       foreach($meta['tags'] as $tag => $values){
@@ -2509,33 +2577,33 @@ class RHtmlFormatter extends RFormatter{
             unset($value[1]);
           }
 
-          $value  = is_array($value) ? implode('</span><span data-cell>', $value) : $value;
-          $tags  .= "<span data-row><span data-cell>@{$tag}</span><span data-cell>{$value}</span></span>";
+          $value  = is_array($value) ? implode("</{$this->def['base']}><{$this->def['base']} {$this->def['cell']}>", $value) : $value;
+          $tags  .= "<{$this->def['base']} {$this->def['row']}><{$this->def['base']} {$this->def['cell']}>@{$tag}</{$this->def['base']}><{$this->def['base']} {$this->def['cell']}>{$value}</{$this->def['base']}></{$this->def['base']}>";
         }
       }
 
       if($tags)
-        $tags = "<span data-table>{$tags}</span>";
+        $tags = "<{$this->def['base']} {$this->def['table']}>{$tags}</{$this->def['base']}>";
 
       if($title || $desc || $tags)
-        $cols[] = "<span data-cell>{$title}{$desc}{$tags}</span>";
+        $cols[] = "<{$this->def['base']} {$this->def['cell']}>{$title}{$desc}{$tags}</{$this->def['base']}>";
 
       if($cols)
-        $tip = '<span data-row>' . implode('', $cols) . '</span>';
+        $tip = "<{$this->def['base']} {$this->def['row']}>" . implode('', $cols) . "</{$this->def['base']}>";
 
       $sub = '';
       foreach($meta['sub'] as $line)
-        $sub .= '<span data-row><span data-cell>' . implode('</span><span data-cell>', $line) . '</span></span>';
+        $sub .= "<{$this->def['base']} {$this->def['row']}><{$this->def['base']} {$this->def['cell']}>" . implode("</{$this->def['base']}><{$this->def['base']} {$this->def['cell']}>", $line) . "</{$this->def['base']}></{$this->def['base']}>";
     
       if($sub)
-        $tip .= "<span data-row><span data-cell data-sub><span data-table>{$sub}</span></span></span>";
+        $tip .= "<{$this->def['base']} {$this->def['row']}><{$this->def['base']} {$this->def['cell']} data-sub><{$this->def['base']} {$this->def['table']}>{$sub}</{$this->def['base']}></{$this->def['base']}></{$this->def['base']}>";
 
       if($tip)
-        $this->out .= "<div>{$tip}</div>";
+        $this->out .= "<{$this->def['tip']}>{$tip}</{$this->def['tip']}>";
     }
 
     if(($timeout = ref::getTimeoutPoint()) > 0)
-      $this->out .= sprintf('<span data-error>Listing incomplete. Timed-out after %4.2fs</span>', $timeout);
+      $this->out .= sprintf("<{$this->def['base']} data-error>Listing incomplete. Timed-out after %4.2fs</{$this->def['base']}>", $timeout);
 
     $this->out .= '</div></div><!-- /ref#' . static::$counter . ' -->';        
   }
@@ -2766,6 +2834,38 @@ class RTextFormatter extends RFormatter{
     $this->out .= "\n"; 
     if(($timeout = ref::getTimeoutPoint()) > 0)
       $this->out .= sprintf("\n-- Listing incomplete. Timed-out after %4.2fs -- \n", $timeout);    
+  }
+
+}
+
+
+
+/**
+ * Text formatter with color support for CLI -- unfinished
+ *   
+ */
+class RCliTextFormatter extends RTextFormatter{
+
+  public function sectionTitle($title){
+    $pad = str_repeat(' ', $this->indent + 2);
+    $this->out .= sprintf("\n\n%s\x1b[4;97m%s\x1b[0m", $pad, $title);    
+  }
+
+  public function startExp(){
+    $this->out .= "\x1b[1;44;96m ";
+  }                    
+
+  public function endExp(){
+    if(ref::config('showBacktrace') && ($trace = ref::getBacktrace()))
+      $this->out .= "\x1b[0m\x1b[44;36m " . $trace['file'] . ':' . $trace['line'];
+
+    $this->out .=  " \x1b[0m\n";
+  }                                 
+
+  public function endRoot(){
+    $this->out .= "\n"; 
+    if(($timeout = ref::getTimeoutPoint()) > 0)
+      $this->out .= sprintf("\n\x1b[3;91m-- Listing incomplete. Timed-out after %4.2fs --\x1b[0m\n", $timeout);    
   }
 
 }
