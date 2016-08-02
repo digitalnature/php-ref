@@ -410,6 +410,10 @@
   background: #baed78;
 }
 
+.ref [data-mod-anonymous]{
+  background: #444;
+}
+
 .ref [data-mod-protected]{
   background: #edd078;
 }

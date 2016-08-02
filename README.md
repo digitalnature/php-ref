@@ -57,6 +57,7 @@ Prepending the error control operator (@) will return the information:
 Keyboard shortcuts (javascript must be enabled):
 
 - `X` - collapses / expands all levels
+- `Ctrl` + `X` - toggles display state
 
 To modify the global configuration call `ref::config()`:
 

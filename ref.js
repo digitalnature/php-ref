@@ -5,8 +5,8 @@ window.addEventListener('load', function(){
 
   for(var i = 0, m = refs.length; i < m; i++){
     var kbds     = refs[i].querySelectorAll('[data-toggle]'),
-        tippable = refs[i].querySelectorAll('[data-tip]'),
-        tips     = refs[i].querySelectorAll('div');        
+        tippable = refs[i].querySelectorAll('[data-tip],[h]'),
+        tips     = refs[i].querySelectorAll('div, t');        
 
     for(var j = 0, n = kbds.length; j < n; j++){        
       if(kbds[j].parentNode !== refs[i])
@@ -20,7 +20,7 @@ window.addEventListener('load', function(){
     });
 
     for(var j = 0, n = tippable.length; j < n; j++){
-      tippable[j].tipRef = tips[tippable[j].dataset.tip];
+      tippable[j].tipRef = tips[tippable[j].dataset.tip] || tips[tippable[j].getAttribute('h')];
       tippable[j].onmouseover = function(){ 
         tip.className = 'ref visible'; 
         tip.innerHTML = this.tipRef.innerHTML;

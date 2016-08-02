@@ -256,6 +256,9 @@ class ref{
       // php 5.6+
       'is56'         => version_compare(PHP_VERSION, '5.6') >= 0,      
 
+      // php 7.0+ ?
+      'is7'          => version_compare(PHP_VERSION, '7.0') >= 0,      
+
       // curl extension running?
       'curlActive'   => function_exists('curl_version'),      
 
@@ -1001,7 +1004,8 @@ class ref{
         if(($context !== null) && ($context->getShortName() !== $item->getDeclaringClass()->getShortName()))
           $meta['sub'][] = array('Inherited from', $item->getDeclaringClass()->getShortName());
 
-        if($item instanceof \ReflectionMethod){
+        // @note: PHP 7 seems to crash when calling getPrototype on Closure::__invoke()
+        if(($item instanceof \ReflectionMethod) && !$item->isInternal()){
           try{
             $proto = $item->getPrototype();
             $meta['sub'][] = array('Prototype defined by', $proto->class);
@@ -1017,6 +1021,9 @@ class ref{
 
         if($item->isAbstract())
           $bubbles[] = array('A', 'Abstract');
+
+        if(static::$env['is7'] && $item->isAnonymous())
+          $bubbles[] = array('?', 'Anonymous');        
 
         if($item->isFinal())
           $bubbles[] = array('F', 'Final');
@@ -1849,6 +1856,7 @@ class ref{
 
       $this->fmt->sectionTitle('Methods');  
       foreach($methods as $idx => $method){
+
         $this->fmt->startRow();
         $this->fmt->sep($method->isStatic() ? '::' : '->');
         $this->fmt->colDiv();
@@ -1940,12 +1948,19 @@ class ref{
             $this->fromReflector($paramClass, $paramClass->name);
             $this->fmt->endContain();
             $this->fmt->sep(' ');
-          }  
           
-          if($parameter->isArray()){
+          }elseif($parameter->isArray()){
             $this->fmt->text('hint', 'array');
             $this->fmt->sep(' ');            
-          }  
+
+          }else{
+            $hasType = static::$env['is7'] && $parameter->hasType();
+            if($hasType){
+              $type = $parameter->getType();
+              $this->fmt->text('hint', (string)$type);
+              $this->fmt->sep(' ');
+            }
+          }
 
           $this->fmt->text('name', $paramName, $meta);
 
@@ -1968,6 +1983,16 @@ class ref{
         }
         $this->fmt->sep(')');
         $this->fmt->endContain();
+
+        $hasReturnType = static::$env['is7'] && $method->hasReturnType();
+        if($hasReturnType){
+          $type = $method->getReturnType();
+          $this->fmt->startContain('ret');
+          $this->fmt->sep(':');
+          $this->fmt->text('hint', (string)$type);
+          $this->fmt->endContain();
+        }
+
         $this->fmt->endRow();
       }
     }  
