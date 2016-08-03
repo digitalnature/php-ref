@@ -223,7 +223,6 @@ class ref{
       $didIni = true;
       foreach(array_keys(static::$config) as $key){
         $iniVal = get_cfg_var('ref.' . $key);
-        print_r($iniVal);
         if($iniVal !== false)
           static::$config[$key] = $iniVal;
       }
@@ -2556,8 +2555,11 @@ class RHtmlFormatter extends RFormatter{
   }                    
 
   public function endExp(){
-    if(ref::config('showBacktrace') && ($trace = ref::getBacktrace()))
-      $this->out .= "<{$this->def['base']} data-backtrace>{$trace['file']}:{$trace['line']}</{$this->def['base']}>";
+    if(ref::config('showBacktrace') && ($trace = ref::getBacktrace())){
+      $docRoot = isset($_SERVER['DOCUMENT_ROOT']) ? $_SERVER['DOCUMENT_ROOT'] : '';
+      $path = strpos($trace['file'], $docRoot) !== 0 ? $trace['file'] : ltrim(str_replace($docRoot, '', $trace['file']), '/');
+      $this->out .= "<{$this->def['base']} data-backtrace>{$path}:{$trace['line']}</{$this->def['base']}>";
+    }
 
     $this->out .= "</{$this->def['base']}><{$this->def['base']} data-output>";
   } 
