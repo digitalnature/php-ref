@@ -223,7 +223,6 @@ class ref{
       $didIni = true;
       foreach(array_keys(static::$config) as $key){
         $iniVal = get_cfg_var('ref.' . $key);
-        print_r($iniVal);
         if($iniVal !== false)
           static::$config[$key] = $iniVal;
       }
