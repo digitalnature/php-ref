@@ -206,7 +206,14 @@ class ref{
      *
      * @var  float
      */ 
-    $startTime = 0;
+    $startTime = 0,
+
+    /**
+     * Internally created objects
+     *
+     * @var  SplObjectStorage
+     */ 
+    $intObjects = null;
 
 
 
@@ -308,6 +315,8 @@ class ref{
       return;
 
     $this->startTime = microtime(true);
+
+    $this->intObjects = new \SplObjectStorage();
     
     $this->fmt->startRoot();
     $this->fmt->startExp();
@@ -1576,11 +1585,15 @@ class ref{
 
             if($isJson){
               $decodingJson++;
-              $json = json_decode($subject);
+              $data = json_decode($subject);
+
+              // ensure created objects live enough for PHP to provide a unique hash
+              if(is_object($data))
+                $this->intObjects->attach($data);
 
               if($isJson = (json_last_error() === JSON_ERROR_NONE)){
                 $this->fmt->startContain('json', true);
-                $this->evaluate($json);
+                $this->evaluate($data);
                 $this->fmt->endContain();
               }  
 
@@ -1588,7 +1601,7 @@ class ref{
             }
 
             // attempt to match a regex            
-            if($length < 768){
+            if(!$isSerialized && !$isJson && $length < 768){
               try{
                 $components = $this->splitRegex($subject);
                 if($components){
