@@ -2028,6 +2028,13 @@ class ref{
 
     if($expression === null)
       return;
+    
+    // Add information where this function was called, so the debugging
+    // person can easily find the function call
+    $backtrace = debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS);
+   	if (isset($backtrace[2])) {
+   		$expression .= ' - '.$backtrace[2]['file'].'('.$backtrace[2]['line'].')';
+   	}
 
     if(static::strLen($expression) > 120)
       $expression = substr($expression, 0, 120) . '...';
