@@ -209,7 +209,7 @@
   color: #bcbcbc;
   text-transform: lowercase;
   margin: 12px 0 2px 10px;
-  display: block;
+  display: block;  
 }
 
 /* emulate a table for displaying array & object members */
@@ -495,4 +495,17 @@
   padding: 2px 5px;  
   margin: 0 0 4px;
   display: block;
+}
+
+/* make labels and less-relevant text non-selectable */ 
+.ref [data-match],
+.ref [m],
+.ref [data-tHead],
+.ref [data-gLabel],
+.ref [gl],
+.ref [data-mod]{
+  -webkit-user-select: none;
+     -moz-user-select: none;
+      -ms-user-select: none;
+          user-select: none;  
 }
