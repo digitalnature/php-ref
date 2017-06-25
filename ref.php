@@ -1664,8 +1664,13 @@ class ref{
     if(static::$config['showPrivateMembers'])
       $flags |= \ReflectionProperty::IS_PRIVATE;
 
-    $props   = $reflector->getProperties($flags);    
-    $methods = array();
+    $props = $magicProps = $methods = array();    
+
+    if($reflector->hasMethod('__debugInfo')){
+      $magicProps = $subject->__debugInfo();
+    }else{
+      $props = $reflector->getProperties($flags);
+    }
 
     if(static::$config['showMethods']){
       $flags = \ReflectionMethod::IS_PUBLIC | \ReflectionMethod::IS_PROTECTED;
@@ -1862,6 +1867,46 @@ class ref{
         $this->fmt->endRow();
       }
     }    
+
+    // __debugInfo()
+    if($magicProps){
+      $this->fmt->sectionTitle('Properties (magic)');
+
+      $max = 0;
+      foreach($magicProps as $name => $value)
+        if(($propNameLen = static::strLen($name)) > $max)
+          $max = $propNameLen;
+
+      foreach($magicProps as $name => $value){
+
+        if($this->hasInstanceTimedOut())
+          break;
+
+        // attempt to pull out doc comment from the "regular" property definition
+        try{
+          $prop = $reflector->getProperty($name);
+          $meta = static::parseComment($prop->getDocComment());
+
+        }catch(\Exception $e){
+          $meta = null;
+        }
+
+        $this->fmt->startRow();
+        $this->fmt->sep('->');
+        $this->fmt->colDiv();
+
+        $type = array('prop');
+
+        $this->fmt->startContain($type);
+        $this->fmt->text('name', $name, $meta);
+        $this->fmt->endContain();
+        $this->fmt->colDiv($max - static::strLen($name));
+        $this->fmt->sep('=');
+        $this->fmt->colDiv();
+        $this->evaluate($value);
+        $this->fmt->endRow();        
+      }
+    }      
 
     // class methods
     if($methods && !$this->hasInstanceTimedOut()){
