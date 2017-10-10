@@ -2023,14 +2023,16 @@ class ref{
 
           if($optional){
             $paramValue = $parameter->isDefaultValueAvailable() ? $parameter->getDefaultValue() : null;            
-            $this->fmt->sep(' = ');
+            if ($paramValue !== null) {
+                $this->fmt->sep(' = ');
 
-            if(static::$env['is546'] && !$parameter->getDeclaringFunction()->isInternal() && $parameter->isDefaultValueConstant()){
-              $this->fmt->text('constant', $parameter->getDefaultValueConstantName(), 'Constant');
+                if(static::$env['is546'] && !$parameter->getDeclaringFunction()->isInternal() && $parameter->isDefaultValueConstant()){
+                  $this->fmt->text('constant', $parameter->getDefaultValueConstantName(), 'Constant');
 
-            }else{
-              $this->evaluate($paramValue, true);
-            }  
+                }else{
+                  $this->evaluate($paramValue, true);
+                }
+            }
           }
 
           $this->fmt->endContain();
