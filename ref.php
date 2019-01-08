@@ -1269,8 +1269,9 @@ class ref{
 
           if($keyInfo === 'string'){
             $encoding = static::$env['mbStr'] ? mb_detect_encoding($key) : '';
-            $keyLen   = $encoding && ($encoding !== 'ASCII') ? static::strLen($key) . '; ' . $encoding : static::strLen($key);
-            $keyInfo  = "{$keyInfo}({$keyLen})";
+            $keyLen     = static::strLen($key);
+            $keyLenInfo = $encoding && ($encoding !== 'ASCII') ? $keyLen . '; ' . $encoding : $keyLen;
+            $keyInfo    = "{$keyInfo}({$keyLenInfo})";
           }else{
             $keyLen   = strlen($key);
           }
