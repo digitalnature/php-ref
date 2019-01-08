@@ -1292,6 +1292,7 @@ class ref{
 
       // resource
       case 'resource':
+      case 'resource (closed)':
         $meta    = array();
         $resType = get_resource_type($subject);        
 
