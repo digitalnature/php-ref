@@ -936,8 +936,9 @@ class ref{
 
         break;
       }    
-    }     
+    }
 
+    return array();
   }
 
 
