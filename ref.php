@@ -21,7 +21,7 @@ function r(){
 
   // something went wrong while trying to parse the source expressions?
   // if so, silently ignore this part and leave out the expression info
-  if(func_num_args() !== count($expressions))
+  if($expressions instanceof \Countable && func_num_args() !== count($expressions))
     $expressions = null;
 
   // use HTML formatter only if we're not in CLI mode, or if return was requested
