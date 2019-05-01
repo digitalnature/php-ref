@@ -936,8 +936,9 @@ class ref{
 
         break;
       }    
-    }     
+    }
 
+    return array();
   }
 
 
@@ -1269,8 +1270,9 @@ class ref{
 
           if($keyInfo === 'string'){
             $encoding = static::$env['mbStr'] ? mb_detect_encoding($key) : '';
-            $keyLen   = $encoding && ($encoding !== 'ASCII') ? static::strLen($key) . '; ' . $encoding : static::strLen($key);
-            $keyInfo  = "{$keyInfo}({$keyLen})";
+            $keyLen     = static::strLen($key);
+            $keyLenInfo = $encoding && ($encoding !== 'ASCII') ? $keyLen . '; ' . $encoding : $keyLen;
+            $keyInfo    = "{$keyInfo}({$keyLenInfo})";
           }else{
             $keyLen   = strlen($key);
           }
@@ -1291,6 +1293,7 @@ class ref{
 
       // resource
       case 'resource':
+      case 'resource (closed)':
         $meta    = array();
         $resType = get_resource_type($subject);        
 
@@ -2023,14 +2026,16 @@ class ref{
 
           if($optional){
             $paramValue = $parameter->isDefaultValueAvailable() ? $parameter->getDefaultValue() : null;            
-            $this->fmt->sep(' = ');
+            if ($paramValue !== null) {
+                $this->fmt->sep(' = ');
 
-            if(static::$env['is546'] && !$parameter->getDeclaringFunction()->isInternal() && $parameter->isDefaultValueConstant()){
-              $this->fmt->text('constant', $parameter->getDefaultValueConstantName(), 'Constant');
+                if(static::$env['is546'] && !$parameter->getDeclaringFunction()->isInternal() && $parameter->isDefaultValueConstant()){
+                  $this->fmt->text('constant', $parameter->getDefaultValueConstantName(), 'Constant');
 
-            }else{
-              $this->evaluate($paramValue, true);
-            }  
+                }else{
+                  $this->evaluate($paramValue, true);
+                }
+            }
           }
 
           $this->fmt->endContain();
