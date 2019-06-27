@@ -69,7 +69,7 @@ function rt(){
   if(func_num_args() !== count($expressions))
     $expressions = null;
 
-  if(!headers_sent())    
+  if(!headers_sent() || $capture)
     header('Content-Type: text/plain; charset=utf-8');  
 
   if($capture)
