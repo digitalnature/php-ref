@@ -2025,8 +2025,9 @@ class ref{
           $this->fmt->text('name', $paramName, $meta);
 
           if($optional){
-            $paramValue = $parameter->isDefaultValueAvailable() ? $parameter->getDefaultValue() : null;            
-            if ($paramValue !== null) {
+            try{
+              $paramValue = $parameter->isDefaultValueAvailable() ? $parameter->getDefaultValue() : null;
+              if($paramValue !== null){
                 $this->fmt->sep(' = ');
 
                 if(static::$env['is546'] && !$parameter->getDeclaringFunction()->isInternal() && $parameter->isDefaultValueConstant()){
@@ -2035,7 +2036,12 @@ class ref{
                 }else{
                   $this->evaluate($paramValue, true);
                 }
+              }
+
+            }catch(\Exception $e){
+              // unable to retrieve default value?
             }
+
           }
 
           $this->fmt->endContain();
