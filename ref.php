@@ -143,6 +143,10 @@ class ref{
                 // note: seriously slows down queries on large amounts of data
                 'showStringMatches'    => true,
 
+                // when a class has the Magic Method "__debugInfo()" defined, show its output by default, or
+                // tet this flag to false to process the class as a normal object without the Magic Method interference
+                'debugInfo'            => true,
+
                 // shortcut functions used to access the query method below;
                 // if they are namespaced, the namespace must be present as well (methods are not supported)
                 'shortcutFunc'         => array('r', 'rt'),
@@ -1669,7 +1673,7 @@ class ref{
 
     $props = $magicProps = $methods = array();    
 
-    if($reflector->hasMethod('__debugInfo')){
+    if($reflector->hasMethod('__debugInfo') && static::$config['debugInfo']){
       $magicProps = $subject->__debugInfo();
     }else{
       $props = $reflector->getProperties($flags);
